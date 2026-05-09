@@ -2,7 +2,7 @@
 STEP 1: Data Prep 4 Hologram Reconstruction and Preprocessing
 =====================================================================
 
-What this shi finna hypothetically do
+What this finna hypothetically do
 1. Loads raw hologram 
 2. Reconstructs focused images at multiple depth planes
 3. Automatically finds best focus plane
@@ -33,7 +33,7 @@ def reconstruct_hologram(raw_hologram, depth_microns):
 
     INPUT:
         raw_hologram = 2D array or 1D tensor if your feeling romatnic (interference pattern from camera)
-        depth_microns = reconstruction depth in microns???(idk ur shi)
+        depth_microns = reconstruction depth in microns???(idk ur stuff)
 
     OUTPUT:
         reconstructed_image = focused image at specified depth
