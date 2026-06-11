@@ -2,6 +2,5 @@
 __pycache__/
 *.pyc
 *.pt
-outputs/overlay.mp4
 outputs/masks/
 data/V4361_combined.mp4
