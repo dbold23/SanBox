@@ -1,0 +1,6 @@
+.venv/
+__pycache__/
+*.pyc
+*.pt
+outputs/overlay.mp4
+outputs/masks/
