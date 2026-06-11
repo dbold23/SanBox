@@ -57,6 +57,23 @@ def seed_points(width, height):
     return points, labels
 
 
+def illumination_gate(frame):
+    """Mask of pixels lit enough to actually be visible seafloor.
+
+    ROV lights illuminate the bottom; the open water column above recedes into
+    near-black. Forward-looking footage therefore has a dark upper region that
+    is *not* ground we can see, just water. We separate lit surface from dark
+    water with an Otsu-derived threshold, clamped to a low band so that a
+    uniformly bright down-looking frame keeps all of its ground while a mostly
+    dark forward-looking frame still drops the black water column.
+    """
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    gray = cv2.GaussianBlur(gray, (5, 5), 0)
+    otsu, _ = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    thr = int(np.clip(otsu * 0.4, 8, 40))
+    return (gray > thr).astype(np.uint8)
+
+
 def keep_bottom_connected(mask):
     """Keep only mask components that touch the bottom edge of the frame.
 
@@ -65,6 +82,12 @@ def keep_bottom_connected(mask):
     keeping the ground itself.
     """
     mask_u8 = (mask > 0).astype(np.uint8)
+    if mask_u8.sum() == 0:
+        return mask_u8
+
+    # Drop tiny isolated specks (marine snow) before grouping components.
+    open_k = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
+    mask_u8 = cv2.morphologyEx(mask_u8, cv2.MORPH_OPEN, open_k)
     if mask_u8.sum() == 0:
         return mask_u8
 
@@ -103,6 +126,9 @@ def predict_ground(model, frame, imgsz):
         for m in r.masks.data.cpu().numpy():
             m = cv2.resize(m.astype(np.uint8), (w, h), interpolation=cv2.INTER_NEAREST)
             combined |= (m > 0).astype(np.uint8)
+
+    # Restrict to lit pixels so the mask cannot bleed into the dark water column.
+    combined &= illumination_gate(frame)
 
     return keep_bottom_connected(combined)
 
