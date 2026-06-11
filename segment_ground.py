@@ -184,7 +184,8 @@ def main():
     )
 
     csv_rows = []
-    prev_mask = None
+    ema = None  # floating-point mask accumulator for temporal smoothing
+    smooth_alpha = 0.6  # weight of the current frame
     frame_idx = 0
     processed = 0
 
@@ -199,11 +200,13 @@ def main():
 
         mask = predict_ground(model, frame, args.imgsz)
 
-        # Light temporal smoothing: average with the previous mask, re-threshold.
-        if prev_mask is not None:
-            blended = (mask.astype(np.float32) + prev_mask.astype(np.float32)) / 2.0
-            mask = (blended >= 0.5).astype(np.uint8)
-        prev_mask = mask
+        # Temporal smoothing via an exponential moving average of the float
+        # mask. This fills single-frame dropouts and releases stale pixels
+        # within a frame or two -- unlike averaging two binary masks, it does
+        # not behave as a union that pins coverage high across scene changes.
+        m_float = mask.astype(np.float32)
+        ema = m_float if ema is None else smooth_alpha * m_float + (1 - smooth_alpha) * ema
+        mask = (ema >= 0.5).astype(np.uint8)
 
         coverage = float(mask.sum()) / float(mask.size)
         csv_rows.append((processed, frame_idx, round(coverage, 4)))
