@@ -2,8 +2,9 @@
 __pycache__/
 *.pyc
 *.pt
-outputs/masks/
 data/V4361_combined.mp4
-outputs/test/masks/
-outputs/test/overlay.mp4
-outputs/test/*.png
+# Large per-run artifacts in any outputs/<name>/ dir; keep coverage.csv tracked.
+outputs/**/masks/
+outputs/**/_raw/
+outputs/**/overlay.mp4
+outputs/**/*.png
