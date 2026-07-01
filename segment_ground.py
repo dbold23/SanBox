@@ -133,6 +133,50 @@ def predict_ground(model, frame, imgsz):
     return keep_bottom_connected(combined)
 
 
+class OverlayWriter:
+    """Write an H.264 mp4 that plays in browsers, falling back to mp4v.
+
+    Browsers won't decode OpenCV's default ``mp4v`` (MPEG-4 Part 2) stream, so
+    we prefer H.264 via the ffmpeg binary bundled with ``imageio-ffmpeg``. If
+    that package isn't installed we fall back to OpenCV's ``mp4v`` writer and
+    say so, so the pipeline still produces a file.
+    """
+
+    def __init__(self, path, fps, size):
+        self.path = str(path)
+        self._imageio = None
+        self._cv2 = None
+        try:
+            import imageio  # noqa: F401  (imageio-ffmpeg provides the encoder)
+            import imageio.v2 as iio
+            self._imageio = iio.get_writer(
+                self.path, fps=fps, codec="libx264",
+                format="ffmpeg", pixelformat="yuv420p",
+                macro_block_size=1, output_params=["-movflags", "+faststart"],
+            )
+        except Exception:
+            self._cv2 = cv2.VideoWriter(
+                self.path, cv2.VideoWriter_fourcc(*"mp4v"), fps, size)
+            print("  (imageio-ffmpeg not available; writing mp4v -- may not "
+                  "play in browsers. `pip install imageio-ffmpeg` for H.264.)")
+
+    @property
+    def codec(self):
+        return "H.264" if self._imageio is not None else "mp4v"
+
+    def write(self, bgr_frame):
+        if self._imageio is not None:
+            self._imageio.append_data(cv2.cvtColor(bgr_frame, cv2.COLOR_BGR2RGB))
+        else:
+            self._cv2.write(bgr_frame)
+
+    def release(self):
+        if self._imageio is not None:
+            self._imageio.close()
+        else:
+            self._cv2.release()
+
+
 def tint(frame, mask, color=(0, 255, 0), alpha=0.45):
     """Overlay a translucent colored mask on a BGR frame."""
     overlay = frame.copy()
@@ -176,12 +220,7 @@ def main():
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     out_fps = max(1.0, fps / max(1, args.stride))
 
-    writer = cv2.VideoWriter(
-        str(out_dir / "overlay.mp4"),
-        cv2.VideoWriter_fourcc(*"mp4v"),
-        out_fps,
-        (width, height),
-    )
+    writer = OverlayWriter(out_dir / "overlay.mp4", out_fps, (width, height))
 
     csv_rows = []
     ema = None  # floating-point mask accumulator for temporal smoothing
@@ -189,7 +228,8 @@ def main():
     frame_idx = 0
     processed = 0
 
-    print(f"Video: {width}x{height} @ {fps:.1f} fps | stride={args.stride}")
+    print(f"Video: {width}x{height} @ {fps:.1f} fps | stride={args.stride} "
+          f"| overlay codec={writer.codec}")
     while True:
         ok, frame = cap.read()
         if not ok:
