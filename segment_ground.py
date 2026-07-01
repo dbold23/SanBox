@@ -296,9 +296,10 @@ def main():
     ap.add_argument("--smooth-window", type=int, default=5,
                     help="temporal median window in frames (odd; 1 disables). "
                          "Larger = fewer background flashes, but laggier masks.")
-    ap.add_argument("--sensitivity", type=float, default=0.0,
+    ap.add_argument("--sensitivity", type=float, default=0.4,
                     help="ground coverage vs water bleed, 0..1. 0=strict (only "
-                         "clearly-lit ground); higher includes dimmer seafloor.")
+                         "clearly-lit ground); higher includes dimmer seafloor. "
+                         "0.4 is the balanced default; ~0.8 starts to bleed.")
     args = ap.parse_args()
 
     video_path = Path(args.video)
