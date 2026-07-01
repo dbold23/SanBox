@@ -123,25 +123,59 @@ def illumination_gate(frame, sensitivity=0.0):
     return (lit & ~water).astype(np.uint8)
 
 
-def texture_gate(frame, thresh=1.5):
+# Auto-mode decision boundary: median texture (over the candidate-ground region)
+# below this means smooth terrain (sand/sediment) whose ground is itself
+# low-texture, so the texture gate must be skipped; above it means rocky terrain
+# where low-texture pixels are smoke/turbid water to strip. Calibrated on real
+# footage: sand ~1.1-1.3, rocky vent ~2.9-3.9.
+AUTO_TEXTURE_MEDIAN = 2.2
+TEXTURE_ON_THRESH = 1.5     # per-pixel texture cutoff when the gate is applied
+
+
+def texture_energy(frame):
+    """Local high-frequency energy per pixel (mean |Laplacian| over a window)."""
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY).astype(np.float32)
+    lap = cv2.Laplacian(gray, cv2.CV_32F, ksize=3)
+    return cv2.boxFilter(np.abs(lap), -1, (15, 15))
+
+
+def texture_gate(frame, thresh=TEXTURE_ON_THRESH):
     """Keep finely-textured (rocky) pixels; reject smooth smoke/haze/water glow.
 
     Hydrothermal-vent plumes ("smoke") and shimmering/turbid water are bright and
     non-blue, so the colour gate passes them, and they billow up from the vent so
     they stay connected to the bottom -- the mask then grabs them as if they were
     ground. The distinguishing cue is texture: rock carries fine high-frequency
-    detail, while smoke and water are smooth. We measure local high-frequency
-    energy (mean |Laplacian| over a window) and keep only pixels above ``thresh``.
+    detail, while smoke and water are smooth. We keep only pixels whose local
+    texture energy exceeds ``thresh``.
 
-    ``thresh <= 0`` disables the gate -- use that for genuinely smooth seafloor
+    ``thresh <= 0`` disables the gate -- e.g. for genuinely smooth seafloor
     (sand/sediment), which is legitimately low-texture and would be eroded.
     """
     if thresh <= 0:
         return np.ones(frame.shape[:2], dtype=np.uint8)
-    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY).astype(np.float32)
-    lap = cv2.Laplacian(gray, cv2.CV_32F, ksize=3)
-    tex = cv2.boxFilter(np.abs(lap), -1, (15, 15))
-    return (tex > thresh).astype(np.uint8)
+    return (texture_energy(frame) > thresh).astype(np.uint8)
+
+
+def apply_texture_gate(frame, candidate, texture_thresh):
+    """Return ``candidate`` with the texture gate applied per ``texture_thresh``.
+
+    ``texture_thresh`` may be a number (fixed cutoff; <=0 disables) or the string
+    ``"auto"``. In auto mode we look at the median texture *inside the candidate
+    ground* and decide per frame: smooth terrain (sand) -> skip the gate and keep
+    the floor; rocky terrain -> apply it and strip the smoke/water. This is what
+    lets one setting serve both a sandy plain and a rocky vent without manual
+    switching.
+    """
+    if isinstance(texture_thresh, str) and texture_thresh.lower() == "auto":
+        if not candidate.any():
+            return candidate
+        tex = texture_energy(frame)
+        med = float(np.median(tex[candidate > 0]))
+        if med < AUTO_TEXTURE_MEDIAN:
+            return candidate                      # smooth ground -> keep as-is
+        return candidate & (tex > TEXTURE_ON_THRESH).astype(np.uint8)
+    return candidate & texture_gate(frame, float(texture_thresh))
 
 
 def keep_bottom_connected(mask):
@@ -201,7 +235,7 @@ def fill_interior_holes(mask, max_hole_frac=0.02):
     return mask
 
 
-def predict_ground(model, frame, imgsz, sensitivity=0.0, texture_thresh=1.5):
+def predict_ground(model, frame, imgsz, sensitivity=0.0, texture_thresh="auto"):
     """Run SAM on one frame and return a binary ground mask (H x W uint8)."""
     h, w = frame.shape[:2]
     lit = illumination_gate(frame, sensitivity)   # lit-surface / colour gate
@@ -223,9 +257,10 @@ def predict_ground(model, frame, imgsz, sensitivity=0.0, texture_thresh=1.5):
             combined |= (m > 0).astype(np.uint8)
 
     # Restrict to lit pixels so the mask cannot bleed into the dark water column,
-    # and to textured pixels so it cannot grab smooth vent smoke / turbid water.
+    # then apply the texture gate (fixed or auto) to drop smooth vent smoke /
+    # turbid water while leaving smooth sand seafloor untouched.
     combined &= lit
-    combined &= texture_gate(frame, texture_thresh)
+    combined = apply_texture_gate(frame, combined, texture_thresh)
 
     return keep_bottom_connected(combined)
 
@@ -324,10 +359,10 @@ def main():
                     help="ground coverage vs water bleed, 0..1. 0=strict (only "
                          "clearly-lit ground); higher includes dimmer seafloor. "
                          "0.4 is the balanced default; ~0.8 starts to bleed.")
-    ap.add_argument("--texture", type=float, default=1.5,
-                    help="min local texture to count as ground; rejects smooth "
-                         "vent smoke / haze / turbid water. 0 disables (use for "
-                         "smooth sand or sediment seafloor).")
+    ap.add_argument("--texture", default="auto",
+                    help="texture gate: 'auto' (default) detects rocky vs smooth "
+                         "terrain per frame and only strips smoke/water on rock; "
+                         "a number sets a fixed cutoff (1.5 typical); 0 disables.")
     args = ap.parse_args()
 
     video_path = Path(args.video)
