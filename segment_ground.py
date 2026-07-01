@@ -129,7 +129,8 @@ def illumination_gate(frame, sensitivity=0.0):
 # where low-texture pixels are smoke/turbid water to strip. Calibrated on real
 # footage: sand ~1.1-1.3, rocky vent ~2.9-3.9.
 AUTO_TEXTURE_MEDIAN = 2.2
-TEXTURE_ON_THRESH = 1.5     # per-pixel texture cutoff when the gate is applied
+TEXTURE_ON_THRESH = 1.5     # floor for the per-pixel texture cutoff
+TEXTURE_REL_ALPHA = 0.20    # cutoff = this fraction of the frame's own rock texture
 
 
 def texture_energy(frame):
@@ -171,10 +172,17 @@ def apply_texture_gate(frame, candidate, texture_thresh):
         if not candidate.any():
             return candidate
         tex = texture_energy(frame)
-        med = float(np.median(tex[candidate > 0]))
-        if med < AUTO_TEXTURE_MEDIAN:
-            return candidate                      # smooth ground -> keep as-is
-        return candidate & (tex > TEXTURE_ON_THRESH).astype(np.uint8)
+        vals = tex[candidate > 0]
+        if float(np.median(vals)) < AUTO_TEXTURE_MEDIAN:
+            return candidate                      # smooth ground (sand) -> keep as-is
+        # Textured terrain: set the cutoff *relative to this frame's own rock*
+        # texture (its 90th percentile). Vent smoke reads as weak texture next to
+        # intense rock, so it is dropped; where the ground is only gently textured
+        # the cutoff floors at TEXTURE_ON_THRESH and the ground is preserved. This
+        # is what lets one rule strip dense smoke without eroding softer rock.
+        rock_level = float(np.percentile(vals, 90))
+        thr = max(TEXTURE_ON_THRESH, TEXTURE_REL_ALPHA * rock_level)
+        return candidate & (tex > thr).astype(np.uint8)
     return candidate & texture_gate(frame, float(texture_thresh))
 
 
