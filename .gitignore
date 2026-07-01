@@ -8,3 +8,7 @@ outputs/**/masks/
 outputs/**/_raw/
 outputs/**/overlay.mp4
 outputs/**/*.png
+
+# Benchmark frames/labels are derived from private footage
+benchmark/frames/
+benchmark/gt/
