@@ -4,3 +4,6 @@ __pycache__/
 *.pt
 outputs/masks/
 data/V4361_combined.mp4
+outputs/test/masks/
+outputs/test/overlay.mp4
+outputs/test/*.png
