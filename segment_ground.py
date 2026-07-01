@@ -8,9 +8,10 @@ Pipeline
    positive points seeded across the lower part of the frame -- where the
    seafloor sits in forward/down-looking ROV footage -- plus a few negative
    points high in the frame to push the water column out of the mask.
-3. Keep the parts of the predicted mask that are connected to the bottom of
-   the frame, so we end up with one coherent "ground" region rather than
-   scattered blobs.
+3. Filter SAM's mask down to real seafloor with two cues: a colour gate (lit,
+   non-blue surface -> not the water column) and a texture gate (finely detailed
+   -> rock, not smooth vent smoke or turbid water). Then keep only the part
+   connected to the bottom edge, so we end up with one coherent "ground" region.
 4. Temporally median-filter each mask against its neighbouring frames, so a
    single-frame "flash" (SAM briefly grabbing the dark water column) is
    outvoted and erased while stable seafloor is kept.
@@ -122,6 +123,27 @@ def illumination_gate(frame, sensitivity=0.0):
     return (lit & ~water).astype(np.uint8)
 
 
+def texture_gate(frame, thresh=1.5):
+    """Keep finely-textured (rocky) pixels; reject smooth smoke/haze/water glow.
+
+    Hydrothermal-vent plumes ("smoke") and shimmering/turbid water are bright and
+    non-blue, so the colour gate passes them, and they billow up from the vent so
+    they stay connected to the bottom -- the mask then grabs them as if they were
+    ground. The distinguishing cue is texture: rock carries fine high-frequency
+    detail, while smoke and water are smooth. We measure local high-frequency
+    energy (mean |Laplacian| over a window) and keep only pixels above ``thresh``.
+
+    ``thresh <= 0`` disables the gate -- use that for genuinely smooth seafloor
+    (sand/sediment), which is legitimately low-texture and would be eroded.
+    """
+    if thresh <= 0:
+        return np.ones(frame.shape[:2], dtype=np.uint8)
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY).astype(np.float32)
+    lap = cv2.Laplacian(gray, cv2.CV_32F, ksize=3)
+    tex = cv2.boxFilter(np.abs(lap), -1, (15, 15))
+    return (tex > thresh).astype(np.uint8)
+
+
 def keep_bottom_connected(mask):
     """Keep only mask components that touch the bottom edge of the frame.
 
@@ -179,7 +201,7 @@ def fill_interior_holes(mask, max_hole_frac=0.02):
     return mask
 
 
-def predict_ground(model, frame, imgsz, sensitivity=0.0):
+def predict_ground(model, frame, imgsz, sensitivity=0.0, texture_thresh=1.5):
     """Run SAM on one frame and return a binary ground mask (H x W uint8)."""
     h, w = frame.shape[:2]
     lit = illumination_gate(frame, sensitivity)   # lit-surface / colour gate
@@ -200,8 +222,10 @@ def predict_ground(model, frame, imgsz, sensitivity=0.0):
             m = cv2.resize(m.astype(np.uint8), (w, h), interpolation=cv2.INTER_NEAREST)
             combined |= (m > 0).astype(np.uint8)
 
-    # Restrict to lit pixels so the mask cannot bleed into the dark water column.
+    # Restrict to lit pixels so the mask cannot bleed into the dark water column,
+    # and to textured pixels so it cannot grab smooth vent smoke / turbid water.
     combined &= lit
+    combined &= texture_gate(frame, texture_thresh)
 
     return keep_bottom_connected(combined)
 
@@ -300,6 +324,10 @@ def main():
                     help="ground coverage vs water bleed, 0..1. 0=strict (only "
                          "clearly-lit ground); higher includes dimmer seafloor. "
                          "0.4 is the balanced default; ~0.8 starts to bleed.")
+    ap.add_argument("--texture", type=float, default=1.5,
+                    help="min local texture to count as ground; rejects smooth "
+                         "vent smoke / haze / turbid water. 0 disables (use for "
+                         "smooth sand or sediment seafloor).")
     args = ap.parse_args()
 
     video_path = Path(args.video)
@@ -343,7 +371,7 @@ def main():
             frame_idx += 1
             continue
 
-        mask = predict_ground(model, frame, args.imgsz, args.sensitivity)
+        mask = predict_ground(model, frame, args.imgsz, args.sensitivity, args.texture)
         cv2.imwrite(str(raw_dir / f"{processed:06d}.png"), mask * 255)
         src_frames.append(frame_idx)
 
