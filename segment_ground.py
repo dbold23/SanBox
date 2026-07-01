@@ -38,28 +38,56 @@ import numpy as np
 from ultralytics import SAM
 
 
-def seed_points(width, height):
-    """Positive points on the (lower) seafloor, negative points up in the water.
+def seed_points(frame, lit, grid=(7, 5)):
+    """Content-adaptive SAM prompts driven by the lit-surface (colour) gate.
 
-    Returns (points, labels) where labels are 1 for foreground (ground) and
-    0 for background (water column / open field above the bottom).
+    A blind fixed grid under-prompts: it never reaches the frame edges or the
+    upper seafloor, so SAM is never told about ground sitting at the left/right
+    margins and under-covers it. Instead we tile the frame into a grid of cells
+    and, using the colour gate (which reliably marks lit seafloor), drop a
+    POSITIVE point on the lit pixels of every cell that is mostly ground -- edges
+    included -- and a NEGATIVE point in every cell that is essentially open
+    water. This spreads foreground prompts across the true extent of the ground
+    and anchors the water column as background.
+
+    Returns (points, labels): labels are 1 for foreground, 0 for background.
     """
-    # Positive points: a small grid across the lower 45% of the frame.
-    pos = []
-    for fy in (0.62, 0.78, 0.92):
-        for fx in (0.2, 0.5, 0.8):
-            pos.append((fx * width, fy * height))
-    # Negative points: top strip, almost always open water in ROV footage.
-    neg = [(0.5 * width, 0.08 * height),
-           (0.2 * width, 0.12 * height),
-           (0.8 * width, 0.12 * height)]
+    h, w = lit.shape
+    gx, gy = grid
+    y0 = int(0.10 * h)                 # ignore the very top for positives
+    cw = w / gx
+    ch = (h - y0) / gy
+
+    pos, neg = [], []
+    for j in range(gy):
+        for i in range(gx):
+            x1, x2 = int(i * cw), int((i + 1) * cw)
+            ya, yb = int(y0 + j * ch), int(y0 + (j + 1) * ch)
+            cell = lit[ya:yb, x1:x2]
+            frac = float(cell.mean())
+            if frac > 0.35:
+                # Put the point on the cell's lit pixels (its ground centroid).
+                ys, xs = np.nonzero(cell)
+                pos.append((x1 + xs.mean(), ya + ys.mean()))
+            elif frac < 0.05:
+                neg.append((x1 + cw / 2.0, ya + ch / 2.0))
+
+    # Always anchor the top strip (open water) as background.
+    neg += [(0.5 * w, 0.06 * h), (0.2 * w, 0.10 * h), (0.8 * w, 0.10 * h)]
+
+    # Fallback: if the gate found almost nothing lit, fall back to a lower grid
+    # so SAM still gets a reasonable seafloor prompt.
+    if not pos:
+        for fy in (0.7, 0.85):
+            for fx in (0.2, 0.5, 0.8):
+                pos.append((fx * w, fy * h))
 
     points = pos + neg
     labels = [1] * len(pos) + [0] * len(neg)
     return points, labels
 
 
-def illumination_gate(frame):
+def illumination_gate(frame, sensitivity=0.0):
     """Mask of pixels that are actually lit seafloor, not open water column.
 
     ROV lights illuminate the bottom; the open water column recedes into a dark,
@@ -72,18 +100,24 @@ def illumination_gate(frame):
     We therefore gate on a green+red "surface illumination" channel (ignoring the
     blue the water inflates), Otsu-thresholded and clamped, and additionally
     reject pixels that are dark *and* strongly blue -- i.e. the water column.
+
+    ``sensitivity`` in [0, 1] trades coverage against water bleed: 0.0 is strict
+    (only clearly-lit ground); higher values lower the brightness threshold and
+    soften the blue-water rejection so dimmer seafloor is included too.
     """
+    s = float(np.clip(sensitivity, 0.0, 1.0))
     b, g, r = cv2.split(frame)
     surf = cv2.addWeighted(g, 0.5, r, 0.5, 0.0)      # lit-surface proxy, no blue
     surf = cv2.GaussianBlur(surf, (5, 5), 0)
     otsu, _ = cv2.threshold(surf, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-    thr = int(np.clip(otsu * 0.5, 12, 60))
+    thr = int(np.clip(otsu * (0.5 - 0.35 * s), 12 - 8 * s, 60))
     lit = surf > thr
 
     # Explicit water-column rejection: dark red channel + blue-dominant.
+    # As sensitivity rises, only more extreme blue/red-starved pixels are cut.
     ri = r.astype(np.int16)
     bi = b.astype(np.int16)
-    water = (ri < 18) & ((bi - ri) > 12)
+    water = (ri < 18 - 10 * s) & ((bi - ri) > 12 + 10 * s)
 
     return (lit & ~water).astype(np.uint8)
 
@@ -145,10 +179,11 @@ def fill_interior_holes(mask, max_hole_frac=0.02):
     return mask
 
 
-def predict_ground(model, frame, imgsz):
+def predict_ground(model, frame, imgsz, sensitivity=0.0):
     """Run SAM on one frame and return a binary ground mask (H x W uint8)."""
     h, w = frame.shape[:2]
-    points, labels = seed_points(w, h)
+    lit = illumination_gate(frame, sensitivity)   # lit-surface / colour gate
+    points, labels = seed_points(frame, lit)
 
     results = model(
         frame,
@@ -166,7 +201,7 @@ def predict_ground(model, frame, imgsz):
             combined |= (m > 0).astype(np.uint8)
 
     # Restrict to lit pixels so the mask cannot bleed into the dark water column.
-    combined &= illumination_gate(frame)
+    combined &= lit
 
     return keep_bottom_connected(combined)
 
@@ -261,6 +296,9 @@ def main():
     ap.add_argument("--smooth-window", type=int, default=5,
                     help="temporal median window in frames (odd; 1 disables). "
                          "Larger = fewer background flashes, but laggier masks.")
+    ap.add_argument("--sensitivity", type=float, default=0.0,
+                    help="ground coverage vs water bleed, 0..1. 0=strict (only "
+                         "clearly-lit ground); higher includes dimmer seafloor.")
     args = ap.parse_args()
 
     video_path = Path(args.video)
@@ -304,7 +342,7 @@ def main():
             frame_idx += 1
             continue
 
-        mask = predict_ground(model, frame, args.imgsz)
+        mask = predict_ground(model, frame, args.imgsz, args.sensitivity)
         cv2.imwrite(str(raw_dir / f"{processed:06d}.png"), mask * 255)
         src_frames.append(frame_idx)
 
