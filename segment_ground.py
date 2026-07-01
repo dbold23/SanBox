@@ -11,7 +11,9 @@ Pipeline
 3. Keep the parts of the predicted mask that are connected to the bottom of
    the frame, so we end up with one coherent "ground" region rather than
    scattered blobs.
-4. Temporally smooth the mask a little to reduce flicker.
+4. Temporally median-filter each mask against its neighbouring frames, so a
+   single-frame "flash" (SAM briefly grabbing the dark water column) is
+   outvoted and erased while stable seafloor is kept.
 5. Write three things to the output directory:
      - overlay.mp4        original footage with the ground tinted green
      - masks/000123.png   per-frame binary ground masks
@@ -58,20 +60,32 @@ def seed_points(width, height):
 
 
 def illumination_gate(frame):
-    """Mask of pixels lit enough to actually be visible seafloor.
+    """Mask of pixels that are actually lit seafloor, not open water column.
 
-    ROV lights illuminate the bottom; the open water column above recedes into
-    near-black. Forward-looking footage therefore has a dark upper region that
-    is *not* ground we can see, just water. We separate lit surface from dark
-    water with an Otsu-derived threshold, clamped to a low band so that a
-    uniformly bright down-looking frame keeps all of its ground while a mostly
-    dark forward-looking frame still drops the black water column.
+    ROV lights illuminate the bottom; the open water column recedes into a dark,
+    strongly *blue* haze. The key discriminator is colour, not just brightness:
+    red light attenuates fastest underwater, so only a near, lit surface returns
+    appreciable red/green, while the water column is blue-dominant with almost no
+    red. A plain grayscale threshold fails because the blue haze inflates
+    luminance enough to survive (that is what caused whole-frame "flashes").
+
+    We therefore gate on a green+red "surface illumination" channel (ignoring the
+    blue the water inflates), Otsu-thresholded and clamped, and additionally
+    reject pixels that are dark *and* strongly blue -- i.e. the water column.
     """
-    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-    gray = cv2.GaussianBlur(gray, (5, 5), 0)
-    otsu, _ = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-    thr = int(np.clip(otsu * 0.4, 8, 40))
-    return (gray > thr).astype(np.uint8)
+    b, g, r = cv2.split(frame)
+    surf = cv2.addWeighted(g, 0.5, r, 0.5, 0.0)      # lit-surface proxy, no blue
+    surf = cv2.GaussianBlur(surf, (5, 5), 0)
+    otsu, _ = cv2.threshold(surf, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    thr = int(np.clip(otsu * 0.5, 12, 60))
+    lit = surf > thr
+
+    # Explicit water-column rejection: dark red channel + blue-dominant.
+    ri = r.astype(np.int16)
+    bi = b.astype(np.int16)
+    water = (ri < 18) & ((bi - ri) > 12)
+
+    return (lit & ~water).astype(np.uint8)
 
 
 def keep_bottom_connected(mask):
@@ -104,7 +118,31 @@ def keep_bottom_connected(mask):
     # Close small gaps so the mask reads as one surface.
     kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (9, 9))
     out = cv2.morphologyEx(out, cv2.MORPH_CLOSE, kernel)
-    return out
+    return fill_interior_holes(out)
+
+
+def fill_interior_holes(mask, max_hole_frac=0.02):
+    """Fill small enclosed holes (dark crevices) inside the ground region.
+
+    A "hole" is a background component fully surrounded by ground. Filling these
+    keeps the seafloor reading as one clean surface. We only fill holes below a
+    fraction of the frame so that genuine open-water gaps -- which are large and
+    reach the frame border -- are never filled in.
+    """
+    inv = (mask == 0).astype(np.uint8)
+    n, lab = cv2.connectedComponents(inv, connectivity=8)
+    if n <= 1:
+        return mask
+    border = set(np.unique(np.concatenate(
+        [lab[0, :], lab[-1, :], lab[:, 0], lab[:, -1]])).tolist())
+    counts = np.bincount(lab.ravel())
+    limit = max_hole_frac * mask.size
+    fill_ids = [i for i in range(1, n)
+                if i not in border and counts[i] <= limit]
+    if fill_ids:
+        mask = mask.copy()
+        mask[np.isin(lab, fill_ids)] = 1
+    return mask
 
 
 def predict_ground(model, frame, imgsz):
@@ -177,6 +215,28 @@ class OverlayWriter:
             self._cv2.release()
 
 
+def temporal_vote(idx, total, half, loader):
+    """Majority-vote a frame's ground mask against its temporal neighbours.
+
+    A pixel is kept only if it is ground in a strict majority of the frames in
+    the centered window [idx-half, idx+half] (clamped at the ends). Because a
+    single-frame "flash" -- where SAM briefly balloons the mask over the dark
+    water column -- appears in only one frame of the window, it is outvoted by
+    its neighbours and erased, while genuine seafloor (present in nearly every
+    frame) survives untouched. Window is clamped at the clip boundaries.
+    """
+    lo = max(0, idx - half)
+    hi = min(total - 1, idx + half)
+    acc = None
+    n = 0
+    for j in range(lo, hi + 1):
+        m = loader(j)
+        acc = m.astype(np.uint16) if acc is None else acc + m
+        n += 1
+    # Strict majority: pixel on in more than half the window.
+    return (acc * 2 > n).astype(np.uint8)
+
+
 def tint(frame, mask, color=(0, 255, 0), alpha=0.45):
     """Overlay a translucent colored mask on a BGR frame."""
     overlay = frame.copy()
@@ -198,6 +258,9 @@ def main():
     ap.add_argument("--imgsz", type=int, default=640, help="inference image size")
     ap.add_argument("--max-frames", type=int, default=0,
                     help="stop after this many processed frames (0 = no limit)")
+    ap.add_argument("--smooth-window", type=int, default=5,
+                    help="temporal median window in frames (odd; 1 disables). "
+                         "Larger = fewer background flashes, but laggier masks.")
     args = ap.parse_args()
 
     video_path = Path(args.video)
@@ -222,14 +285,17 @@ def main():
 
     writer = OverlayWriter(out_dir / "overlay.mp4", out_fps, (width, height))
 
-    csv_rows = []
-    ema = None  # floating-point mask accumulator for temporal smoothing
-    smooth_alpha = 0.6  # weight of the current frame
+    half = max(0, args.smooth_window // 2)
+    raw_dir = out_dir / "_raw"          # temp per-frame masks, removed at the end
+    raw_dir.mkdir(parents=True, exist_ok=True)
+
+    # ---- Pass 1: run SAM once per frame and save the raw ground mask. ----
+    print(f"Video: {width}x{height} @ {fps:.1f} fps | stride={args.stride} "
+          f"| overlay codec={writer.codec} | smooth_window={args.smooth_window}")
+    print("Pass 1/2: segmenting frames...")
+    src_frames = []      # source frame index for each processed frame
     frame_idx = 0
     processed = 0
-
-    print(f"Video: {width}x{height} @ {fps:.1f} fps | stride={args.stride} "
-          f"| overlay codec={writer.codec}")
     while True:
         ok, frame = cap.read()
         if not ok:
@@ -239,30 +305,60 @@ def main():
             continue
 
         mask = predict_ground(model, frame, args.imgsz)
-
-        # Temporal smoothing via an exponential moving average of the float
-        # mask. This fills single-frame dropouts and releases stale pixels
-        # within a frame or two -- unlike averaging two binary masks, it does
-        # not behave as a union that pins coverage high across scene changes.
-        m_float = mask.astype(np.float32)
-        ema = m_float if ema is None else smooth_alpha * m_float + (1 - smooth_alpha) * ema
-        mask = (ema >= 0.5).astype(np.uint8)
-
-        coverage = float(mask.sum()) / float(mask.size)
-        csv_rows.append((processed, frame_idx, round(coverage, 4)))
-
-        cv2.imwrite(str(masks_dir / f"{processed:06d}.png"), mask * 255)
-        writer.write(tint(frame, mask))
+        cv2.imwrite(str(raw_dir / f"{processed:06d}.png"), mask * 255)
+        src_frames.append(frame_idx)
 
         processed += 1
         if processed % 10 == 0:
-            print(f"  processed {processed} frames (coverage {coverage:.1%})")
+            cov = float(mask.sum()) / float(mask.size)
+            print(f"  segmented {processed} frames (raw coverage {cov:.1%})")
         if args.max_frames and processed >= args.max_frames:
             break
+        frame_idx += 1
+    cap.release()
+
+    total = processed
+
+    def load_raw(j):
+        m = cv2.imread(str(raw_dir / f"{j:06d}.png"), cv2.IMREAD_GRAYSCALE)
+        return (m > 127).astype(np.uint8)
+
+    # ---- Pass 2: temporally vote each mask, then composite the overlay. ----
+    print(f"Pass 2/2: temporal median (window={args.smooth_window}) + overlay...")
+    cap = cv2.VideoCapture(str(video_path))
+    csv_rows = []
+    frame_idx = 0
+    p = 0
+    while p < total:
+        ok, frame = cap.read()
+        if not ok:
+            break
+        if frame_idx != src_frames[p]:
+            frame_idx += 1
+            continue
+
+        if args.smooth_window <= 1:
+            mask = load_raw(p)
+        else:
+            mask = temporal_vote(p, total, half, load_raw)
+
+        coverage = float(mask.sum()) / float(mask.size)
+        csv_rows.append((p, frame_idx, round(coverage, 4)))
+        cv2.imwrite(str(masks_dir / f"{p:06d}.png"), mask * 255)
+        writer.write(tint(frame, mask))
+
+        p += 1
+        if p % 50 == 0:
+            print(f"  composited {p}/{total} frames")
         frame_idx += 1
 
     cap.release()
     writer.release()
+
+    # Remove the temporary raw masks now that voted masks are written.
+    for f in raw_dir.glob("*.png"):
+        f.unlink()
+    raw_dir.rmdir()
 
     with open(out_dir / "coverage.csv", "w", newline="") as f:
         w = csv.writer(f)
