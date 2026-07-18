@@ -129,6 +129,34 @@ Isolated single-spot ID degrades gracefully with tilt; once spots live on a
 surface, constellation geometry makes identification nearly exact — the
 600-spot layout is far more distinctive than any single shape.
 
+## Learned embeddings (spotid/ml)
+
+The synthetic generator doubles as an infinite labeled dataset, so the
+handcrafted descriptor can be replaced by a *trained* one:
+
+```bash
+pip install torch
+
+# train the encoder (CPU proof of concept, ~25 min)
+python -m spotid.ml.train --steps 1200 --out spotid/ml/checkpoints/encoder.pt
+
+# head-to-head vs the classical descriptor on identical images
+python -m spotid.ml.evaluate_ml --checkpoint spotid/ml/checkpoints/encoder.pt
+```
+
+- `dataset.py` renders fresh views on the fly (no stored dataset, no
+  labeling); training identities use seeds ≥ 1,000,000 so evaluation
+  identities are never seen in training.
+- `model.py` is a compact CNN (~1.2M params) mapping a 96×96 spot patch
+  to an L2-normalized embedding, trained with supervised-contrastive
+  loss (views of the same spot attract, different spots repel).
+- `infer.py` wraps the trained encoder as a drop-in `describe_image`,
+  so `SpotMatcher` works unchanged with learned embeddings.
+
+Scaling on a GPU is the same script:
+`python -m spotid.ml.train --device cuda --width 64 --embed-dim 256
+--steps 20000 --ids-per-batch 32 --id-pool 20000`.
+
 ## Files
 
 | file                 | what it does                                    |
