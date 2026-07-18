@@ -190,6 +190,24 @@ different mistakes. Scaling on a GPU is the same script:
 `python -m spotid.ml.train --device cuda --width 64 --embed-dim 256
 --steps 20000 --ids-per-batch 32 --id-pool 20000`.
 
+### learned (GPU)
+
+Running that GPU recipe end to end (`spotid/ml/gpu_train.sh`: 20,000
+steps, width 64, embed 256, ~56 min on an RTX 5090) and benchmarking on
+150 unseen identities × 40 views with tilts to 60° (6,000 queries),
+identical images and matcher for all rows:
+
+| descriptor              | top-1       | 30–45° tilt | 45–60° tilt |
+|-------------------------|-------------|-------------|-------------|
+| classical (handcrafted) | 95.6 %      | 95.2 %      | 83.7 %      |
+| **learned (GPU)**       | **100.0 %** | **100.0 %** | **100.0 %** |
+| ensemble (both)         | 100.0 %     | 100.0 %     | 100.0 %     |
+
+The scaled-up encoder saturates the benchmark — perfect top-1 in every
+tilt bucket, including the 45–60° range where the classical descriptor
+drops to 83.7 %. Checkpoint: `spotid/ml/checkpoints/encoder_gpu.pt`
+(trained on an RTX 5090, torch 2.13.0+cu130, sm_120).
+
 ## Files
 
 | file                 | what it does                                    |
