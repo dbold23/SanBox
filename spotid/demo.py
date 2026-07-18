@@ -64,14 +64,18 @@ def match_grid(n_ids: int = 4, views: int = 5) -> np.ndarray:
     return np.vstack(rows)
 
 
-def surface_demo(n_spots: int = 600) -> np.ndarray:
+def surface_demo(n_spots: int = 600, harsh: bool = False) -> np.ndarray:
     """Annotated identification of a tilted surface with n_spots spots."""
+    from .surface import SurfaceViewConfig, harsh_view_config
+
     surfaces = [generate_surface(i, n_spots=n_spots) for i in range(3)]
     matcher = SurfaceMatcher()
     for s in surfaces:
         matcher.enroll_surface(s)
     rng = np.random.default_rng(21)
-    img, info = render_surface_view(surfaces[1], rng, tilt_deg=40.0)
+    cfg = harsh_view_config(fill_range=(0.8, 0.95)) if harsh \
+        else SurfaceViewConfig()
+    img, info = render_surface_view(surfaces[1], rng, cfg, tilt_deg=40.0)
     res = matcher.identify(img)[0]
     out = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
     if res.homography is not None:
@@ -103,6 +107,9 @@ def main() -> None:
     print("wrote matches.png")
     cv2.imwrite(os.path.join(args.out_dir, "surface.png"), surface_demo())
     print("wrote surface.png")
+    cv2.imwrite(os.path.join(args.out_dir, "surface_harsh.png"),
+                surface_demo(harsh=True))
+    print("wrote surface_harsh.png")
 
 
 if __name__ == "__main__":

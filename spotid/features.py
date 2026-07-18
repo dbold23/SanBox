@@ -28,18 +28,47 @@ BLOCK_WEIGHTS = {"fd": 1.0, "radial": 0.6, "flusser": 0.35}
 # Segmentation
 # ---------------------------------------------------------------------------
 
-def _threshold_dark(img: np.ndarray) -> np.ndarray:
-    """Binary mask of dark-on-light splotches, robust to smooth gradients."""
-    f = img.astype(np.float32)
-    # High-pass: remove illumination gradient before thresholding.
-    lowpass = cv2.GaussianBlur(f, (0, 0), max(img.shape) / 10.0)
-    residual = cv2.GaussianBlur(f, (0, 0), 1.0) - lowpass
-    r8 = cv2.normalize(residual, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
-    _, binmask = cv2.threshold(r8, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+def _threshold_dark(img: np.ndarray, scale_frac: float = 1 / 24.0,
+                    k_sigma: float = 1.4, floor_frac: float = 1.0,
+                    abs_depth: float = 0.05) -> np.ndarray:
+    """Binary mask of dark-on-light splotches, robust to smooth gradients,
+    vignetting, gamma shifts and glossy sheen.
+
+    Thresholds the high-pass residual with a *local* criterion: a pixel is
+    spot if it sits clearly below its neighborhood, where "clearly" scales
+    with the local residual spread. ``scale_frac`` sets the neighborhood
+    size relative to the image (use larger for images of a single big
+    spot). This keeps faded spots while ignoring smooth glare (whose
+    residual is flat)."""
+    f = img.astype(np.float32) / 255.0
+    sigma_px = max(2.0, max(img.shape) * scale_frac)
+    smooth = cv2.GaussianBlur(f, (0, 0), 1.2)
+    lowpass = cv2.GaussianBlur(f, (0, 0), sigma_px)
+    residual = smooth - lowpass
+    # Local scale of the residual (robust-ish spread over a mid window).
+    local_sq = cv2.GaussianBlur(residual * residual, (0, 0), sigma_px)
+    sigma = np.sqrt(np.maximum(local_sq, 1e-8))
+    # Global floor stops flat regions from amplifying sensor noise, and the
+    # absolute depth floor keeps large empty backgrounds (far-away views)
+    # from promoting texture ripples into spots.
+    floor = floor_frac * float(np.median(sigma))
+    gate = np.maximum(k_sigma * np.maximum(sigma, floor), abs_depth)
+    binmask = (residual < -gate).astype(np.uint8) * 255
     kernel = np.ones((3, 3), np.uint8)
     binmask = cv2.morphologyEx(binmask, cv2.MORPH_OPEN, kernel)
     binmask = cv2.morphologyEx(binmask, cv2.MORPH_CLOSE, kernel)
     return binmask
+
+
+def _is_crack(contour: np.ndarray) -> bool:
+    """True for scratch/crack-like blobs: extremely thin and elongated.
+    Legitimate elongated spots are streaks with real width; cracks are a
+    few pixels wide and much longer."""
+    (_, _), (w, h) = cv2.minAreaRect(contour.astype(np.float32))[:2]
+    w, h = min(w, h), max(w, h)
+    if h < 1e-6:
+        return False
+    return w < 4.0 and h / max(w, 1e-6) > 7.0
 
 
 def segment_spot(img: np.ndarray) -> np.ndarray | None:
@@ -47,7 +76,9 @@ def segment_spot(img: np.ndarray) -> np.ndarray | None:
 
     Returns an (N, 2) float contour in pixel coordinates, or None.
     """
-    binmask = _threshold_dark(img)
+    # A single spot fills much of the frame: use a wide neighborhood so the
+    # spot interior is not absorbed into the local baseline.
+    binmask = _threshold_dark(img, scale_frac=0.5)
     contours, _ = cv2.findContours(binmask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
     if not contours:
         return None
@@ -57,13 +88,19 @@ def segment_spot(img: np.ndarray) -> np.ndarray | None:
     return best.reshape(-1, 2).astype(np.float64)
 
 
-def segment_all_spots(img: np.ndarray, min_area: float = 12.0) -> list[np.ndarray]:
-    """Outer contours of every splotch in a multi-spot image."""
+def segment_all_spots(img: np.ndarray, min_area: float = 12.0,
+                      max_area_fraction: float = 0.02) -> list[np.ndarray]:
+    """Outer contours of every splotch in a multi-spot image.
+
+    Filters out crack/scratch-like thin lines and anything larger than
+    ``max_area_fraction`` of the image (shadows, image-scale artifacts)."""
     binmask = _threshold_dark(img)
     contours, _ = cv2.findContours(binmask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+    max_area = max_area_fraction * img.shape[0] * img.shape[1]
     out = []
     for c in contours:
-        if cv2.contourArea(c) >= min_area:
+        area = cv2.contourArea(c)
+        if min_area <= area <= max_area and not _is_crack(c):
             out.append(c.reshape(-1, 2).astype(np.float64))
     return out
 

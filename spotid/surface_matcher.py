@@ -31,8 +31,11 @@ ICP_ROUNDS = 3
 # Local constellation signatures (partial-view mode).
 SIG_NEIGHBORS = 6
 SIG_CANDIDATES = 3      # gallery hits considered per query spot
-# Global-mode result below this matched fraction triggers the fallback.
-GLOBAL_ACCEPT_FRACTION = 0.5
+# Global mode is accepted when it tight-matches at least this fraction of
+# query blobs AND this many blobs absolutely (clutter inflates the blob
+# count, so the absolute count matters more than the fraction).
+GLOBAL_ACCEPT_FRACTION = 0.35
+GLOBAL_ACCEPT_MIN = 40
 # ICP convergence uses a loose radius (fraction of spot spacing); scoring
 # uses a tight one — genuine alignments land within a few percent of the
 # spacing, chance alignments do not.
@@ -94,38 +97,54 @@ def _rotation_candidates(hq: np.ndarray, hg: np.ndarray, k: int) -> np.ndarray:
     return np.array(picked) * 2.0 * np.pi / ANGLE_BINS
 
 
-def _local_signatures(pts: np.ndarray, k: int = SIG_NEIGHBORS) -> np.ndarray:
-    """Affine-invariant local constellation signature for every point.
+def _signature_of(center, nb, ii, jj, trips):
+    """Sorted triangle-area-ratio signature of one point + its neighbors.
 
-    For each point p and its k nearest neighbors: the sorted vector of
-    |triangle areas| of all (p, ni, nj) and all (ni, nj, nl) triangles,
-    normalized to unit sum. Affine maps scale all areas by the same factor,
-    so ratios survive; sorting removes the neighbor labeling.
+    Uses |areas| of all (p, ni, nj) and all (ni, nj, nl) triangles,
+    normalized to unit sum. Affine maps scale every area by the same
+    factor, so the ratios survive; sorting removes neighbor labeling."""
+    rel = nb - center
+    a1 = 0.5 * np.abs(rel[ii, 0] * rel[jj, 1] - rel[ii, 1] * rel[jj, 0])
+    v1 = nb[trips[:, 1]] - nb[trips[:, 0]]
+    v2 = nb[trips[:, 2]] - nb[trips[:, 0]]
+    a2 = 0.5 * np.abs(v1[:, 0] * v2[:, 1] - v1[:, 1] * v2[:, 0])
+    sig = np.concatenate([np.sort(a1), np.sort(a2)])
+    return sig / max(sig.sum(), 1e-12)
+
+
+def _local_signatures(pts: np.ndarray, k: int = SIG_NEIGHBORS,
+                      loo: bool = True):
+    """Affine-invariant local constellation signatures for every point.
+
+    With ``loo`` (leave-one-out), each point takes its k+1 nearest
+    neighbors and emits k+1 signatures, each omitting one neighbor. A
+    point then still matches its gallery twin when one neighbor is
+    missing (worn/faded/glare-hidden) or one clutter blob intrudes into
+    the neighborhood. Returns (signatures, owner_point_index_per_row).
     """
-    n = len(pts)
-    if n < k + 1:
-        return np.zeros((n, 1))
-    tree = cKDTree(pts)
-    _, nbrs = tree.query(pts, k=k + 1)
-    sigs = []
-    ii, jj = np.triu_indices(k, 1)
     from itertools import combinations
-    trips = np.array(list(combinations(range(k), 3)))
-    def cross2(u, v):
-        return u[:, 0] * v[:, 1] - u[:, 1] * v[:, 0]
 
+    n = len(pts)
+    ii, jj = np.triu_indices(k, 1)
+    trips = np.array(list(combinations(range(k), 3)))
+    dim = len(ii) + len(trips)
+    n_nbrs = k + 1 if loo else k
+    if n < n_nbrs + 1:
+        return np.zeros((0, dim)), np.zeros(0, int)
+    tree = cKDTree(pts)
+    _, nbrs = tree.query(pts, k=n_nbrs + 1)
+    sigs, owners = [], []
     for p in range(n):
-        nb = pts[nbrs[p, 1:]]
-        rel = nb - pts[p]
-        # areas of (p, ni, nj)
-        a1 = 0.5 * np.abs(cross2(rel[ii], rel[jj]))
-        # areas of neighbor-only triangles (ni, nj, nl)
-        v1 = nb[trips[:, 1]] - nb[trips[:, 0]]
-        v2 = nb[trips[:, 2]] - nb[trips[:, 0]]
-        a2 = 0.5 * np.abs(cross2(v1, v2))
-        sig = np.concatenate([np.sort(a1), np.sort(a2)])
-        sigs.append(sig / max(sig.sum(), 1e-12))
-    return np.array(sigs)
+        nb_all = pts[nbrs[p, 1:]]
+        if loo:
+            for drop in range(n_nbrs):
+                nb = np.delete(nb_all, drop, axis=0)
+                sigs.append(_signature_of(pts[p], nb, ii, jj, trips))
+                owners.append(p)
+        else:
+            sigs.append(_signature_of(pts[p], nb_all, ii, jj, trips))
+            owners.append(p)
+    return np.array(sigs), np.array(owners, int)
 
 
 def _mutual_matches(a: np.ndarray, b: np.ndarray, max_dist: float):
@@ -142,7 +161,7 @@ def _mutual_matches(a: np.ndarray, b: np.ndarray, max_dist: float):
 
 class SurfaceMatcher:
     def __init__(self, use_shape_descriptors: bool = True,
-                 min_blob_area: float = 25.0):
+                 min_blob_area: float = 12.0):
         self.use_shape_descriptors = use_shape_descriptors
         self.min_blob_area = min_blob_area
         self._surfaces: list[dict] = []
@@ -182,9 +201,9 @@ class SurfaceMatcher:
     def _prepare_signatures(self) -> None:
         blocks, owners = [], []
         for si, entry in enumerate(self._surfaces):
-            sig = entry["signatures"]
+            sig, own = entry["signatures"]
             blocks.append(sig)
-            owners.extend((si, spot) for spot in range(len(sig)))
+            owners.extend((si, int(spot)) for spot in own)
         self._sig_index = np.vstack(blocks)
         self._sig_owner = owners
         self._sig_tree = cKDTree(self._sig_index)
@@ -225,14 +244,21 @@ class SurfaceMatcher:
                 best = (score, matches, aff)
         return best
 
+    @staticmethod
+    def _ransac_threshold(cents: np.ndarray) -> float:
+        """Reprojection tolerance scaled to the observed blob spacing."""
+        spacing = float(np.median(cKDTree(cents).query(cents, k=2)[0][:, 1]))
+        return float(np.clip(0.25 * spacing, 3.0, 12.0))
+
     def _finalize(self, res: SurfaceMatch, entry, cents, matches) -> SurfaceMatch:
         """Fit a RANSAC homography on the matched pairs and re-assign every
         query blob to its surface spot under that homography."""
-        if len(matches) < 8:
+        if len(matches) < 6:
             return res
         src = entry["positions"][matches[:, 1]].astype(np.float64)
         dst = cents[matches[:, 0]].astype(np.float64)
-        H, _ = cv2.findHomography(src, dst, cv2.RANSAC, 5.0)
+        H, _ = cv2.findHomography(src, dst, cv2.RANSAC,
+                                  self._ransac_threshold(cents))
         if H is None:
             return res
         res.homography = H
@@ -274,27 +300,32 @@ class SurfaceMatcher:
         surfaces; candidate correspondences are verified with RANSAC."""
         if self._sig_index is None:
             self._prepare_signatures()
-        qsig = _local_signatures(cents)
-        if qsig.shape[1] != self._sig_index.shape[1]:
+        qsig, qowner = _local_signatures(cents)
+        if not len(qsig) or qsig.shape[1] != self._sig_index.shape[1]:
             return []
         d, hits = self._sig_tree.query(qsig, k=SIG_CANDIDATES)
         d = np.atleast_2d(d)
         hits = np.atleast_2d(hits)
-        votes = np.zeros(len(self._surfaces))
-        for qi in range(len(cents)):
+        # Best hit per (query blob, surface): a blob emits several
+        # leave-one-out rows, but may vote once per surface.
+        best_pair: dict[tuple, tuple] = {}
+        for row in range(len(qsig)):
+            qi = int(qowner[row])
             for c in range(SIG_CANDIDATES):
-                si, _ = self._sig_owner[hits[qi, c]]
-                votes[si] += 1.0 / (1.0 + 50.0 * d[qi, c])
+                si, spot = self._sig_owner[hits[row, c]]
+                w = 1.0 / (1.0 + 50.0 * d[row, c])
+                key = (qi, si)
+                if key not in best_pair or w > best_pair[key][0]:
+                    best_pair[key] = (w, spot)
+        votes = np.zeros(len(self._surfaces))
+        for (qi, si), (w, _) in best_pair.items():
+            votes[si] += w
         order = np.argsort(votes)[::-1][:max(top_k, 2)]
         out = []
         for si in order:
             entry = self._surfaces[si]
-            pairs = []
-            for qi in range(len(cents)):
-                for c in range(SIG_CANDIDATES):
-                    owner, spot = self._sig_owner[hits[qi, c]]
-                    if owner == si:
-                        pairs.append((qi, spot))
+            pairs = [(qi, spot) for (qi, s2), (_, spot) in best_pair.items()
+                     if s2 == si]
             res = SurfaceMatch(
                 surface_id=entry["id"], score=0.0, n_matched=0,
                 n_query_spots=len(cents),
@@ -304,8 +335,9 @@ class SurfaceMatcher:
                 pairs = np.array(pairs)
                 src = entry["positions"][pairs[:, 1]].astype(np.float64)
                 dst = cents[pairs[:, 0]].astype(np.float64)
-                H, inliers = cv2.findHomography(src, dst, cv2.RANSAC, 8.0,
-                                                maxIters=5000)
+                H, inliers = cv2.findHomography(
+                    src, dst, cv2.RANSAC,
+                    max(self._ransac_threshold(cents), 6.0), maxIters=5000)
                 if H is not None and inliers is not None and inliers.sum() >= 6:
                     matches = pairs[inliers.ravel().astype(bool)]
                     # De-duplicate (a query blob may appear in several pairs).
@@ -361,7 +393,8 @@ class SurfaceMatcher:
             return []
         if mode in ("global", "auto"):
             results = self._identify_global(cents, qdescs, top_k)
-            frac = results[0].n_matched / max(len(cents), 1) if results else 0.0
-            if mode == "global" or frac >= GLOBAL_ACCEPT_FRACTION:
+            n = results[0].n_matched if results else 0
+            if mode == "global" or n >= max(
+                    GLOBAL_ACCEPT_MIN, GLOBAL_ACCEPT_FRACTION * len(cents)):
                 return results
         return self._identify_partial(cents, top_k)

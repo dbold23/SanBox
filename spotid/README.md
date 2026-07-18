@@ -6,6 +6,13 @@ recognize which spot is which from any of those views. Scales up to whole
 *surfaces* carrying hundreds of spots: identify the surface from one photo
 — full or partial, at an angle — and label **every individual spot** on it.
 
+Built for real-world imagery: spots range from tiny specks to long
+streaks (4:1 elongation), some faded to near-invisibility; views suffer
+uneven lighting, vignettes, gamma shifts, glossy wet sheen, cracks and
+scratches, clutter blobs that belong to no surface, missing/worn-away
+spots, and photos taken from far away or close up. See the stress matrix
+below.
+
 ## Quick start
 
 ```bash
@@ -16,6 +23,9 @@ python -m spotid.evaluate --identities 150 --views 70
 
 # multi-surface benchmark (12 surfaces x 600 spots, full + cropped views)
 python -m spotid.evaluate_surface --surfaces 12 --spots 600 --views 6
+
+# real-world stress matrix (glare, fade, clutter, distance, ... combined)
+python -m spotid.evaluate_stress --surfaces 10 --spots 600 --views 4
 
 # demo images (permutation grid, cross-angle matches, annotated surface)
 python -m spotid.demo --out-dir demo_out

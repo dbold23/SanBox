@@ -34,12 +34,20 @@ def _blob_centroids(img: np.ndarray, min_area: float) -> np.ndarray:
 
 
 def score_view(matcher, surface, img, info, offset=(0.0, 0.0)):
-    """Return (predicted_id, mode, n_good, n_bad, n_visible_gt)."""
+    """Return (predicted_id, mode, n_good, n_bad, n_visible_gt).
+
+    A spot counts as visible when its center is in frame, it was actually
+    drawn (not worn away), and it is not hidden under glare."""
     res = matcher.identify(img, mode="auto")
     gt = info["spot_centroids_px"] - np.asarray(offset)
     h, w = img.shape
-    visible = int(np.sum((gt[:, 0] >= 0) & (gt[:, 0] < w)
-                         & (gt[:, 1] >= 0) & (gt[:, 1] < h)))
+    in_frame = ((gt[:, 0] >= 0) & (gt[:, 0] < w)
+                & (gt[:, 1] >= 0) & (gt[:, 1] < h))
+    present = in_frame
+    n = len(gt)
+    present = present & info.get("drawn", np.ones(n, bool))
+    present = present & ~info.get("obscured", np.zeros(n, bool))
+    visible = int(np.sum(present))
     if not res:
         return None, "none", 0, 0, visible
     r = res[0]
@@ -49,7 +57,9 @@ def score_view(matcher, surface, img, info, offset=(0.0, 0.0)):
         tree = cKDTree(gt)
         for qi, si, _ in r.assignments:
             d, j = tree.query(cents[qi])
-            if d < GT_GATE_PX:
+            # Score only blobs that land on a countably-visible spot, so
+            # coverage stays comparable to the visible denominator.
+            if d < GT_GATE_PX and present[j]:
                 if j == si:
                     good += 1
                 else:
