@@ -17,7 +17,7 @@ from dataclasses import dataclass
 import cv2
 import numpy as np
 
-from .render import ViewConfig, _rot2, _background, project_plane_points
+from .render import _rot2, _background, project_plane_points
 from .shapes import generate_identity, _harmonic_blob
 
 # Spot contours on surfaces use fewer points: hundreds of polygons per view.
@@ -41,14 +41,20 @@ class Surface:
         self.surface_id = surface_id
         self.spots = spots
         self.positions = np.array([s.position for s in spots])
+        self._contour_cache: dict[int, np.ndarray] = {}
 
     def spot_contour(self, i: int) -> np.ndarray:
-        """Contour of spot i in surface coordinates."""
-        s = self.spots[i]
-        base = generate_identity(s.shape_seed, SURFACE_CONTOUR_POINTS)
-        # Area-preserving elongation, then in-plane orientation.
-        stretch = np.diag([np.sqrt(s.aspect), 1.0 / np.sqrt(s.aspect)])
-        return s.position + (base @ stretch.T @ _rot2(s.angle).T) * s.radius
+        """Contour of spot i in surface coordinates (cached — rendering a
+        600-spot surface would otherwise regenerate every shape per view)."""
+        cached = self._contour_cache.get(i)
+        if cached is None:
+            s = self.spots[i]
+            base = generate_identity(s.shape_seed, SURFACE_CONTOUR_POINTS)
+            # Area-preserving elongation, then in-plane orientation.
+            stretch = np.diag([np.sqrt(s.aspect), 1.0 / np.sqrt(s.aspect)])
+            cached = s.position + (base @ stretch.T @ _rot2(s.angle).T) * s.radius
+            self._contour_cache[i] = cached
+        return cached
 
 
 def generate_surface(

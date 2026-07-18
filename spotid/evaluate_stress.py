@@ -21,7 +21,6 @@ from .surface_matcher import SurfaceMatcher
 
 
 def conditions() -> list[tuple]:
-    base = SurfaceViewConfig()
     return [
         ("baseline", SurfaceViewConfig(), False),
         ("harsh lighting", SurfaceViewConfig(

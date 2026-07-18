@@ -47,6 +47,35 @@ def test_encoder_normalized_and_trainable():
     assert grads and all(torch.isfinite(g).all() for g in grads)
 
 
+def test_canonicalization_consistent_between_train_and_inference():
+    """The canonical frame must not depend on contour point density: the
+    training path uses the analytic polygon (uniform in generator angle),
+    inference uses segmentation pixels (uniform in arc length)."""
+    from spotid.features import segment_spot
+    from spotid.ml.dataset import canonical_patch
+    from spotid.render import ViewConfig, render_view
+    from spotid.shapes import generate_identity
+
+    rng = np.random.default_rng(11)
+    cfg = ViewConfig(tilt_max_deg=30, noise_sigma_range=(0.0, 0.005),
+                     blur_sigma_range=(0.0, 0.2))
+    cors = []
+    for seed in range(8):
+        img, info = render_view(generate_identity(seed), rng, cfg)
+        seg = segment_spot(img)
+        assert seg is not None
+        p_train = canonical_patch(img, info["polygon_px"])
+        p_infer = canonical_patch(img, seg)
+        a = p_train - p_train.mean()
+        b = p_infer - p_infer.mean()
+        cors.append(float((a * b).sum()
+                          / max(np.linalg.norm(a) * np.linalg.norm(b), 1e-9)))
+    # Residual difference is genuine segmentation noise (the contour
+    # itself moves under blur/threshold), covered by training jitter.
+    # The density bug this guards against produced ~0.6 here.
+    assert np.mean(cors) > 0.85, f"train/infer frames diverge: {cors}"
+
+
 def test_supcon_loss_prefers_clustered_embeddings():
     y = torch.tensor([0, 0, 1, 1])
     good = torch.nn.functional.normalize(torch.tensor(

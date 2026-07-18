@@ -19,7 +19,7 @@ from ..features import describe_image
 from ..matcher import SpotMatcher
 from ..render import ViewConfig, render_view
 from ..shapes import generate_identity
-from .infer import MLSpotDescriptor
+from .infer import EnsembleDescriptor, MLSpotDescriptor
 
 
 def main() -> None:
@@ -33,7 +33,9 @@ def main() -> None:
     args = ap.parse_args()
 
     ml = MLSpotDescriptor(args.checkpoint, args.device)
-    describers = {"classical": describe_image, "learned": ml.describe_image}
+    ensemble = EnsembleDescriptor(args.checkpoint, args.device)
+    describers = {"classical": describe_image, "learned": ml.describe_image,
+                  "ensemble": ensemble.describe_image}
     matchers = {name: SpotMatcher() for name in describers}
 
     t0 = time.time()

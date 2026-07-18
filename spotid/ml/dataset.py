@@ -8,6 +8,7 @@ the evaluation range (small seeds) is never seen during training.
 import cv2
 import numpy as np
 
+from ..features import _resample_closed
 from ..render import ViewConfig, render_view
 from ..shapes import generate_identity
 
@@ -51,6 +52,12 @@ def canonical_patch(img: np.ndarray, contour: np.ndarray,
     the CNN ever sees the pixels — the same trick the classical descriptor
     uses, so the network only has to learn fine shape discrimination.
     """
+    # Resample uniformly by arc length so the moment-based frame does not
+    # depend on where the contour points came from: training feeds the
+    # analytic polygon (uniform in generator angle), inference feeds
+    # segmentation pixels (uniform in arc length). Without this the two
+    # paths canonicalize the same shape into different frames.
+    contour = _resample_closed(np.asarray(contour, np.float64), 256)
     c = contour.mean(axis=0)
     rel = contour - c
     cov = rel.T @ rel / len(rel)
@@ -73,7 +80,7 @@ def canonical_patch(img: np.ndarray, contour: np.ndarray,
     amat = scale * rot @ white
     offs = np.array([out / 2.0, out / 2.0]) - amat @ c
     m = np.hstack([amat, offs[:, None]]).astype(np.float64)
-    patch = cv2.warpAffine(img, m, (out, out), flags=cv2.INTER_AREA,
+    patch = cv2.warpAffine(img, m, (out, out), flags=cv2.INTER_LINEAR,
                            borderMode=cv2.BORDER_REPLICATE)
     return patch.astype(np.float32) / 255.0
 

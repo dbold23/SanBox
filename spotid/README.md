@@ -158,8 +158,8 @@ handcrafted descriptor can be replaced by a *trained* one:
 ```bash
 pip install torch
 
-# train the encoder (CPU proof of concept, ~25 min)
-python -m spotid.ml.train --steps 1200 --out spotid/ml/checkpoints/encoder.pt
+# train the encoder (CPU proof of concept, ~20 min)
+python -m spotid.ml.train --steps 2500 --out spotid/ml/checkpoints/encoder.pt
 
 # head-to-head vs the classical descriptor on identical images
 python -m spotid.ml.evaluate_ml --checkpoint spotid/ml/checkpoints/encoder.pt
@@ -202,4 +202,6 @@ different mistakes. Scaling on a GPU is the same script:
 | `surface_matcher.py` | constellation matching, full & partial views     |
 | `evaluate.py`        | spot-level benchmark CLI                         |
 | `evaluate_surface.py`| surface-level benchmark CLI                      |
+| `evaluate_stress.py` | real-world stress-matrix CLI                     |
 | `demo.py`            | demo image generation                            |
+| `ml/`                | learned embeddings: dataset, model, train, infer |

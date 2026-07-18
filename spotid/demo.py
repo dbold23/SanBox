@@ -13,7 +13,7 @@ import numpy as np
 
 from .evaluate import enroll_identity
 from .matcher import SpotMatcher
-from .render import ViewConfig, render_view
+from .render import render_view
 from .shapes import generate_identity
 from .surface import generate_surface, render_surface_view
 from .surface_matcher import SurfaceMatcher

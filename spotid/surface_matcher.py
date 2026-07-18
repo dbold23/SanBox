@@ -168,6 +168,10 @@ class SurfaceMatcher:
         self._sig_index: np.ndarray | None = None
         self._sig_tree: cKDTree | None = None
         self._sig_owner: list[tuple] = []
+        # Query blob centroids from the most recent identify() call; the
+        # qi indices in SurfaceMatch.assignments index into this array.
+        # Exposed so callers can reuse them instead of re-segmenting.
+        self.last_query_centroids: np.ndarray | None = None
 
     def enroll_surface(self, surface: Surface) -> None:
         pts = surface.positions
@@ -389,6 +393,7 @@ class SurfaceMatcher:
         if not self._surfaces:
             return []
         cents, qdescs = self._query_features(img)
+        self.last_query_centroids = cents
         if cents is None:
             return []
         if mode in ("global", "auto"):

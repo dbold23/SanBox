@@ -9,28 +9,15 @@ Usage:
 import argparse
 import time
 
-import cv2
 import numpy as np
 from scipy.spatial import cKDTree
 
-from .features import segment_all_spots
 from .surface import SurfaceViewConfig, generate_surface, render_surface_view
 from .surface_matcher import SurfaceMatcher
 
 # Ground-truth association gate: a query blob centroid must lie within this
 # many pixels of a true projected spot center to be scored.
 GT_GATE_PX = 6.0
-
-
-def _blob_centroids(img: np.ndarray, min_area: float) -> np.ndarray:
-    cents = []
-    for c in segment_all_spots(img, min_area=min_area):
-        m = cv2.moments(c.astype(np.float32))
-        if abs(m["m00"]) > 1e-9:
-            cents.append([m["m10"] / m["m00"], m["m01"] / m["m00"]])
-        else:
-            cents.append(c.mean(axis=0))
-    return np.array(cents)
 
 
 def score_view(matcher, surface, img, info, offset=(0.0, 0.0)):
@@ -53,7 +40,9 @@ def score_view(matcher, surface, img, info, offset=(0.0, 0.0)):
     r = res[0]
     good = bad = 0
     if r.surface_id == surface.surface_id and r.assignments:
-        cents = _blob_centroids(img, matcher.min_blob_area)
+        # identify() already segmented the image; its assignment indices
+        # refer to exactly these centroids.
+        cents = matcher.last_query_centroids
         tree = cKDTree(gt)
         for qi, si, _ in r.assignments:
             d, j = tree.query(cents[qi])
