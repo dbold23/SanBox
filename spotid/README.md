@@ -180,11 +180,11 @@ views, tilts to 55°, identical images and matcher for all rows:
 | descriptor              | top-1      | at 45–55° tilt |
 |-------------------------|------------|----------------|
 | classical (handcrafted) | 96.0 %     | 87.1 %         |
-| learned (CNN)           | 94.3 %     | 85.5 %         |
-| **ensemble (both)**     | **97.2 %** | **92.3 %**     |
+| learned (CNN)           | 97.6 %     | 93.2 %         |
+| **ensemble (both)**     | **98.7 %** | **96.3 %**     |
 
-The learned embedding nearly matches the handcrafted descriptor after
-minutes of CPU training, and the concatenated ensemble
+Twenty minutes of CPU training beats the handcrafted descriptor,
+especially at extreme viewing angles, and the concatenated ensemble
 (`spotid.ml.infer.EnsembleDescriptor`) beats both — the two make
 different mistakes. Scaling on a GPU is the same script:
 `python -m spotid.ml.train --device cuda --width 64 --embed-dim 256
