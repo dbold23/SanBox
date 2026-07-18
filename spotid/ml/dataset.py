@@ -42,6 +42,42 @@ def extract_patch(img: np.ndarray, center: np.ndarray, radius: float,
     return patch.astype(np.float32) / 255.0
 
 
+def canonical_patch(img: np.ndarray, contour: np.ndarray,
+                    out: int = PATCH, margin: float = 1.5,
+                    jitter_rng: np.random.Generator | None = None) -> np.ndarray:
+    """Affine-canonicalized patch: whiten the spot's second moments and
+    rotate to a third-moment principal orientation, then sample the image
+    through that transform. Rotation/tilt/shear/scale are removed before
+    the CNN ever sees the pixels — the same trick the classical descriptor
+    uses, so the network only has to learn fine shape discrimination.
+    """
+    c = contour.mean(axis=0)
+    rel = contour - c
+    cov = rel.T @ rel / len(rel)
+    w, v = np.linalg.eigh(cov)
+    w = np.clip(w, 1e-9, None)
+    white = v @ np.diag(1.0 / np.sqrt(w)) @ v.T          # SPD, no reflection
+    pw = rel @ white.T
+    # Third-moment vector fixes the rotation left over after whitening.
+    r2 = (pw ** 2).sum(axis=1, keepdims=True)
+    m3 = (pw * r2).mean(axis=0)
+    phi = float(np.arctan2(m3[1], m3[0])) if np.linalg.norm(m3) > 1e-6 else 0.0
+    cs, sn = np.cos(-phi), np.sin(-phi)
+    rot = np.array([[cs, -sn], [sn, cs]])
+    if jitter_rng is not None:
+        a = jitter_rng.uniform(-0.18, 0.18)
+        ca, sa = np.cos(a), np.sin(a)
+        rot = rot @ np.array([[ca, -sa], [sa, ca]])
+    # Whitened shape has unit RMS radius; fit margin*unit into the patch.
+    scale = out / 2.0 / margin
+    amat = scale * rot @ white
+    offs = np.array([out / 2.0, out / 2.0]) - amat @ c
+    m = np.hstack([amat, offs[:, None]]).astype(np.float64)
+    patch = cv2.warpAffine(img, m, (out, out), flags=cv2.INTER_AREA,
+                           borderMode=cv2.BORDER_REPLICATE)
+    return patch.astype(np.float32) / 255.0
+
+
 def _augment(patch: np.ndarray, rng: np.random.Generator) -> np.ndarray:
     """Photometric augmentation beyond what the renderer already does:
     gamma, gain/bias, glare-like bright wash, extra noise."""
@@ -69,12 +105,12 @@ def render_training_view(identity_seed: int, rng: np.random.Generator,
                                 else identity_seed)
     img, info = render_view(contour, rng, TRAIN_VIEW)
     poly = info["polygon_px"]
-    center = poly.mean(axis=0)
-    radius = float(np.sqrt(((poly - center) ** 2).sum(axis=1).mean()))
     if augment:
-        center = center + rng.uniform(-0.12, 0.12, 2) * radius
-        radius = radius * rng.uniform(0.85, 1.25)
-    patch = extract_patch(img, center, radius)
+        # Perturb the contour used for canonicalization so the model
+        # tolerates imperfect segmentation-derived transforms at inference.
+        poly = poly + rng.normal(0.0, 0.6, poly.shape)
+    patch = canonical_patch(img, poly,
+                            jitter_rng=rng if augment else None)
     return _augment(patch, rng) if augment else patch
 
 

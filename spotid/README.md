@@ -129,6 +129,27 @@ Isolated single-spot ID degrades gracefully with tilt; once spots live on a
 surface, constellation geometry makes identification nearly exact — the
 600-spot layout is far more distinctive than any single shape.
 
+Real-world stress matrix — 10 surfaces × 600 spots, 40 views per
+condition (spot sizes speck-to-blob, elongation to 4:1, 15 % faded):
+
+| condition            | surface top-1 | assignment precision | coverage |
+|----------------------|---------------|----------------------|----------|
+| baseline             | 40/40         | 0.999                | 0.86     |
+| harsh lighting       | 40/40         | 0.999                | 0.87     |
+| glossy sheen         | 40/40         | 0.998                | 0.87     |
+| missing + clutter    | 40/40         | 0.991                | 0.76     |
+| heavy fade           | 40/40         | 0.999                | 0.87     |
+| far away             | 36/40         | 0.998                | 0.61     |
+| close-up crop        | 40/40         | 1.000                | 0.87     |
+| cracks + texture     | 40/40         | 0.992                | 0.80     |
+| everything at once   | 40/40         | 1.000                | 0.84     |
+| everything + crop    | 39/40         | 1.000                | 0.87     |
+
+Coverage = correctly labeled fraction of spots that are actually visible
+(drawn, in frame, not under glare). When a spot *is* assigned a label,
+that label is right ≥ 99 % of the time in every condition; what harsh
+conditions cost is how many spots remain readable at all.
+
 ## Learned embeddings (spotid/ml)
 
 The synthetic generator doubles as an infinite labeled dataset, so the

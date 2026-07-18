@@ -35,7 +35,8 @@ def main() -> None:
     ap.add_argument("--embed-dim", type=int, default=128)
     ap.add_argument("--width", type=int, default=32)
     ap.add_argument("--lr", type=float, default=3e-4)
-    ap.add_argument("--temperature", type=float, default=0.1)
+    ap.add_argument("--warmup", type=int, default=100)
+    ap.add_argument("--temperature", type=float, default=0.15)
     ap.add_argument("--device", default="cpu")
     ap.add_argument("--workers", type=int, default=3)
     ap.add_argument("--seed", type=int, default=0)
@@ -48,8 +49,15 @@ def main() -> None:
     n_params = sum(p.numel() for p in model.parameters())
     print(f"encoder: {n_params/1e6:.2f}M params | device {device}", flush=True)
     opt = torch.optim.AdamW(model.parameters(), lr=args.lr, weight_decay=1e-4)
-    sched = torch.optim.lr_scheduler.CosineAnnealingLR(
-        opt, T_max=args.steps, eta_min=args.lr * 0.03)
+    # Warmup guards against early embedding collapse (all vectors identical
+    # -> loss pinned at ln(batch-1)); cosine decay after.
+    sched = torch.optim.lr_scheduler.SequentialLR(opt, [
+        torch.optim.lr_scheduler.LinearLR(
+            opt, start_factor=0.05, total_iters=args.warmup),
+        torch.optim.lr_scheduler.CosineAnnealingLR(
+            opt, T_max=max(args.steps - args.warmup, 1),
+            eta_min=args.lr * 0.03),
+    ], milestones=[args.warmup])
 
     os.makedirs(os.path.dirname(args.out) or ".", exist_ok=True)
     pool = ProcessPoolExecutor(max_workers=args.workers)

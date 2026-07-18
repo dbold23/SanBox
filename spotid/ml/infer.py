@@ -4,7 +4,7 @@ import numpy as np
 import torch
 
 from ..features import segment_spot
-from .dataset import extract_patch
+from .dataset import canonical_patch
 from .model import SpotEncoder
 
 
@@ -23,9 +23,7 @@ class MLSpotDescriptor:
         contour = segment_spot(img)
         if contour is None:
             return None
-        center = contour.mean(axis=0)
-        radius = float(np.sqrt(((contour - center) ** 2).sum(axis=1).mean()))
-        return extract_patch(img, center, radius)
+        return canonical_patch(img, contour)
 
     def describe_image(self, img: np.ndarray) -> np.ndarray | None:
         patch = self.patch_of(img)

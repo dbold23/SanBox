@@ -38,14 +38,18 @@ class SpotEncoder(nn.Module):
                 nn.MaxPool2d(2),
             ))
             cin = cout
-        self.head = nn.Linear(cin, embed_dim)
+        # Mean+std pooling and a LayerNorm keep initial embeddings spread
+        # out; plain mean-pool + linear collapses at init (all inputs map
+        # to nearly the same vector, cos ~ 0.99) and training stalls.
+        self.post = nn.LayerNorm(2 * cin)
+        self.head = nn.Linear(2 * cin, embed_dim)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = self.stem(x)
         for stage in self.stages:
             x = stage(x)
-        x = x.mean(dim=(2, 3))
-        return F.normalize(self.head(x), dim=1)
+        z = torch.cat([x.mean(dim=(2, 3)), x.std(dim=(2, 3))], dim=1)
+        return F.normalize(self.head(self.post(z)), dim=1)
 
 
 def supcon_loss(emb: torch.Tensor, labels: torch.Tensor,

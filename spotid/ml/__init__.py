@@ -5,6 +5,7 @@ for the handcrafted descriptor in SpotMatcher.
 """
 
 from .model import SpotEncoder
-from .dataset import extract_patch, render_training_view
+from .dataset import canonical_patch, extract_patch, render_training_view
 
-__all__ = ["SpotEncoder", "extract_patch", "render_training_view"]
+__all__ = ["SpotEncoder", "canonical_patch", "extract_patch",
+           "render_training_view"]
