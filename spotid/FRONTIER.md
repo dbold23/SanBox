@@ -114,6 +114,38 @@ ceiling silently imports 1–2 orders of magnitude more data than exists.
 
 ---
 
+## 3b. UPDATE — Experiment B was run, and it PASSED decisively
+
+The foundation-matcher probe (`spotid/probe_matchers.py`) was executed on the
+real flank crops. Off-the-shelf local-feature matchers (DISK deep features
+and classical SIFT) + RANSAC verification, RANSAC-inlier counts:
+
+| matcher | TRUE re-sightings | DIFFERENT individuals |
+|---------|-------------------|-----------------------|
+| SIFT    | 57–156 (mean 106) | 0–13 (mean 10, max 13)|
+| DISK    | 553–821 (mean 681)| 14–23 (mean 18, max 23)|
+
+**All 4 true pairs sit far above every one of 24 impostor pairs, for both
+matchers — zero overlap, a ~5–30× margin.** Different sharks get only
+noise-floor inliers; the matchers do NOT align different individuals by body
+outline (critique risk #3 falsified). Inlier correspondences land on the
+flank (spots + skin), not the background.
+
+This **overturns the earlier "real re-ID fails (2/8)" conclusion** — and the
+reason is important: the failing matchers used *only spot centroids* (each
+spot reduced to an (x,y) point). The pixels around each spot — its shape,
+edges, and the surrounding skin texture — carry far more matchable structure,
+and generic local-feature matching exploits it. The same pairs my
+centroid matcher missed (J001, J003, A257) are matched cleanly here.
+
+Caveats (still real): n is small (4 pairs vs 24 impostors), though the effect
+size is enormous; the pairs may share some imaging context (mitigated by
+tight flank crops + on-flank correspondences); this is closed-set feasibility,
+not open-set deployment. But **the load-bearing thesis of the frontier design
+— appearance-based local features re-identify these sharks — is validated on
+real data.** The unwrap-then-match machinery is now an *accuracy multiplier*
+on top of a baseline that already works, not a prerequisite.
+
 ## 4. Do these FIRST — cheap experiments that de-risk everything (this week)
 
 Both critics independently prescribed the same near-zero-cost checks.

@@ -275,6 +275,22 @@ global and local matchers land at **2/8 top-1**.
   the learned path needs many labeled individuals with re-sightings — far
   more than this 58-image set provides.
 
+**Update — real re-ID does work, with the right features.** The negative
+result above is specific to matching *spot centroids*. A follow-up probe
+(`spotid/probe_matchers.py`) matched flank crops with off-the-shelf local
+image features (DISK deep features, SIFT) + RANSAC:
+
+| matcher | TRUE re-sightings (inliers) | DIFFERENT individuals |
+|---------|-----------------------------|-----------------------|
+| SIFT    | 57–156                      | 0–13                  |
+| DISK    | 553–821                     | 14–23                 |
+
+All 4 true re-sighting pairs separate cleanly from all 24 impostor pairs
+(zero overlap), including the pairs the centroid matcher missed. The
+discriminative signal is in the spot *appearance and local skin texture*,
+not just centroid geometry — reducing each spot to a point threw it away.
+See `spotid/FRONTIER.md` for the full frontier design and roadmap.
+
 The synthetic benchmarks below remain valid *for the synthetic setting*
 (planar, controlled); they should not be read as real-world performance.
 
