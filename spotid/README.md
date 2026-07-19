@@ -212,6 +212,48 @@ Independently reproduced on CPU with a separate protocol (100 unseen
 identities × 30 views, seed 7): 3,000/3,000 top-1, all tilt buckets
 1.000, vs classical 0.960 on identical images.
 
+## Real-world validation (sevengill sharks)
+
+The synthetic pipeline was tested on a real dataset: 58 photos of
+sevengill shark flanks, 6,618 hand-annotated spots (`spotid/realdata.py`,
+`spotid/real_reid.py`). The individual shark's identity is encoded in each
+filename, and 4 individuals were photographed more than once — genuine
+re-sighting pairs for testing individual re-identification.
+
+**Individual re-ID from spot geometry alone.** Enroll a gallery of
+well-annotated individuals; query with a held-out photo of a re-sighted
+shark; does the constellation matcher return the right animal?
+
+| metric                        | result            |
+|-------------------------------|-------------------|
+| queries                       | 8 (4 individuals) |
+| gallery size                  | 38-way            |
+| top-1 re-ID                   | 6/8 (chance ≈ 2.6 %) |
+| individuals re-ID'd both ways | 3 of 4            |
+
+These are true cross-view matches (e.g. individual `AOTB_A002`: −23°
+rotation across two different-resolution photos, 59 spots matched). The
+one failure has ≈180° flip, 3× scale, and very different flank extent
+(356 vs 147 spots) between its two photos. **The re-ID signal is the
+constellation, not per-spot appearance.**
+
+**Domain-adapting the encoder to real spots** (`ml/finetune_real.py`;
+5,510 real crops; `ml/eval_real_embed.py` scores it on geometry-verified
+real same-spot pairs):
+
+| descriptor                    | verification AUC | same−diff sim gap |
+|-------------------------------|------------------|-------------------|
+| classical                     | 0.619            | +0.021            |
+| synthetic encoder (GPU)       | 0.650            | +0.120            |
+| **real-fine-tuned encoder**   | **0.684**        | **+0.158**        |
+
+Real spots are faint (median contrast 0.055; 67 % below 0.08) and carry
+little individuating *appearance* — so per-spot descriptors are a weak
+secondary cue, and fine-tuning lifts them only modestly. The distinctive
+information is the spatial layout, which the constellation matcher already
+exploits. The clearest path to stronger real-world numbers is **more
+re-sighting photos**, not a bigger model.
+
 ## Files
 
 | file                 | what it does                                    |
@@ -227,3 +269,7 @@ identities × 30 views, seed 7): 3,000/3,000 top-1, all tilt buckets
 | `evaluate_stress.py` | real-world stress-matrix CLI                     |
 | `demo.py`            | demo image generation                            |
 | `ml/`                | learned embeddings: dataset, model, train, infer |
+| `realdata.py`        | load real YOLO dataset, parse individuals        |
+| `real_reid.py`       | real individual re-ID via constellation matching |
+| `ml/finetune_real.py`| domain-adapt encoder on real crops               |
+| `ml/eval_real_embed.py` | appearance eval on real same-spot pairs       |
