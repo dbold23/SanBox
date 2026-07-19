@@ -212,47 +212,47 @@ Independently reproduced on CPU with a separate protocol (100 unseen
 identities × 30 views, seed 7): 3,000/3,000 top-1, all tilt buckets
 1.000, vs classical 0.960 on identical images.
 
-## Real-world validation (sevengill sharks)
+## Real-world validation (sevengill sharks) — negative result
 
 The synthetic pipeline was tested on a real dataset: 58 photos of
 sevengill shark flanks, 6,618 hand-annotated spots (`spotid/realdata.py`,
-`spotid/real_reid.py`). The individual shark's identity is encoded in each
-filename, and 4 individuals were photographed more than once — genuine
-re-sighting pairs for testing individual re-identification.
+`spotid/real_reid.py`, `spotid/match_matrix.py`). Some individuals were
+photographed more than once, giving true re-sighting pairs.
 
-**Individual re-ID from spot geometry alone.** Enroll a gallery of
-well-annotated individuals; query with a held-out photo of a re-sighted
-shark; does the constellation matcher return the right animal?
+**The synthetic result did NOT transfer. The constellation matcher does
+not re-identify real sevengill individuals as implemented.** Scoring each
+photo pair by the fraction of the smaller constellation explained under a
+single homography:
 
-| metric                        | result            |
-|-------------------------------|-------------------|
-| queries                       | 8 (4 individuals) |
-| gallery size                  | 38-way            |
-| top-1 re-ID                   | 6/8 (chance ≈ 2.6 %) |
-| individuals re-ID'd both ways | 3 of 4            |
+| pairs                                   | mean fraction |
+|-----------------------------------------|---------------|
+| true re-sightings (same individual)     | 0.33          |
+| all impostor pairs                      | 0.18 (but p90 0.37, **max 0.65**) |
 
-These are true cross-view matches (e.g. individual `AOTB_A002`: −23°
-rotation across two different-resolution photos, 59 spots matched). The
-one failure has ≈180° flip, 3× scale, and very different flank extent
-(356 vs 147 spots) between its two photos. **The re-ID signal is the
-constellation, not per-spot appearance.**
+The true signal is real but weak and drowned by false matches: **11 % of
+impostor pairs beat the median true pair**, and using each re-sighting
+image as a query, the correct individual is the top match only **2 of 8**
+times. The full 41×41 match matrix shows no per-individual block
+structure — instead, dense-spot images match *everything* (bright stripes).
 
-**Domain-adapting the encoder to real spots** (`ml/finetune_real.py`;
-5,510 real crops; `ml/eval_real_embed.py` scores it on geometry-verified
-real same-spot pairs):
+Why it fails on real data (all absent from the synthetic model):
 
-| descriptor                    | verification AUC | same−diff sim gap |
-|-------------------------------|------------------|-------------------|
-| classical                     | 0.619            | +0.021            |
-| synthetic encoder (GPU)       | 0.650            | +0.120            |
-| **real-fine-tuned encoder**   | **0.684**        | **+0.158**        |
+- **Curved, non-planar flanks.** A shark's side is a 3-D curved surface;
+  two views are not related by a single homography, so true matches are
+  suppressed while dense clouds still yield coincidental partial
+  alignments.
+- **High spot density + RANSAC.** 150–400 spots give many chances for a
+  spurious consensus set (impostors reach 0.65 explained).
+- **Partial overlap.** Re-sighting photos often show different extents of
+  the flank, so genuine overlap is limited.
 
-Real spots are faint (median contrast 0.055; 67 % below 0.08) and carry
-little individuating *appearance* — so per-spot descriptors are a weak
-secondary cue, and fine-tuning lifts them only modestly. The distinctive
-information is the spatial layout, which the constellation matcher already
-exploits. The clearest path to stronger real-world numbers is **more
-re-sighting photos**, not a bigger model.
+**What would actually be needed:** local (piecewise / thin-plate-spline)
+geometric matching instead of one global homography; a distinctiveness
+score (à la HotSpotter / Wild-ID LNBNN) rather than raw overlap; and, for
+a learned solution, many labeled individuals with re-sightings — far more
+than this 58-image set provides. The synthetic benchmarks below remain
+valid *for the synthetic setting*; they should not be read as real-world
+performance.
 
 ## Files
 
