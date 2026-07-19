@@ -246,13 +246,37 @@ Why it fails on real data (all absent from the synthetic model):
 - **Partial overlap.** Re-sighting photos often show different extents of
   the flank, so genuine overlap is limited.
 
-**What would actually be needed:** local (piecewise / thin-plate-spline)
-geometric matching instead of one global homography; a distinctiveness
-score (à la HotSpotter / Wild-ID LNBNN) rather than raw overlap; and, for
-a learned solution, many labeled individuals with re-sightings — far more
-than this 58-image set provides. The synthetic benchmarks below remain
-valid *for the synthetic setting*; they should not be read as real-world
-performance.
+**A curvature-aware matcher was then built** (`spotid/reid_local.py`):
+rotation/scale-invariant local shape-context descriptors + mutual-NN
+candidates + *neighborhood-preservation* verification (a match is kept
+only if several of a spot's spatial neighbors are matched to the other
+spot's neighbors — a non-rigid check that survives curvature but rejects
+coincidental collisions).
+
+This **fixed the false-match problem** (impostor pairs now score ≈ 0,
+where the global homography reached 0.65) but revealed the deeper limit:
+it re-identifies only the mild-viewpoint pair (`AOTB_A002`: 5 verified
+matches, cleanly rank 1, zero for all 37 impostors) and scores 0 on the
+larger-viewpoint true pairs. Diagnosis: candidate correspondences are
+found for every pair, but the local neighborhood is only *preserved* when
+the two photos are taken from similar angles. Across big viewpoint changes
+on a curved flank, centroid geometry alone is not preserved — so both the
+global and local matchers land at **2/8 top-1**.
+
+**Honest conclusions:**
+
+- The spot pattern *is* individually distinctive, and matching works
+  cleanly and confidently **when the two photos share a similar
+  viewpoint** (A002). A standardized photographing angle/distance would
+  likely make centroid matching usable in practice.
+- Across large viewpoint changes it does not work from centroids alone.
+  The algorithmic path is appearance-based local features (HotSpotter /
+  Wild-ID: image descriptors at each spot + distinctiveness scoring), and
+  the learned path needs many labeled individuals with re-sightings — far
+  more than this 58-image set provides.
+
+The synthetic benchmarks below remain valid *for the synthetic setting*
+(planar, controlled); they should not be read as real-world performance.
 
 ## Files
 
