@@ -178,6 +178,33 @@ validated end-to-end, and there is a **working, annotation-free identifier
 on the existing data today.** The unwrap-then-match machinery is an
 *accuracy multiplier* on a baseline that already works, not a prerequisite.
 
+## 3c. Field run on the full 1,096-photo catalog (reported)
+
+The identifier was run on the full raw catalog (1,096 photos) on a GPU box
+(`spotid/run_catalog.sh` + parallelized scan). Result:
+
+- **290 putative individuals** with >=2 photos, 944/1,096 photos linked,
+  152 singletons; largest cluster 11 photos (no runaway blob). Visual QA of
+  every score band found **no wrong groupings**; the strongest links are
+  duplicate catalog re-exports of the same frame, correctly collapsed.
+- **But 0 of 290 groups span more than one calendar day.** The tool
+  reliably groups multiple frames of a single *capture encounter* (and
+  de-duplicates), but did **not** surface the same shark across days.
+
+Two real reasons: (a) the catalog appears to be roughly one-capture-per-
+shark, so cross-day repeats are rare or absent in the data; (b) full-frame
+DISK keys on body/gill-slit anatomy, not the discriminative spots, so it
+cannot bridge the large pose/appearance change between days.
+
+**Honest correction:** the leave-one-out "8/8 - 13/13" results above are
+*within-encounter / duplicate-collapse* accuracy. They demonstrate reliable
+photo grouping and de-duplication, **not** cross-day (cross-session)
+re-identification, which remains unproven and is likely not testable on
+this particular catalog. The genuine unlock is (1) a validation set with
+KNOWN cross-day re-sightings — captive/known-ID animals (e.g. aquarium
+sharks) are the cheapest guaranteed source — and (2) spot-region crops so
+the matcher keys on spots rather than anatomy.
+
 ## 4. Do these FIRST — cheap experiments that de-risk everything (this week)
 
 Both critics independently prescribed the same near-zero-cost checks.
