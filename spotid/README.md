@@ -289,6 +289,19 @@ All 4 true re-sighting pairs separate cleanly from all 24 impostor pairs
 (zero overlap), including the pairs the centroid matcher missed. The
 discriminative signal is in the spot *appearance and local skin texture*,
 not just centroid geometry — reducing each spot to a point threw it away.
+A full leave-one-out re-ID (`spotid/reid_appearance.py`) reaches **8/8
+top-1** with an open-set margin of +510 inliers; the packaged tool
+(`spotid/identify.py`) reaches **13/13 on whole photos with no spot
+annotations**:
+
+```bash
+python -m spotid.identify enroll    --images photos/ --out catalog.npz
+python -m spotid.identify query     --catalog catalog.npz --image new.jpg
+python -m spotid.identify calibrate --catalog catalog.npz   # pick threshold
+```
+
+`query` returns ranked candidate individuals + a normalized score and flags
+NEW INDIVIDUAL when the best match is below the (recalibratable) threshold.
 See `spotid/FRONTIER.md` for the full frontier design and roadmap.
 
 The synthetic benchmarks below remain valid *for the synthetic setting*

@@ -156,13 +156,27 @@ across all 41 photos. This is not context leakage: the "new individual"
 images share the same aquarium setting yet still score <=43 (shared context
 would inflate impostor scores, not suppress them).
 
-Caveats (still real): only 4 individuals / 8 queries — the *margin* is huge
-but the *sample* is small; a fuller test needs more individuals and
-across-session pairs. But the frontier design's load-bearing thesis —
-appearance-based local features re-identify these sharks — is now validated
-end-to-end, and there is a **working identifier on the existing data today.**
-The unwrap-then-match machinery is an *accuracy multiplier* on a baseline
-that already works, not a prerequisite.
+**Packaged as a usable tool** (`spotid/identify.py`: `enroll` / `query` /
+`batch` / `calibrate`). Run on the **whole photos with NO spot
+annotations** (matching flank pixels, not labeled centroids):
+
+- **13/13 re-sighted-image accuracy** leave-one-out — *more* than the
+  annotation-based 8/8, because it recovers two re-sighting photos that had
+  zero annotated spots (J002's pair, A002's third photo).
+- Normalized score (inliers / min-keypoints, resolution-robust): genuine
+  best-match ≥ 0.214, impostor best-match ≤ 0.030 → threshold ≈ 0.12.
+
+So the identifier needs no annotation and runs on raw images — it can be
+applied to the entire photo collection, and every query either confirms a
+re-sighting or flags a new individual, which is the data flywheel.
+
+Caveats (still real): only ~5 individuals with re-sightings — the *margin*
+is huge but the *sample* is small; a fuller test needs more individuals and
+confirmed across-session pairs. But the frontier design's load-bearing
+thesis — appearance-based local features re-identify these sharks — is
+validated end-to-end, and there is a **working, annotation-free identifier
+on the existing data today.** The unwrap-then-match machinery is an
+*accuracy multiplier* on a baseline that already works, not a prerequisite.
 
 ## 4. Do these FIRST — cheap experiments that de-risk everything (this week)
 
