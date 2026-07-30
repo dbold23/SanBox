@@ -46,7 +46,7 @@ def load_data_generator(data_dir, batch_size, augment=False):
     images_dir = Path(data_dir) / 'images'
     masks_dir = Path(data_dir) / 'masks'
 
-    # Get all dem image files
+    # Get all image files
     image_files = sorted(list(images_dir.glob('*.png')))
 
     while True:  # Infinite generator
@@ -116,7 +116,7 @@ def count_samples(data_dir):
 
 def build_unet_model(input_shape=(512, 512, 1)):
     """
-    Build dat U-Net architecture here sum basics
+    Build the U-Net architecture (basic configuration)
 
     U-Net consists of:
     1. Encoder (contracting path) - downsamples and extracts features
@@ -196,7 +196,7 @@ def build_unet_model(input_shape=(512, 512, 1)):
 
 
 # ============================================================================
-# CUSTOM LOSS FUNC FO YO BUNC
+# CUSTOM LOSS FUNCTIONS
 # ============================================================================
 
 def dice_coefficient(y_true, y_pred, smooth=1e-6):
@@ -382,7 +382,7 @@ def train_model():
     model.save(final_model_path)
 
     print("\n" + "=" * 60)
-    print("TRAINING COMPLETE BITCH!")
+    print("Training complete.")
     print("=" * 60)
     print(f"Best model saved to: {checkpoint_path}")
     print(f"Final model saved to: {final_model_path}")

@@ -1,8 +1,8 @@
 """
-STEP 1: Data Prep 4 Hologram Reconstruction and Preprocessing
+STEP 1: Data prep for hologram reconstruction and preprocessing
 =====================================================================
 
-What this finna hypothetically do
+What this pipeline does
 1. Loads raw hologram 
 2. Reconstructs focused images at multiple depth planes
 3. Automatically finds best focus plane
@@ -29,22 +29,22 @@ from config import CONFIG
 
 def reconstruct_hologram(raw_hologram, depth_microns):
     """
-    Thought is try to reconstruct hologram at given depth
+    Reconstruct a hologram at a given depth.
 
     INPUT:
-        raw_hologram = 2D array or 1D tensor if your feeling romatnic (interference pattern from camera)
-        depth_microns = reconstruction depth in microns???(idk ur stuff)
+        raw_hologram = 2D array (or 1D tensor) interference pattern from the camera
+        depth_microns = reconstruction depth in microns
 
     OUTPUT:
         reconstructed_image = focused image at specified depth
 
     NOTE: This is SIMPLIFIED pseudocode. Replace with your actual
-          holography reconstruction library idk wtf ur using
+          holography reconstruction library for your setup.
     """
 
     # 1:  parameters
-    wavelength = CONFIG['WAVELENGTH']  # microns question MARK
-    pixel_size = CONFIG['PIXEL_SIZE']  # also microns not the french president
+    wavelength = CONFIG['WAVELENGTH']  # microns
+    pixel_size = CONFIG['PIXEL_SIZE']  # microns
 
     #2: Convert to frequency domain
     hologram_fft = np.fft.fft2(raw_hologram)
@@ -57,7 +57,7 @@ def reconstruct_hologram(raw_hologram, depth_microns):
     FX, FY = np.meshgrid(fx, fy)
 
     # 4: Angular Spectrum Propagation
-    #  implements the diffraction formula ?
+    # Implements the diffraction formula
     k = 2 * np.pi / wavelength  # Wave number
     propagation_phase = np.exp(1j * k * depth_microns *
                                np.sqrt(1 - (wavelength * FX)**2 - (wavelength * FY)**2))
@@ -69,7 +69,7 @@ def reconstruct_hologram(raw_hologram, depth_microns):
     propagated_fft_unshifted = np.fft.ifftshift(propagated_fft)
     reconstructed_complex = np.fft.ifft2(propagated_fft_unshifted)
 
-    #6: Extract intensity (just fuckin amplitude squared)
+    #6: Extract intensity (amplitude squared)
     reconstructed_intensity = np.abs(reconstructed_complex)**2
 
     return reconstructed_intensity
@@ -77,7 +77,7 @@ def reconstruct_hologram(raw_hologram, depth_microns):
 
 def reconstruct_hologram_stack(raw_hologram):
     """
-    PSEUDOCODE: Reconstruct hologram at multiple depths agian idk what u use
+    PSEUDOCODE: Reconstruct hologram at multiple depths
 
     INPUT: raw_hologram = 2D interference pattern
     OUTPUT: List of images at different depths
@@ -104,13 +104,13 @@ def reconstruct_hologram_stack(raw_hologram):
 
 def find_best_focus(image_stack):
     """
-    PSEUDOCODE: Automatically find bestest focused image
+    PSEUDOCODE: Automatically find the best-focused image
 
     INPUT: List of images at different depths
     OUTPUT: Index of sharpest image
 
     METHOD: Uses variance of Laplacian as focus metric
-            (higher variance = sharper edges = better focus) (idk if yall have a better way or method)
+            (higher variance = sharper edges = better focus)
     """
 
     focus_scores = []
@@ -137,39 +137,40 @@ def find_best_focus(image_stack):
 # IMAGE PREPROCESSING FUNCTIONS
 # ============================================================================
 
-def preprocess_image(image):
+def preprocess_image(image, subtract_background=False):
     """
-    PSEUDOCODE: Standardize image for ML pipeline
+    Standardize an image for the ML pipeline.
 
-    INPUT: Raw reconstructed image
-    OUTPUT: Preprocessed image (512x512 wit better contrast n stuff)
+    INPUT:  Raw reconstructed image
+    OUTPUT: Preprocessed image (512x512, contrast-enhanced)
+
+    Pass subtract_background=True to remove the low-frequency background,
+    which helps separate colonies when the illumination is uneven.
     """
 
     # 1: Normalize to 0-255 range
     normalized = (image - image.min()) / (image.max() - image.min() + 1e-10)
     normalized = (normalized * 255).astype(np.uint8)
 
-    #2: Apply CLAHE (look it up if you want)
-    #applies local contrast 
+    # 2: Apply CLAHE for local contrast enhancement
     clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
     enhanced = clahe.apply(normalized)
 
-    #3: Resize to standard dimensions
+    # 3: Resize to standard dimensions
     resized = cv2.resize(enhanced,
                         (CONFIG['IMAGE_WIDTH'], CONFIG['IMAGE_HEIGHT']),
                         interpolation=cv2.INTER_CUBIC)
-"""
-    # 4: Optional idk what you do for background 
-    # Helps separate colonies from background if u think its necessary uncomment it
-    blurred_background = cv2.GaussianBlur(resized, (51, 51), 0)
-    foreground = cv2.subtract(resized, blurred_background)
 
-    # Clip negative values
-    foreground = np.clip(foreground, 0, 255).astype(np.uint8)
+    # 4: Optional background subtraction
+    if subtract_background:
+        blurred_background = cv2.GaussianBlur(resized, (51, 51), 0)
+        foreground = cv2.subtract(resized, blurred_background)
+        # Clip negative values
+        return np.clip(foreground, 0, 255).astype(np.uint8)
 
-    return foreground
+    return resized
 
-"""
+
 # ============================================================================
 # MAIN PIPELINE FUNCTION
 # ============================================================================
@@ -178,7 +179,7 @@ def process_raw_holograms():
     """
     MAIN PSEUDOCODE: Process all raw holograms
 
-    FOR each hologram file what you do:
+    FOR each hologram file:
         1. Load raw hologram
         2. Reconstruct at multiple depths
         3. Find best focus
@@ -190,7 +191,8 @@ def process_raw_holograms():
     output_dir = Path(CONFIG['RECONSTRUCTED_DIR'])
 
     # Find all hologram files
-    # Adjust extensions based on your file format agian idk what u use jus keep relevant one but added bunch o shi to look for you(.tif, .png, .npy, etc.)
+    # Adjust extensions to match your file format; keep only the relevant
+    # entries (.tif, .png, .npy, etc.)
     hologram_files = list(raw_dir.glob('*.tif')) + \
                     list(raw_dir.glob('*.tiff')) + \
                     list(raw_dir.glob('*.png'))
