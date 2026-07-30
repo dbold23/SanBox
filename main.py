@@ -9,8 +9,9 @@ Usage:
     python main.py --input room.ply [options]
 """
 import argparse
-import sys
 import time
+
+import numpy as np
 
 from wifi_placer.config import (
     DEFAULT_TX_POWER_DBM, MIN_RSSI_DBM, VOXEL_SIZE, SA_MAX_ROUTERS,
@@ -111,7 +112,6 @@ def main():
     print("\n[5/5] Generating visualizations...")
 
     # 2D heatmap (always)
-    import numpy as np
     plot_floor_plan_heatmap(
         floor_plan=floor_plan,
         rssi_map=result.rssi_map,
@@ -129,5 +129,4 @@ def main():
 
 
 if __name__ == "__main__":
-    import numpy as np
     main()
