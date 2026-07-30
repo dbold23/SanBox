@@ -109,13 +109,20 @@ def main():
             continue
         best_none.append(max((S[i, j] for j in range(N) if j != i), default=0))
     best_twin, best_none = np.array(best_twin), np.array(best_none)
-    print(f"  genuine (has true match): min {best_twin.min():.0f} "
-          f"mean {best_twin.mean():.0f}")
-    print(f"  new individual (no match): max {best_none.max():.0f} "
-          f"mean {best_none.mean():.0f}")
-    gap = best_twin.min() - best_none.max()
-    print(f"  separation margin: {gap:+.0f}  "
-          f"({'cleanly separable' if gap > 0 else 'overlap'})")
+    if len(best_twin):
+        print(f"  genuine (has true match): min {best_twin.min():.0f} "
+              f"mean {best_twin.mean():.0f}")
+    else:
+        print("  genuine (has true match): none in this dataset")
+    if len(best_none):
+        print(f"  new individual (no match): max {best_none.max():.0f} "
+              f"mean {best_none.mean():.0f}")
+    else:
+        print("  new individual (no match): none — every individual has a twin")
+    if len(best_twin) and len(best_none):
+        gap = best_twin.min() - best_none.max()
+        print(f"  separation margin: {gap:+.0f}  "
+              f"({'cleanly separable' if gap > 0 else 'overlap'})")
 
     if args.also_sift:
         print("\n=== SIFT cross-check (true vs impostor best scores) ===")

@@ -219,6 +219,27 @@ sevengill shark flanks, 6,618 hand-annotated spots (`spotid/realdata.py`,
 `spotid/real_reid.py`, `spotid/match_matrix.py`). Some individuals were
 photographed more than once, giving true re-sighting pairs.
 
+### Dataset provenance and use
+
+The annotated set is committed as `realworldspots.yolov8.zip` and unpacks to
+`realdata/`:
+
+```bash
+unzip realworldspots.yolov8.zip -d realdata/
+```
+
+Filename prefixes (`AOTB_`, `OCAq_`) denote the source institution. These
+photographs are redistributed here with permission for non-commercial
+scientific research; they are not public-domain images. If you reuse them,
+retain this attribution and do not redistribute them for commercial purposes.
+
+The larger raw catalog is not in this repo. `spotid/run_catalog.sh` fetches it
+from Google Drive and requires `DRIVE_ID` to be set to your own copy:
+
+```bash
+DRIVE_ID=<your-drive-file-id> bash spotid/run_catalog.sh
+```
+
 **The synthetic result did NOT transfer. The constellation matcher does
 not re-identify real sevengill individuals as implemented.** Scoring each
 photo pair by the fraction of the smaller constellation explained under a

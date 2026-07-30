@@ -5,17 +5,17 @@ Score = fraction of the smaller spot set matched under one homography with
 tight residuals (a scale-free measure that a large true overlap should
 push high and coincidental alignments should not)."""
 
+import os
 import re
 
 import cv2
 import numpy as np
-from scipy.spatial import cKDTree
 
 from .realdata import load_dataset
 from .real_reid import _CentroidSurface, identify_centroids
 from .surface_matcher import SurfaceMatcher
 
-OUT = "/tmp/claude-0/-home-user-SanBox/b501c8e0-afbc-56a3-aade-8375de946ebf/scratchpad/viz"
+OUT = os.environ.get("SPOTID_VIZ_OUT", "viz_out")
 
 
 def coarse(name):
@@ -34,6 +34,7 @@ def match_fraction(a, b):
 
 
 def main():
+    os.makedirs(OUT, exist_ok=True)
     shots = [s for s in load_dataset("realdata/realworldspots.yolov8")
              if s.n_spots >= 40]
     shots.sort(key=lambda s: (coarse(s.individual), s.individual))

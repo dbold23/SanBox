@@ -330,11 +330,16 @@ def cmd_calibrate(args):
             gen.append(best_same)
         imp.append(best_diff)
     gen, imp = np.array(gen), np.array(imp)
+    if not len(gen):
+        print("no genuine pairs in catalog (no individual has 2+ photos) "
+              "— cannot calibrate a threshold.")
+        return
     print(f"genuine best-match norm: n={len(gen)} min {gen.min():.3f} "
           f"mean {gen.mean():.3f}")
-    print(f"impostor best-match norm: n={len(imp)} max {imp.max():.3f} "
-          f"mean {imp.mean():.3f}")
-    if len(gen):
+    if len(imp):
+        print(f"impostor best-match norm: n={len(imp)} max {imp.max():.3f} "
+              f"mean {imp.mean():.3f}")
+    if len(imp):
         print(f"suggested threshold: {(gen.min()+imp.max())/2:.3f} "
               f"(midpoint of genuine-min and impostor-max)")
 

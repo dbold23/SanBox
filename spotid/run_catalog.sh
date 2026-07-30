@@ -2,9 +2,8 @@
 # Process a large raw sevengill photo catalog: download from Drive, enroll
 # DISK features, and discover individuals / re-sightings — unsupervised.
 #
-# Run on a machine with unrestricted network (a GPU box is ideal; DISK
-# feature extraction is much faster on GPU). NOT runnable from the Claude
-# sandbox, whose egress policy blocks Google Drive.
+# Requires outbound network access to Google Drive. A GPU box is ideal;
+# DISK feature extraction is much faster on GPU.
 #
 #     git clone <this-repo> && cd SanBox
 #     bash spotid/run_catalog.sh
@@ -14,7 +13,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-DRIVE_ID="${DRIVE_ID:-1hESUgjTS7CvJtF4iLOgJx86o1I0y0sil}"   # images_raw.zip
+DRIVE_ID="${DRIVE_ID:?set DRIVE_ID to the Drive file id of your catalog zip}"
 ZIP="${ZIP:-images_raw.zip}"
 IMGDIR="${IMGDIR:-images_raw}"
 CATALOG="${CATALOG:-catalog.npz}"

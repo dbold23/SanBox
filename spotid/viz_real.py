@@ -10,7 +10,7 @@ from .realdata import group_by_individual, load_dataset, resighting_pairs
 from .real_reid import _CentroidSurface, build_matcher, identify_centroids
 from .surface_matcher import SurfaceMatcher
 
-OUT = "/tmp/claude-0/-home-user-SanBox/b501c8e0-afbc-56a3-aade-8375de946ebf/scratchpad/viz"
+OUT = os.environ.get("SPOTID_VIZ_OUT", "viz_out")
 
 
 def _fit(img, H):
@@ -126,6 +126,11 @@ def main():
         ov = alignment_overlay(ind, a, b, res)
         if ov is not None:
             cv2.imwrite(f"{OUT}/align_{ind}.png", ov)
+
+    if not panels:
+        raise SystemExit(
+            "no re-sighting pairs found — check that the dataset is unpacked "
+            "at realdata/realworldspots.yolov8 (see spotid/README.md)")
 
     w = max(p.shape[1] for p in panels)
     stacked = np.vstack([cv2.copyMakeBorder(p, 6, 6, 0, w - p.shape[1],
