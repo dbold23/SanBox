@@ -1,0 +1,89 @@
+{
+  "config": {
+    "L": 560.0,
+    "W": 64.0,
+    "theta": 1.2,
+    "margin": 24,
+    "n_s": 384,
+    "n_r": 96,
+    "n_stations": 256,
+    "n_spots": 40,
+    "spot_radius": 4.5,
+    "min_sep": 30.0,
+    "body_val": 0.78,
+    "spot_val": 0.12,
+    "bg_val": 0.15,
+    "seed": 0
+  },
+  "epsilon_default_source": "0.05 = midpoint of the +/-3.9-6.6% longitudinal skin-strain bracket from leopard-shark sonomicrometry (Donley & Shadwick, J. Exp. Biol. 206(7), 2003) [SEARCH-grade per docs/sevengill-canonical-reid]",
+  "runs": {
+    "eps_0.00": {
+      "epsilon": 0.0,
+      "seed": 0,
+      "n_spots_truth": 28,
+      "n_detected_rest": 28,
+      "n_detected_bent": 28,
+      "n_matched": 28,
+      "chart_len_rest_px": 554.2608695652173,
+      "chart_len_bent_px": 553.3378034679806,
+      "mean_abs_ds_px": 0.400933490945176,
+      "max_abs_ds_px": 1.5847305774598794,
+      "mean_abs_ds_pct_bl": 0.07159526624021001,
+      "max_abs_ds_pct_bl": 0.2829876031178356,
+      "mean_abs_dr_px": 0.14024187927455575,
+      "max_abs_dr_px": 0.5505376344085988,
+      "convex": {
+        "n": 16,
+        "mean_signed_ds_px": -0.3060139486836295,
+        "mean_abs_ds_px": 0.46208065275460974,
+        "max_abs_ds_px": 1.5847305774598794,
+        "mean_abs_ds_pct_bl": 0.08251440227760888,
+        "max_abs_ds_pct_bl": 0.2829876031178356
+      },
+      "concave": {
+        "n": 12,
+        "mean_signed_ds_px": -0.08847017460596618,
+        "mean_abs_ds_px": 0.3194039418659311,
+        "max_abs_ds_px": 1.0714621513974407,
+        "mean_abs_ds_pct_bl": 0.05703641819034483,
+        "max_abs_ds_pct_bl": 0.19133252703525727
+      },
+      "fit_slope_measured_vs_predicted": null,
+      "fit_intercept_px": null
+    },
+    "eps_0.05": {
+      "epsilon": 0.05,
+      "seed": 0,
+      "n_spots_truth": 28,
+      "n_detected_rest": 28,
+      "n_detected_bent": 28,
+      "n_matched": 28,
+      "chart_len_rest_px": 554.2608695652173,
+      "chart_len_bent_px": 553.6725413787532,
+      "mean_abs_ds_px": 3.886692525851982,
+      "max_abs_ds_px": 8.05972592807251,
+      "mean_abs_ds_pct_bl": 0.6940522367592825,
+      "max_abs_ds_pct_bl": 1.439236772870091,
+      "mean_abs_dr_px": 0.9027870022487363,
+      "max_abs_dr_px": 1.9479549313165592,
+      "convex": {
+        "n": 16,
+        "mean_signed_ds_px": 3.550661232220489,
+        "mean_abs_ds_px": 3.565145021437872,
+        "max_abs_ds_px": 8.05972592807251,
+        "mean_abs_ds_pct_bl": 0.6366330395424772,
+        "max_abs_ds_pct_bl": 1.439236772870091
+      },
+      "concave": {
+        "n": 12,
+        "mean_signed_ds_px": -4.315422531737462,
+        "mean_abs_ds_px": 4.315422531737462,
+        "max_abs_ds_px": 7.69087141252902,
+        "mean_abs_ds_pct_bl": 0.7706111663816896,
+        "max_abs_ds_pct_bl": 1.373369895094468
+      },
+      "fit_slope_measured_vs_predicted": 1.0190146959861217,
+      "fit_intercept_px": -0.1948723509138077
+    }
+  }
+}
