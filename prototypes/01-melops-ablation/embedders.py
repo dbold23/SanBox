@@ -249,6 +249,10 @@ _EMBEDDERS = {
 
 def get_embedder(name, seed=0):
     """Factory. ``seed`` is consumed only by embedders that are stochastic."""
+    if isinstance(name, str) and name.startswith("finetuned:"):
+        # run-2 fine-tuned checkpoints; lazy import keeps torch/timm optional
+        from finetune import FinetunedEmbedder
+        return FinetunedEmbedder(name[len("finetuned:"):])
     if name not in _EMBEDDERS:
         raise ValueError("unknown backbone %r; choose from %r" % (name, sorted(_EMBEDDERS)))
     if name == "random":

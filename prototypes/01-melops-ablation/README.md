@@ -159,4 +159,71 @@ own plain-CSV fallback loader.
 | `embedders.py` | `hist`, `random` (numpy-only), `megadescriptor` / `dinov2` / `miewid` (torch/timm-guarded, exact model strings) |
 | `protocol.py` | `one_shot_open_set_split`, `cross_orientation_split`, `evaluate`; all invariants raise `ProtocolViolation` |
 | `run_ablation.py` | CLI; writes `results.json` + `report.md` with the verdict and the do-not-overread caveat |
-| `tests/` | protocol invariants, chance-floor/above-chance metric sanity, verdict-detection on constructed corpora, CLI smoke |
+| `finetune.py` | run-2 fine-tune arm: `split_identities` (identity-disjoint 60/40), ArcFace (`ArcMarginProduct`) training over a timm backbone, `FinetunedEmbedder` + `finetuned:CKPT` backbone spec |
+| `tests/` | protocol invariants, chance-floor/above-chance metric sanity, verdict-detection on constructed corpora, CLI smoke, fine-tune arm (disjointness, loss descent, checkpoint round-trip, fine-tuned-beats-random-init micro-run) |
+
+## Fine-tune arm (run 2)
+
+Run 1's zero-shot arms sat at 1–2 Rank-1 points — INCONCLUSIVE under the
+15-point decision floor (`results/ANALYSIS.md`). `finetune.py` implements the
+decisive arm the analysis calls for: supervised metric fine-tuning (ArcFace,
+additive angular margin m=0.5, scale s=30 — Deng et al., CVPR 2019) on an
+**identity-disjoint 60% of identities**, with the four-arm ablation evaluated
+on the held-out 40%.
+
+**Identity-disjoint eval contract.** `split_identities(df, train_frac=0.6,
+seed)` splits on `identity` (both flanks of one fish travel together), with
+zero overlap enforced via `ProtocolViolation`. The eval frame is then fed to
+the *existing* `protocol.one_shot_open_set_split` **unchanged** — fine-tuning
+never sees an eval identity, in any crop, on either side. The exact identity
+lists are written to `split_identities.json` next to the checkpoint so the
+eval run can prove disjointness after the fact; the eval-side catalogue must
+be restricted to `eval_identities` before any evaluation.
+
+**Training (GPU/vast box, open egress):**
+
+```bash
+cd prototypes/01-melops-ablation
+python finetune.py \
+    --root /data/Melops --out runs/ft-megadesc \
+    --backbone hf-hub:BVRA/MegaDescriptor-L-384 \
+    --bbox body --train-frac 0.6 \
+    --epochs 10 --batch-size 64 --lr 1e-4 --backbone-lr 1e-5 \
+    --unfreeze-last-N 20 --img-size 384 --seed 0
+```
+
+`--lr` is the ArcFace-head rate; unfrozen backbone tensors train at
+`--backbone-lr` (default `lr * 0.1`, i.e. 1e-5 here). `--freeze-backbone`
+trains the head only; `--unfreeze-last-N` frees the last N backbone parameter
+tensors. Horizontal flip is **off by default and must stay off**: left and
+right flanks are separate identity units, and mirroring a left flank
+manufactures a fake right flank — it would alias the two flank classes.
+Outputs: `checkpoint.pt`, `train_log.json` (per-epoch mean ArcFace loss),
+`split_identities.json`. All seeding (split, torch init, batch order,
+augmentation) hangs off `--seed`.
+
+**Evaluation** uses the same runner via the `finetuned:` backbone spec
+(dispatched by `embedders.get_embedder` / `finetune.get_embedder_from_spec`
+through a guarded lazy import — torch/timm are only required if the spec is
+used):
+
+```bash
+python run_ablation.py --data melops --root /data/Melops \
+    --backbone finetuned:runs/ft-megadesc/checkpoint.pt \
+    --arms head,body,headless,cross_orientation --out results-melops-ft/
+```
+
+restricting the catalogue to the `eval_identities` of
+`runs/ft-megadesc/split_identities.json` (train identities must never enter
+gallery or query).
+
+**Reminder:** the head-vs-headless verdict is only readable if this lifts the
+operating point above the **15-point decision floor** — if every crop arm
+stays under 15 Rank-1 points, `compute_verdict` reports INCONCLUSIVE again,
+and no delta from the run may be cited in either direction.
+
+Offline/CI: this sandbox has torch+timm but huggingface.co egress-blocked, so
+tests use `resnet10t` at 64 px with `--no-pretrained`; the micro-run in
+`tests/test_finetune.py` trains 8 epochs on the synthetic train split and
+asserts the fine-tuned Rank-1 on held-out identities beats the random-init
+same-architecture baseline.

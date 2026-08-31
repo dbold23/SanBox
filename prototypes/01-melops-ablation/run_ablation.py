@@ -22,6 +22,7 @@ import os
 import sys
 import time
 
+import emb_cache
 import embedders
 import melops_data
 import protocol
@@ -51,17 +52,69 @@ CAVEAT = (
 )
 
 
-def _embed_frame(embedder, root, frame):
-    crops = [melops_data.load_crop(root, row) for _, row in frame.iterrows()]
-    return embedder.embed(crops)
+def _embed_frame(embedder, root, frame, backbone, bbox_arm, emb_cache_dir=None):
+    return emb_cache.embed_frame(embedder, root, frame, backbone, bbox_arm,
+                                 cache_dir=emb_cache_dir)
 
 
-def run_experiment(root, backbone="hist", arms=ALL_ARMS, seed=0, cutoff_fraction=0.5):
-    """Run the requested arms; returns the full results dict (JSON-safe)."""
+_FIXED_BACKBONES = ("hist", "random", "megadescriptor", "dinov2", "miewid")
+
+
+def _backbone_arg(value):
+    if value in _FIXED_BACKBONES or (isinstance(value, str) and value.startswith("finetuned:")):
+        return value
+    raise argparse.ArgumentTypeError(
+        "backbone must be one of %r or finetuned:CHECKPOINT_PATH, got %r"
+        % (_FIXED_BACKBONES, value)
+    )
+
+
+def _exclude_train_identities(df, backbone):
+    """For a finetuned backbone, drop the checkpoint's training identities.
+
+    A fine-tuned model evaluated on identities it trained on is a leaked
+    eval, so the exclusion is enforced here in code, not by README prose.
+    Returns ``(filtered_df, n_identities_excluded, n_rows_excluded)``.
+    Raises ``protocol.ProtocolViolation`` if the checkpoint carries no
+    training-identity record (pre-hygiene format) or excludes everything.
+    """
+    if not str(backbone).startswith("finetuned:"):
+        return df, 0, 0
+    import finetune  # lazy: needs torch, which finetuned backbones need anyway
+
+    train_ids = finetune.load_train_identities(backbone[len("finetuned:"):])
+    if not train_ids:
+        raise protocol.ProtocolViolation(
+            "checkpoint carries no training-identity record; refusing to "
+            "evaluate a fine-tuned model without an enforceable eval split"
+        )
+    mask = df["identity"].astype(str).isin(train_ids)
+    n_rows = int(mask.sum())
+    n_ids = int(df.loc[mask, "identity"].astype(str).nunique())
+    out = df.loc[~mask].reset_index(drop=True)
+    if len(out) == 0:
+        raise protocol.ProtocolViolation(
+            "excluding the checkpoint's %d training identities removed every "
+            "row; the catalogue and the training split do not match" % n_ids
+        )
+    return out, n_ids, n_rows
+
+
+def run_experiment(root, backbone="hist", arms=ALL_ARMS, seed=0, cutoff_fraction=0.5,
+                   emb_cache_dir=None):
+    """Run the requested arms; returns the full results dict (JSON-safe).
+
+    ``emb_cache_dir=None`` keeps the uncached behavior; a directory enables
+    the npz embedding cache (keyed by backbone + bbox arm + image-id list, so
+    head/body/headless never collide). Use one cache dir per corpus root.
+    """
     for arm in arms:
         if arm not in ALL_ARMS:
             raise ValueError("unknown arm %r; choose from %r" % (arm, ALL_ARMS))
     embedder = embedders.get_embedder(backbone, seed=seed)
+    # The random chance-floor embedder depends on its seed; key it apart so
+    # two seeds never share a cache entry. All other backbones are seed-free.
+    cache_backbone = backbone if backbone != "random" else "random-seed%d" % int(seed)
     results = {
         "backbone": backbone,
         "seed": int(seed),
@@ -73,20 +126,27 @@ def run_experiment(root, backbone="hist", arms=ALL_ARMS, seed=0, cutoff_fraction
         t0 = time.time()
         if arm == "cross_orientation":
             df = melops_data.load_melops(root, bbox="body")
+            df, n_tid, n_trow = _exclude_train_identities(df, backbone)
             gallery_df, query_df = protocol.cross_orientation_split(
                 df, enroll_side="L", query_side="R", cutoff_fraction=cutoff_fraction, seed=seed
             )
             cross = True
         else:
             df = melops_data.load_melops(root, bbox=arm)
+            df, n_tid, n_trow = _exclude_train_identities(df, backbone)
             gallery_df, query_df = protocol.one_shot_open_set_split(
                 df, cutoff_fraction=cutoff_fraction, seed=seed
             )
             cross = False
-        gallery_emb = _embed_frame(embedder, root, gallery_df)
-        query_emb = _embed_frame(embedder, root, query_df)
+        bbox_arm = "body" if arm == "cross_orientation" else arm
+        gallery_emb = _embed_frame(embedder, root, gallery_df, cache_backbone, bbox_arm,
+                                   emb_cache_dir=emb_cache_dir)
+        query_emb = _embed_frame(embedder, root, query_df, cache_backbone, bbox_arm,
+                                 emb_cache_dir=emb_cache_dir)
         metrics = protocol.evaluate(gallery_emb, gallery_df, query_emb, query_df, cross_side=cross)
         metrics["n_same_date_excluded"] = int(query_df.attrs.get("n_same_date_excluded", 0))
+        metrics["n_train_identities_excluded"] = n_tid
+        metrics["n_train_identity_rows_excluded"] = n_trow
         metrics["elapsed_s"] = round(time.time() - t0, 2)
         results["arms"][arm] = metrics
     results["verdict"] = compute_verdict(results["arms"])
@@ -208,12 +268,17 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--data", choices=("synthetic", "melops"), required=True)
     parser.add_argument("--root", required=True, help="corpus root directory")
-    parser.add_argument("--backbone", default="hist",
-                        choices=("hist", "random", "megadescriptor", "dinov2", "miewid"))
+    parser.add_argument("--backbone", default="hist", type=_backbone_arg,
+                        help="hist | random | megadescriptor | dinov2 | miewid | "
+                             "finetuned:CHECKPOINT_PATH (from finetune.py)")
     parser.add_argument("--arms", default="head,body,headless,cross_orientation")
     parser.add_argument("--out", default="results")
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--cutoff-fraction", type=float, default=0.5)
+    parser.add_argument("--emb-cache", default=None, metavar="DIR",
+                        help="optional embedding-cache directory (npz per backbone/arm/"
+                             "id-list); default None keeps the uncached behavior. Use "
+                             "one cache dir per corpus root.")
     parser.add_argument("--n-individuals", type=int, default=40,
                         help="synthetic only; used when --root has no metadata.csv yet")
     parser.add_argument("--head-signal", type=float, default=1.0, help="synthetic only")
@@ -233,6 +298,7 @@ def main(argv=None):
     results = run_experiment(
         args.root, backbone=args.backbone, arms=arms,
         seed=args.seed, cutoff_fraction=args.cutoff_fraction,
+        emb_cache_dir=args.emb_cache,
     )
     json_path, report_path = write_report(results, args.out)
 
