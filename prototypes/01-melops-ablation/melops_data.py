@@ -102,10 +102,24 @@ def _load_wildlife_datasets(root, bbox):
     return ds.df.copy()
 
 
+_SIDE_MAP = {"l": "L", "left": "L", "r": "R", "right": "R"}
+
+
+def _normalize_side(series):
+    lowered = series.astype(str).str.strip().str.lower()
+    return lowered.map(_SIDE_MAP).fillna(series)
+
+
 def _normalize(df, bbox):
     df = df.copy()
+    # The real Zenodo metadata spells sides "left"/"right"; the catalogue
+    # contract (and synthetic mode) uses "L"/"R". Unknown values fall through
+    # unchanged so _check_catalogue still rejects them.
+    df["side"] = _normalize_side(df["side"])
     if "orientation" not in df.columns:
         df["orientation"] = df["side"]
+    else:
+        df["orientation"] = _normalize_side(df["orientation"])
     df["identity"] = df["identity"].astype(str)
     df["image_id"] = df["image_id"].astype(str)
     df["date"] = pd.to_datetime(df["date"]).dt.strftime("%Y-%m-%d")
