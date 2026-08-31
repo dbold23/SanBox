@@ -1,0 +1,156 @@
+{
+  "backbone": "megadescriptor",
+  "arm": "body",
+  "seed": 0,
+  "cutoff_fraction": 0.5,
+  "root": "/root/data/Melops",
+  "n_gallery": 10410,
+  "n_known": 2596,
+  "n_novel": 11276,
+  "n_same_date_excluded": 295,
+  "recapture_gap": {
+    "n_known": 2596,
+    "buckets": [
+      {
+        "bucket_days": "0-30",
+        "n": 213,
+        "mean_true_mate_sim": 0.6049935156933212,
+        "rank1": 0.051643192488262914
+      },
+      {
+        "bucket_days": "31-180",
+        "n": 513,
+        "mean_true_mate_sim": 0.5313785122951892,
+        "rank1": 0.007797270955165692
+      },
+      {
+        "bucket_days": "181-365",
+        "n": 611,
+        "mean_true_mate_sim": 0.49958620077278026,
+        "rank1": 0.008183306055646482
+      },
+      {
+        "bucket_days": "366-730",
+        "n": 688,
+        "mean_true_mate_sim": 0.477335597288802,
+        "rank1": 0.005813953488372093
+      },
+      {
+        "bucket_days": "731+",
+        "n": 571,
+        "mean_true_mate_sim": 0.47437781084121006,
+        "rank1": 0.0035026269702276708
+      }
+    ]
+  },
+  "auroc_year_strata": {
+    "pooled_auroc": 0.3537153442603596,
+    "strata": [
+      {
+        "year": 2018,
+        "n_known": 212,
+        "n_novel": 0,
+        "auroc": null,
+        "mean_max_sim_known": 0.7603426667758769,
+        "mean_max_sim_novel": null
+      },
+      {
+        "year": 2019,
+        "n_known": 101,
+        "n_novel": 0,
+        "auroc": null,
+        "mean_max_sim_known": 0.7442313355510286,
+        "mean_max_sim_novel": null
+      },
+      {
+        "year": 2020,
+        "n_known": 838,
+        "n_novel": 0,
+        "auroc": null,
+        "mean_max_sim_known": 0.7305211437154929,
+        "mean_max_sim_novel": null
+      },
+      {
+        "year": 2021,
+        "n_known": 760,
+        "n_novel": 1565,
+        "auroc": 0.3705111821086262,
+        "mean_max_sim_known": 0.6886382819143708,
+        "mean_max_sim_novel": 0.7228330908325024
+      },
+      {
+        "year": 2022,
+        "n_known": 378,
+        "n_novel": 3229,
+        "auroc": 0.27945077759261716,
+        "mean_max_sim_known": 0.7154932172616557,
+        "mean_max_sim_novel": 0.7637134913980573
+      },
+      {
+        "year": 2023,
+        "n_known": 217,
+        "n_novel": 4420,
+        "auroc": 0.2188867110119482,
+        "mean_max_sim_known": 0.6897751586075831,
+        "mean_max_sim_novel": 0.7601243077071678
+      },
+      {
+        "year": 2024,
+        "n_known": 90,
+        "n_novel": 2062,
+        "auroc": 0.46786830477422137,
+        "mean_max_sim_known": 0.7234493511160796,
+        "mean_max_sim_novel": 0.7336975853473563
+      }
+    ],
+    "reading": "below 0.5 even within years => confound NOT temporal, investigate further [3 of 7 strata untestable (single-class) and excluded]"
+  },
+  "small_gallery_calibration": {
+    "k_requested": 500,
+    "k_effective": 500,
+    "n_seeds": 3,
+    "base_seed": 0,
+    "runs": [
+      {
+        "subsample_seed": 0,
+        "n_gallery": 500,
+        "n_known": 145,
+        "n_novel": 620,
+        "rank1": 0.034482758620689655,
+        "open_set_auroc": 0.3999777530589544
+      },
+      {
+        "subsample_seed": 1,
+        "n_gallery": 500,
+        "n_known": 150,
+        "n_novel": 601,
+        "rank1": 0.04666666666666667,
+        "open_set_auroc": 0.34331669439822515
+      },
+      {
+        "subsample_seed": 2,
+        "n_gallery": 500,
+        "n_known": 129,
+        "n_novel": 607,
+        "rank1": 0.07751937984496124,
+        "open_set_auroc": 0.36545215381275303
+      }
+    ],
+    "rank1": {
+      "mean": 0.052889601710772526,
+      "min": 0.034482758620689655,
+      "max": 0.07751937984496124
+    },
+    "open_set_auroc": {
+      "mean": 0.36958220042331086,
+      "min": 0.34331669439822515,
+      "max": 0.3999777530589544
+    },
+    "anchor_note": "compare against the NLDL 2023 one-shot 0.35 anchor (arXiv:2301.00596, population-trained model, small gallery) [SEARCH-grade, confirm against the PDF before quoting]"
+  },
+  "contact_sheets": {
+    "head": "contact_sheet_head.png",
+    "body": "contact_sheet_body.png",
+    "headless": "contact_sheet_headless.png"
+  }
+}

@@ -1,0 +1,17 @@
+== max-sim by year and type ==
+year 2018 known n=212 mean=0.7603 | novel n=0 mean=nan
+year 2019 known n=101 mean=0.7442 | novel n=0 mean=nan
+year 2020 known n=838 mean=0.7305 | novel n=0 mean=nan
+year 2021 known n=760 mean=0.6886 | novel n=1565 mean=0.7228
+year 2022 known n=378 mean=0.7155 | novel n=3229 mean=0.7637
+year 2023 known n=217 mean=0.6898 | novel n=4420 mean=0.7601
+year 2024 known n=90 mean=0.7234 | novel n=2062 mean=0.7337
+== length effects ==
+spearman(maxsim, query length) all: rho=-0.312 p=8.8e-310
+  known: rho=-0.202 p=2.3e-25 | mean length=145.3
+  novel: rho=-0.280 p=8.5e-202 | mean length=132.4
+spearman(maxsim, |len_q - len_matched_gallery|): rho=-0.145 p=1.0e-65
+mean |len diff| to argmax-gallery: 16.04 vs random-gallery baseline: 24.17
+== gallery-neighbor date structure ==
+median |days query -> argmax gallery|: 310 (known) / 1046 (novel)
+random-gallery baseline median |days|: 1099
