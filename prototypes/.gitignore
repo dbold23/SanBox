@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+# embedding caches (run_ablation --emb-cache / diagnose.py) are large, per-machine artifacts
+emb_cache/
+*.npz
+# model checkpoints from finetune.py stay on the training box
+*.pt
+*.pth
