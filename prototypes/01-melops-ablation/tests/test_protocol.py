@@ -224,3 +224,39 @@ def test_nat_dates_raise():
     df = frame([row("a1", "A", "2018-01-01", "L"), row("a2", "A", None, "L")])
     with pytest.raises(ProtocolViolation):
         protocol.one_shot_open_set_split(df, cutoff_date="2019-01-01")
+
+
+def test_cross_orientation_same_date_queries_excluded_by_default():
+    # a_r1 is A's opposite flank shot from the enrollment handling session
+    # (same date as A's L gallery image): a cross-side near-duplicate that
+    # must not count as a known query.
+    df = frame(
+        [
+            row("a_l1", "A", "2018-01-01", "L"),
+            row("a_r1", "A", "2018-01-01", "R"),  # same session, opposite flank
+            row("a_r2", "A", "2019-06-01", "R"),  # later resighting: legit known query
+            row("b_l1", "B", "2018-02-01", "L"),
+            row("z_r1", "Z", "2018-01-01", "R"),  # not enrolled: novel, never excluded
+        ]
+    )
+    gallery, queries = protocol.cross_orientation_split(
+        df, enroll_side="L", query_side="R", cutoff_date="2019-01-01", seed=0
+    )
+    assert set(gallery["image_id"]) == {"a_l1", "b_l1"}
+    assert set(queries["image_id"]) == {"a_r2", "z_r1"}
+    assert queries.attrs["n_same_date_excluded"] == 1
+    # z_r1 shares the date but not the identity: novel query, kept
+    assert not bool(queries.loc[queries["image_id"] == "z_r1", "is_known"].iloc[0])
+
+    _, queries_inc = protocol.cross_orientation_split(
+        df, enroll_side="L", query_side="R", cutoff_date="2019-01-01", seed=0,
+        same_date_policy="include",
+    )
+    assert set(queries_inc["image_id"]) == {"a_r1", "a_r2", "z_r1"}
+    assert queries_inc.attrs["n_same_date_excluded"] == 0
+
+    with pytest.raises(ProtocolViolation):
+        protocol.cross_orientation_split(
+            df, enroll_side="L", query_side="R", cutoff_date="2019-01-01",
+            same_date_policy="drop",
+        )

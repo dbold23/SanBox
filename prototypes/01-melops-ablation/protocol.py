@@ -160,7 +160,8 @@ def _check_split(gallery_df, query_df):
                 raise ProtocolViolation("novel query %r leaks into gallery" % (key,))
 
 
-def cross_orientation_split(df, enroll_side="L", query_side="R", cutoff_fraction=None, cutoff_date=None, seed=0):
+def cross_orientation_split(df, enroll_side="L", query_side="R", cutoff_fraction=None,
+                            cutoff_date=None, seed=0, same_date_policy="exclude"):
     """Enroll one side, query the other. THE ONLY ARM THAT CROSSES SIDES.
 
     This split ignores the same-side matching rule BY DESIGN -- it measures
@@ -168,9 +169,20 @@ def cross_orientation_split(df, enroll_side="L", query_side="R", cutoff_fraction
     image of each identity whose first ``enroll_side`` sighting precedes the
     cutoff. Queries: all ``query_side`` images; known iff the identity is
     enrolled. Evaluate the result with ``evaluate(..., cross_side=True)``.
+
+    ``same_date_policy`` mirrors ``one_shot_open_set_split``, applied across
+    sides: a known query taken on the SAME date as its identity's gallery
+    image is the opposite flank of the same handling session (the fish is
+    photographed on both sides in one session), so the default ``"exclude"``
+    drops it from the query set (count recorded in
+    ``query_df.attrs["n_same_date_excluded"]`` and must be reported).
+    ``"include"`` keeps them as known queries, for measuring the inflation.
     """
     if enroll_side == query_side:
         raise ValueError("enroll_side and query_side must differ")
+    if same_date_policy not in ("exclude", "include"):
+        raise ProtocolViolation("same_date_policy must be 'exclude' or 'include', got %r"
+                                % (same_date_policy,))
     _check_input_frame(df)
     enroll_df = df[df["side"] == enroll_side]
     if len(enroll_df) == 0:
@@ -183,9 +195,29 @@ def cross_orientation_split(df, enroll_side="L", query_side="R", cutoff_fraction
     if len(query_df) == 0:
         raise ProtocolViolation("no images on query side %r" % query_side)
     query_df["is_known"] = query_df["identity"].isin(enrolled)
+    query_dates = pd.to_datetime(query_df["date"])
+    if query_dates.isna().any():
+        bad = query_df.loc[query_dates.isna(), "image_id"].tolist()[:5]
+        raise ProtocolViolation("unparseable/missing dates (first ids: %r); "
+                                "fix the metadata rather than letting the split guess" % (bad,))
+    n_same_date_excluded = 0
+    if same_date_policy == "exclude":
+        gallery_date_by_identity = dict(
+            zip(gallery_df["identity"], pd.to_datetime(gallery_df["date"]))
+        )
+        enrolled_date = pd.to_datetime(query_df["identity"].map(gallery_date_by_identity))
+        same_date = query_df["is_known"] & (query_dates == enrolled_date)
+        n_same_date_excluded = int(same_date.sum())
+        query_df = query_df.loc[~same_date].reset_index(drop=True)
+        if len(query_df) == 0:
+            raise ProtocolViolation(
+                "same-date exclusion emptied the query side %r (all %d queries were "
+                "same-session opposite flanks)" % (query_side, n_same_date_excluded)
+            )
     overlap = set(gallery_df["image_id"]).intersection(set(query_df["image_id"]))
     if overlap:
         raise ProtocolViolation("image(s) in both gallery and query: %r" % sorted(overlap)[:3])
+    query_df.attrs["n_same_date_excluded"] = n_same_date_excluded
     return gallery_df, query_df
 
 

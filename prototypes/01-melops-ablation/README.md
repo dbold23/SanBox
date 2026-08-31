@@ -118,9 +118,14 @@ syntax; they import cleanly on 3.9 (checked with `vermin`: minimum 3.7).
   unit's other photos from the *same date* as its gallery image are dropped
   from the query set (`same_date_policy="exclude"`), because on real Melops
   they are same-handling-session near-duplicates that inflate known-query
-  metrics. The excluded count is reported per arm as
+  metrics. In the `cross_orientation` arm the same rule applies *across*
+  sides — a known query on the opposite flank taken on its identity's
+  enrollment date is the other side of one handling session, so it is
+  dropped too. The excluded count is reported per arm as
   `n_same_date_excluded` in `results.json`; pass
   `same_date_policy="include"` to measure the inflation directly.
+  Cross-orientation numbers stored under `results/` predate this exclusion
+  and are not comparable to runs made after it.
 * **Dates must parse**: a NaT/missing date raises `ProtocolViolation`
   rather than being silently binned.
 * Metrics: Rank-1 / Rank-5 / mAP over known queries (one-shot gallery ⇒ AP =
