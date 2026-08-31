@@ -35,6 +35,13 @@ VERDICT_KILL = (
 )
 VERDICT_DISTRIBUTED = "identity distributed - Approach 2 earns a hearing"
 VERDICT_INTERMEDIATE = "intermediate - widen data before deciding"
+VERDICT_INCONCLUSIVE = (
+    "INCONCLUSIVE - operating point below decision floor: every crop arm is "
+    "under 15 Rank-1 points, so the >= 15-point kill criterion is arithmetically "
+    "inexpressible and the <= 5-point distributed rule is vacuous on a "
+    "near-floor base. Improve the matcher (fine-tune on a disjoint identity "
+    "subset) before reading the ablation; do not cite these deltas either way."
+)
 
 CAVEAT = (
     "Do not overread: Melops fish are board-mounted (photographed against a "
@@ -104,7 +111,15 @@ def compute_verdict(arm_results):
     # tolerance is far above that error and far below the 5-point grid of any
     # realistic count difference.
     tol = 1e-9
-    if head - headless >= 15.0 - tol:
+    # Decision floor: the kill rule needs head >= 15 points to be expressible
+    # at all, and "within 5 points" on a ~1% base is noise, not evidence of
+    # distributed identity. Below the floor the experiment has not answered
+    # the question -- say so instead of laundering a floor artifact into a
+    # programme decision. (The real Melops zero-shot run of 2026-08-31 sat at
+    # 1-2 points across all crop arms and is exactly this case.)
+    if max(head, body, headless) < 15.0 - tol:
+        verdict = VERDICT_INCONCLUSIVE
+    elif head - headless >= 15.0 - tol:
         verdict = VERDICT_KILL
     elif abs(headless - body) <= 5.0 + tol:
         verdict = VERDICT_DISTRIBUTED
@@ -150,6 +165,9 @@ def write_report(results, out_dir):
         "build a patch matcher, not a surface). |headless - body| <= 5 points ->",
         "identity distributed (Approach 2 earns a hearing). Otherwise ->",
         "intermediate (widen data before deciding). KILL is checked first.",
+        "A decision floor gates all of it: if every crop arm is below 15",
+        "Rank-1 points the verdict is INCONCLUSIVE, because the kill rule",
+        "cannot express and the distributed rule is vacuous at that level.",
         "",
     ]
     v = results["verdict"]

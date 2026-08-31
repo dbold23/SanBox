@@ -80,3 +80,26 @@ def test_report_states_decision_rule(tmp_path):
     text = (tmp_path / "report.md").read_text()
     assert ">= 15 points -> KILL/redirect" in text
     assert "|headless - body| <= 5 points" in text
+
+
+def test_verdict_inconclusive_below_decision_floor():
+    # The real 2026-08-31 Melops zero-shot run: all crop arms at 1-2 points.
+    def arms(head, headless, body):
+        return {
+            "head": {"rank1": head},
+            "headless": {"rank1": headless},
+            "body": {"rank1": body},
+        }
+
+    v = run_ablation.compute_verdict(arms(0.019, 0.012, 0.010))
+    assert v["verdict"] == run_ablation.VERDICT_INCONCLUSIVE
+
+    # At a healthy operating point the original rules still apply.
+    v = run_ablation.compute_verdict(arms(0.40, 0.20, 0.22))
+    assert v["verdict"] == run_ablation.VERDICT_KILL
+    v = run_ablation.compute_verdict(arms(0.40, 0.36, 0.38))
+    assert v["verdict"] == run_ablation.VERDICT_DISTRIBUTED
+
+    # Exactly at the floor with one arm at 15.0 points: rules express again.
+    v = run_ablation.compute_verdict(arms(15 / 100, 0.0, 0.0))
+    assert v["verdict"] == run_ablation.VERDICT_KILL
