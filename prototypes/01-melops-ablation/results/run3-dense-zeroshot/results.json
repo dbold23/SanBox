@@ -1,0 +1,363 @@
+{
+  "backbone": "megadescriptor",
+  "seed": 0,
+  "cutoff_fraction": 0.5,
+  "root": "/root/data/Melops",
+  "dense_min_images": 4,
+  "arms": {
+    "head": {
+      "n_gallery": 151,
+      "n_known": 411,
+      "n_novel": 291,
+      "rank1": 0.15328467153284672,
+      "rank5": 0.39172749391727496,
+      "mAP": 0.27915579561620746,
+      "open_set_auroc": 0.3966689241728748,
+      "rejection_curve": [
+        {
+          "quantile": 0.0,
+          "threshold": 0.2129829419764216,
+          "known_acceptance_rate": 1.0,
+          "novel_rejection_rate": 0.0,
+          "rank1_at_threshold": 0.15328467153284672
+        },
+        {
+          "quantile": 0.1,
+          "threshold": 0.5326226072739896,
+          "known_acceptance_rate": 0.8759124087591241,
+          "novel_rejection_rate": 0.06872852233676977,
+          "rank1_at_threshold": 0.1411192214111922
+        },
+        {
+          "quantile": 0.2,
+          "threshold": 0.5790336803672141,
+          "known_acceptance_rate": 0.754257907542579,
+          "novel_rejection_rate": 0.13745704467353953,
+          "rank1_at_threshold": 0.13138686131386862
+        },
+        {
+          "quantile": 0.3,
+          "threshold": 0.6076215922523369,
+          "known_acceptance_rate": 0.6374695863746959,
+          "novel_rejection_rate": 0.21305841924398625,
+          "rank1_at_threshold": 0.11678832116788321
+        },
+        {
+          "quantile": 0.4,
+          "threshold": 0.6277451787033115,
+          "known_acceptance_rate": 0.5304136253041363,
+          "novel_rejection_rate": 0.3024054982817869,
+          "rank1_at_threshold": 0.1070559610705596
+        },
+        {
+          "quantile": 0.5,
+          "threshold": 0.6472618543545507,
+          "known_acceptance_rate": 0.43309002433090027,
+          "novel_rejection_rate": 0.4054982817869416,
+          "rank1_at_threshold": 0.09732360097323602
+        },
+        {
+          "quantile": 0.6,
+          "threshold": 0.6668925272156255,
+          "known_acceptance_rate": 0.34793187347931875,
+          "novel_rejection_rate": 0.5257731958762887,
+          "rank1_at_threshold": 0.07542579075425791
+        },
+        {
+          "quantile": 0.7,
+          "threshold": 0.6823376784772865,
+          "known_acceptance_rate": 0.25790754257907544,
+          "novel_rejection_rate": 0.6391752577319587,
+          "rank1_at_threshold": 0.06569343065693431
+        },
+        {
+          "quantile": 0.8,
+          "threshold": 0.7063880040434415,
+          "known_acceptance_rate": 0.1678832116788321,
+          "novel_rejection_rate": 0.7525773195876289,
+          "rank1_at_threshold": 0.0535279805352798
+        },
+        {
+          "quantile": 0.9,
+          "threshold": 0.7375029715913496,
+          "known_acceptance_rate": 0.072992700729927,
+          "novel_rejection_rate": 0.8591065292096219,
+          "rank1_at_threshold": 0.014598540145985401
+        }
+      ],
+      "n_same_date_excluded": 189,
+      "n_train_identities_excluded": 0,
+      "n_train_identity_rows_excluded": 0,
+      "elapsed_s": 23.51
+    },
+    "body": {
+      "n_gallery": 151,
+      "n_known": 411,
+      "n_novel": 291,
+      "rank1": 0.1192214111922141,
+      "rank5": 0.30656934306569344,
+      "mAP": 0.22534427573454044,
+      "open_set_auroc": 0.43751306427203784,
+      "rejection_curve": [
+        {
+          "quantile": 0.0,
+          "threshold": 0.3266179688894071,
+          "known_acceptance_rate": 1.0,
+          "novel_rejection_rate": 0.0,
+          "rank1_at_threshold": 0.1192214111922141
+        },
+        {
+          "quantile": 0.1,
+          "threshold": 0.5081119363671565,
+          "known_acceptance_rate": 0.8856447688564477,
+          "novel_rejection_rate": 0.08247422680412371,
+          "rank1_at_threshold": 0.10948905109489052
+        },
+        {
+          "quantile": 0.2,
+          "threshold": 0.5531957651771544,
+          "known_acceptance_rate": 0.7688564476885644,
+          "novel_rejection_rate": 0.15807560137457044,
+          "rank1_at_threshold": 0.09732360097323602
+        },
+        {
+          "quantile": 0.3,
+          "threshold": 0.5910926255983766,
+          "known_acceptance_rate": 0.6618004866180048,
+          "novel_rejection_rate": 0.24742268041237114,
+          "rank1_at_threshold": 0.0851581508515815
+        },
+        {
+          "quantile": 0.4,
+          "threshold": 0.6140527945972488,
+          "known_acceptance_rate": 0.5547445255474452,
+          "novel_rejection_rate": 0.33676975945017185,
+          "rank1_at_threshold": 0.07542579075425791
+        },
+        {
+          "quantile": 0.5,
+          "threshold": 0.6392955769800236,
+          "known_acceptance_rate": 0.46228710462287104,
+          "novel_rejection_rate": 0.44673539518900346,
+          "rank1_at_threshold": 0.06082725060827251
+        },
+        {
+          "quantile": 0.6,
+          "threshold": 0.6609358237532834,
+          "known_acceptance_rate": 0.3722627737226277,
+          "novel_rejection_rate": 0.5601374570446735,
+          "rank1_at_threshold": 0.0535279805352798
+        },
+        {
+          "quantile": 0.7,
+          "threshold": 0.6805691695852361,
+          "known_acceptance_rate": 0.26763990267639903,
+          "novel_rejection_rate": 0.6529209621993127,
+          "rank1_at_threshold": 0.046228710462287104
+        },
+        {
+          "quantile": 0.8,
+          "threshold": 0.7101649331642244,
+          "known_acceptance_rate": 0.18248175182481752,
+          "novel_rejection_rate": 0.7731958762886598,
+          "rank1_at_threshold": 0.0340632603406326
+        },
+        {
+          "quantile": 0.9,
+          "threshold": 0.7417232871015796,
+          "known_acceptance_rate": 0.09245742092457421,
+          "novel_rejection_rate": 0.8865979381443299,
+          "rank1_at_threshold": 0.021897810218978103
+        }
+      ],
+      "n_same_date_excluded": 189,
+      "n_train_identities_excluded": 0,
+      "n_train_identity_rows_excluded": 0,
+      "elapsed_s": 30.72
+    },
+    "headless": {
+      "n_gallery": 151,
+      "n_known": 411,
+      "n_novel": 291,
+      "rank1": 0.10948905109489052,
+      "rank5": 0.31386861313868614,
+      "mAP": 0.22515410404992164,
+      "open_set_auroc": 0.46853287179873077,
+      "rejection_curve": [
+        {
+          "quantile": 0.0,
+          "threshold": 0.2781285260536421,
+          "known_acceptance_rate": 1.0,
+          "novel_rejection_rate": 0.0,
+          "rank1_at_threshold": 0.10948905109489052
+        },
+        {
+          "quantile": 0.1,
+          "threshold": 0.4999252030340267,
+          "known_acceptance_rate": 0.8807785888077859,
+          "novel_rejection_rate": 0.07560137457044673,
+          "rank1_at_threshold": 0.10462287104622871
+        },
+        {
+          "quantile": 0.2,
+          "threshold": 0.5471034981118593,
+          "known_acceptance_rate": 0.7834549878345499,
+          "novel_rejection_rate": 0.17869415807560138,
+          "rank1_at_threshold": 0.09732360097323602
+        },
+        {
+          "quantile": 0.3,
+          "threshold": 0.5735856043617462,
+          "known_acceptance_rate": 0.6861313868613139,
+          "novel_rejection_rate": 0.281786941580756,
+          "rank1_at_threshold": 0.08759124087591241
+        },
+        {
+          "quantile": 0.4,
+          "threshold": 0.5987131958767806,
+          "known_acceptance_rate": 0.5742092457420924,
+          "novel_rejection_rate": 0.3642611683848797,
+          "rank1_at_threshold": 0.08029197080291971
+        },
+        {
+          "quantile": 0.5,
+          "threshold": 0.6242158109563252,
+          "known_acceptance_rate": 0.48418491484184917,
+          "novel_rejection_rate": 0.47766323024054985,
+          "rank1_at_threshold": 0.07542579075425791
+        },
+        {
+          "quantile": 0.6,
+          "threshold": 0.647842367263774,
+          "known_acceptance_rate": 0.39172749391727496,
+          "novel_rejection_rate": 0.5876288659793815,
+          "rank1_at_threshold": 0.05596107055961071
+        },
+        {
+          "quantile": 0.7,
+          "threshold": 0.6688355997032036,
+          "known_acceptance_rate": 0.29683698296836986,
+          "novel_rejection_rate": 0.6941580756013745,
+          "rank1_at_threshold": 0.046228710462287104
+        },
+        {
+          "quantile": 0.8,
+          "threshold": 0.6893926726780387,
+          "known_acceptance_rate": 0.1922141119221411,
+          "novel_rejection_rate": 0.7869415807560137,
+          "rank1_at_threshold": 0.0267639902676399
+        },
+        {
+          "quantile": 0.9,
+          "threshold": 0.7236783709941786,
+          "known_acceptance_rate": 0.09002433090024331,
+          "novel_rejection_rate": 0.8831615120274914,
+          "rank1_at_threshold": 0.019464720194647202
+        }
+      ],
+      "n_same_date_excluded": 189,
+      "n_train_identities_excluded": 0,
+      "n_train_identity_rows_excluded": 0,
+      "elapsed_s": 28.1
+    },
+    "cross_orientation": {
+      "n_gallery": 80,
+      "n_known": 162,
+      "n_novel": 381,
+      "rank1": 0.07407407407407407,
+      "rank5": 0.29012345679012347,
+      "mAP": 0.18505290531995017,
+      "open_set_auroc": 0.7481611094909433,
+      "rejection_curve": [
+        {
+          "quantile": 0.0,
+          "threshold": 0.10299850286360464,
+          "known_acceptance_rate": 1.0,
+          "novel_rejection_rate": 0.0,
+          "rank1_at_threshold": 0.07407407407407407
+        },
+        {
+          "quantile": 0.1,
+          "threshold": 0.20927834865327388,
+          "known_acceptance_rate": 1.0,
+          "novel_rejection_rate": 0.14435695538057744,
+          "rank1_at_threshold": 0.07407407407407407
+        },
+        {
+          "quantile": 0.2,
+          "threshold": 0.269416858187828,
+          "known_acceptance_rate": 1.0,
+          "novel_rejection_rate": 0.28608923884514437,
+          "rank1_at_threshold": 0.07407407407407407
+        },
+        {
+          "quantile": 0.3,
+          "threshold": 0.34478880618707436,
+          "known_acceptance_rate": 1.0,
+          "novel_rejection_rate": 0.42782152230971127,
+          "rank1_at_threshold": 0.07407407407407407
+        },
+        {
+          "quantile": 0.4,
+          "threshold": 0.48240376760331133,
+          "known_acceptance_rate": 0.9320987654320988,
+          "novel_rejection_rate": 0.5406824146981627,
+          "rank1_at_threshold": 0.05555555555555555
+        },
+        {
+          "quantile": 0.5,
+          "threshold": 0.5587626680686759,
+          "known_acceptance_rate": 0.7530864197530864,
+          "novel_rejection_rate": 0.6062992125984252,
+          "rank1_at_threshold": 0.04938271604938271
+        },
+        {
+          "quantile": 0.6,
+          "threshold": 0.5999206096287301,
+          "known_acceptance_rate": 0.6049382716049383,
+          "novel_rejection_rate": 0.6876640419947506,
+          "rank1_at_threshold": 0.030864197530864196
+        },
+        {
+          "quantile": 0.7,
+          "threshold": 0.6374342548656776,
+          "known_acceptance_rate": 0.48148148148148145,
+          "novel_rejection_rate": 0.7769028871391076,
+          "rank1_at_threshold": 0.024691358024691357
+        },
+        {
+          "quantile": 0.8,
+          "threshold": 0.6721507193866517,
+          "known_acceptance_rate": 0.30864197530864196,
+          "novel_rejection_rate": 0.8451443569553806,
+          "rank1_at_threshold": 0.012345679012345678
+        },
+        {
+          "quantile": 0.9,
+          "threshold": 0.706870316595404,
+          "known_acceptance_rate": 0.14814814814814814,
+          "novel_rejection_rate": 0.9186351706036745,
+          "rank1_at_threshold": 0.006172839506172839
+        }
+      ],
+      "n_same_date_excluded": 51,
+      "n_train_identities_excluded": 0,
+      "n_train_identity_rows_excluded": 0,
+      "elapsed_s": 22.35
+    }
+  },
+  "n_units_retained": 219,
+  "n_units_before_filter": 19457,
+  "n_images_retained": 1042,
+  "verdict": {
+    "verdict": "identity distributed - Approach 2 earns a hearing",
+    "rank1_points": {
+      "head": 15.328467153284672,
+      "body": 11.922141119221411,
+      "headless": 10.948905109489052
+    },
+    "head_minus_headless": 4.3795620437956195,
+    "headless_minus_body_abs": 0.9732360097323589
+  },
+  "caveat": "Do not overread: Melops fish are board-mounted (photographed against a standardised white board) and are not laterally bending in frame. This experiment settles WHERE identity lives (rigid part vs deformable flank), never what unwrapping buys on a bending body."
+}

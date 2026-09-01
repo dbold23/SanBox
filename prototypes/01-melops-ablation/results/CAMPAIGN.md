@@ -57,3 +57,52 @@ species-agnostic + light-fine-tune transfer to fine-grained wild fish. The progr
 Phase 1B (sevengill data with ≥8 images/individual, rigid-anterior patch matcher as the primary arm,
 midline rectification as the secondary), and the head>headless residual travels there as a
 pre-registered hypothesis, not a result.
+
+---
+
+## Run 3 — executed 2026-09-01. The leg closes with a verdict, not exhaustion.
+
+Both legs ran as specified. The full Rank-1 matrix (percentage points; standard = full catalogue,
+held-out eval identities for fine-tuned cells; dense = units with ≥4 images):
+
+| cell | gallery | head | body | headless | cross | verdict |
+|---|---|---|---|---|---|---|
+| zero-shot × standard (run 1/2) | 10,410 | 1.9 | 1.0 | 1.2 | 0.7 | INCONCLUSIVE |
+| zero-shot × dense | 151 | **15.3** | 11.9 | 10.9 | 7.4 | distributed (head−headless 4.4; floor cleared marginally) |
+| fine-tuned × standard | 4,182 | 4.8 | 7.2 | 7.2 | 4.4 | INCONCLUSIVE (max 7.2 < 15) |
+| fine-tuned × dense (supplementary, n small) | 58 | 18.2 | **29.2** | **27.3** | 21.3 | distributed (headless − head = **+9.1**; all arms clear the floor) |
+
+**The fine-tune that was actually planned ran**: full-backbone MegaDescriptor-L-384, bf16 autocast +
+gradient checkpointing + batch 16 × grad-accum 4, min-images-per-unit 2 (2,341 classes), 7.55 h on a
+48 GB 4090. It hit the 40-epoch cap still improving (probe Rank-1 7.8% → 91.6%, loss 22.5 → 4.97,
+never early-stopped) — so these numbers are a lower bound on what this recipe reaches.
+
+**Readings, in order of confidence:**
+
+1. **The head>headless residual did not survive training — it reversed.** Zero-shot models favour
+   the head (+4.4 dense); trained models favour the flank (−2.4 standard, −9.1 dense). The
+   pre-registered head-concentration hypothesis is **refuted on Melops**: generic pretrained
+   features happen to read the high-contrast head region best, but the learnable identity signal
+   lives predominantly in the deformable flank. Verdict at every above-floor operating point:
+   **identity distributed — Approach 2 earns its hearing.**
+2. **Catalogue density is worth more than any modelling choice tested.** Zero-shot, density alone:
+   1.9 → 15.3 (8×). Training alone: 1.9 → 7.2 (≈4× on body). Together: 29.2. The sevengill field
+   protocol (8–15 images/individual) is the highest-leverage decision in the programme.
+3. **The run-1 AUROC anomaly is closed.** With the trained model, length-banded open-set AUROC
+   crosses chance (0.5475; body-arm raw AUROC 0.567). The inversion was size-cohort structure plus
+   an untrained encoder. The size-assortativity index itself never moved (0.338 → 0.342): training
+   added pattern signal on top of the size bias rather than removing it — stratified Rank-1 improved
+   in every growth tercile including the largest (0.0 → 2.1% standard; see readouts).
+4. **Cross-flank matching becomes non-trivial in the trained+dense regime** (21.3%, AUROC 0.540,
+   with same-session exclusion active) after being near-zero (0.7%) zero-shot. Two-sided catalogues
+   remain the safe budget assumption, but flank transfer is not hopeless with a trained encoder.
+
+**Implication for Phase 1B, superseding the pre-declaration above:** the redirect stands, but the
+arm ordering written before run 3 (rigid-anterior patch primary) was premised on the residual that
+run 3 refuted. The evidence now supports **flank-based matching as the primary arm** (with the
+head patch as secondary/corroborating) — subject to the standing caveat that Melops fish do not bend
+in frame, so what pose normalization buys on a bending sevengill remains unmeasured and is exactly
+what Phase 1B must test. Decision owner: PI.
+
+Artifacts: `run3-dense-zeroshot/`, `run3-finetuned/`, `run3-dense-finetuned/`, `run3-readout/`,
+`run3-finetune-training/` (checkpoint `ft-mega3` was left on the box and dies with it).
