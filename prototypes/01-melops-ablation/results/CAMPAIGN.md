@@ -106,3 +106,30 @@ what Phase 1B must test. Decision owner: PI.
 
 Artifacts: `run3-dense-zeroshot/`, `run3-finetuned/`, `run3-dense-finetuned/`, `run3-readout/`,
 `run3-finetune-training/` (checkpoint `ft-mega3` was left on the box and dies with it).
+
+---
+
+## Protocol owner's sign-off on the run-3 reading (statistical bounds)
+
+Verified from the committed results.json files. The verdict stands, with its confidence stated:
+
+- **"Identity is not concentrated in the head" is the robust conclusion.** Its strongest form is
+  not any single delta but the conjunction: **headless ≈ body in all four cells** (gaps 0.2 / 1.0 /
+  0.0 / 1.9 points, zero-shot and trained, standard and dense galleries). Removing the head never
+  costs measurable Rank-1; keeping only the head costs 2.4–11 points once trained.
+- **The reversal of the pre-registered residual** is carried by the fine-tuned × standard cell:
+  headless − head = +2.4 points at n_known = 1,055 (76 vs 51 correct; unpaired z ≈ 2.3, and unpaired
+  is conservative here). The dense cell's +9.1 (42 vs 28 of 154, z ≈ 1.9) points the same way but its
+  queries are a subset of the standard cell's — the two cells corroborate, they do not combine as
+  independent evidence.
+- **The dense-finetuned "distributed" verdict alone is under-powered**: Wilson 95% CIs at n = 154 are
+  roughly ±7 points against a ±5-point decision band. Cite the verdict as the cross-cell conjunction
+  above, not as that one cell.
+- Per-cell 95% CIs (Rank-1, points): fine-tuned × standard — head [3.7, 6.3], body [5.8, 8.9],
+  headless [5.8, 8.9] at n=1,055. Zero-shot × dense — head [12.2, 19.1], body [9.1, 15.4], headless
+  [8.3, 14.3] at n=411. Fine-tuned × dense — head [12.9, 25.0], body [22.6, 36.8], headless
+  [20.9, 34.8] at n=154.
+
+The Phase 1B implication as written above stands: flank-based matching primary, head patch
+secondary, PI decides — with the standing caveat unchanged (Melops fish do not bend in frame; what
+pose normalization buys on a bending body is exactly what Phase 1B exists to measure).

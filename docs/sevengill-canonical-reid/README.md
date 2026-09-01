@@ -45,6 +45,14 @@ interesting than the gap.**
    almost unchanged, and is *better posed* here than in medicine, because you have a rest-pose template
    and can compute the chart once, offline, then carry it through skinning.
 
+> **Outcome (2026-09-01): the Melops ablation was run and the leg is closed with a verdict.**
+> Identity in a fine-grained wild fish is **not concentrated in the rigid head** — headless ≈ body in
+> every cell tested, and the zero-shot head advantage reversed under fine-tuning (it was generic-
+> feature bias, not biology). Catalogue density mattered more than any modelling choice (Rank-1 1.9 →
+> 15.3 zero-shot from density alone; 29.2 dense + trained). Approach 2 has earned its hearing;
+> Phase 1B proceeds with flank-based matching primary. Full record, statistical bounds and caveats:
+> `prototypes/01-melops-ablation/results/CAMPAIGN.md`.
+
 **Recommended first move is not the 3D pipeline.** It is a four-week ablation on `Melops` (corkwing
 wrasse: 24,578 images / 9,861 individuals / 7 years / CC BY 4.0, shipping body, head *and* headless
 crops) to settle whether the identity signal lives in the deformable body at all. If it lives in the
