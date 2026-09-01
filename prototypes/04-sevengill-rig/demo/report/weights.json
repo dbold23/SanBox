@@ -1,0 +1,47 @@
+{
+ "influences_histogram": {
+  "1": 949,
+  "2": 5204,
+  "3": 137
+ },
+ "max_influences": 3,
+ "mean_influences": 1.870906200317965,
+ "row_sum_max": 1.0000000000000002,
+ "row_sum_min": 0.9999999999999999,
+ "shape": [
+  6290,
+  29
+ ],
+ "unweighted_joints": [],
+ "vertex_mass_by_joint": {
+  "anal_fin_root": 42.28773971968621,
+  "anal_fin_tip": 20.712260280313796,
+  "caudal_lower_fin_root": 53.93123987373349,
+  "caudal_lower_fin_tip": 32.06876012626651,
+  "caudal_upper_fin_root": 107.831899898312,
+  "caudal_upper_fin_tip": 72.50143343502135,
+  "dorsal_fin_root": 69.63828890063186,
+  "dorsal_fin_tip": 38.028377766034836,
+  "pectoral_L_fin_root": 57.96767870692667,
+  "pectoral_L_fin_tip": 41.032321293073345,
+  "pectoral_R_fin_root": 61.73763058333491,
+  "pectoral_R_fin_tip": 37.26236941666509,
+  "pelvic_L_fin_root": 47.05713050360194,
+  "pelvic_L_fin_tip": 22.94286949639805,
+  "pelvic_R_fin_root": 48.896635144995706,
+  "pelvic_R_fin_tip": 25.103364855004273,
+  "spine_00_cranium": 478.3667094593819,
+  "spine_01_branchial_1": 134.31641982005166,
+  "spine_02_branchial_7": 115.58420668758716,
+  "spine_03_trunk_01": 289.68652108855827,
+  "spine_04_trunk_02": 484.0570569713121,
+  "spine_05_trunk_03": 497.69617142900097,
+  "spine_06_trunk_04": 486.14827273191565,
+  "spine_07_trunk_05": 482.32815390873617,
+  "spine_08_trunk_06": 483.03159143092705,
+  "spine_09_trunk_07": 494.9233498860041,
+  "spine_10_precaudal": 460.7916002566962,
+  "spine_11_caudal_axis_1": 435.45926073809613,
+  "spine_12_caudal_axis_2": 668.6106855917361
+ }
+}
