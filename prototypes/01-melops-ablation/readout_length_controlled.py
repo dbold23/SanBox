@@ -125,13 +125,21 @@ def compute_band_auroc(S, known, qlen, glen, band):
 
 
 def run_readout(root, backbone, arm="body", seed=0, cutoff_fraction=0.5,
-                emb_cache_dir="emb_cache", band=0.10, baseline_seed=17):
+                emb_cache_dir="emb_cache", band=0.10, baseline_seed=17,
+                dense_min_images=None):
+    from run_ablation import _filter_dense_units
+
     df = melops_data.load_melops(root, bbox=arm)
+    if dense_min_images is not None:
+        df, _, _ = _filter_dense_units(df, dense_min_images)
     df, n_train_excluded, _ = _exclude_train_identities(df, backbone)
     gallery_df, query_df = protocol.one_shot_open_set_split(
         df, cutoff_fraction=cutoff_fraction, seed=seed
     )
     cache_backbone = backbone if backbone != "random" else "random-seed%d" % int(seed)
+    if dense_min_images is not None:
+        # match run_ablation's dense cache namespace
+        cache_backbone = "%s-dense%d" % (cache_backbone, int(dense_min_images))
     ge = emb_cache.load(emb_cache_dir, cache_backbone, arm,
                         emb_cache._ids_list(gallery_df["image_id"].tolist()))
     qe = emb_cache.load(emb_cache_dir, cache_backbone, arm,
@@ -192,12 +200,16 @@ def main(argv=None):
     parser.add_argument("--cutoff-fraction", type=float, default=0.5)
     parser.add_argument("--band", type=float, default=0.10)
     parser.add_argument("--baseline-seed", type=int, default=17)
+    parser.add_argument("--dense-min-images", type=int, default=None,
+                        help="apply the run-3 Leg A dense-subset catalogue filter "
+                             "before the split (matches run_ablation's cache keys)")
     args = parser.parse_args(argv)
 
     out = run_readout(args.root, args.backbone, arm=args.arm, seed=args.seed,
                       cutoff_fraction=args.cutoff_fraction,
                       emb_cache_dir=args.emb_cache, band=args.band,
-                      baseline_seed=args.baseline_seed)
+                      baseline_seed=args.baseline_seed,
+                      dense_min_images=args.dense_min_images)
     os.makedirs(os.path.dirname(os.path.abspath(args.out)), exist_ok=True)
     with open(args.out, "w") as f:
         json.dump(out, f, indent=2)
