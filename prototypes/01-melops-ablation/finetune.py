@@ -107,6 +107,13 @@ def load_train_identities(ckpt_path):
     import torch
 
     payload = torch.load(ckpt_path, map_location="cpu", weights_only=True)
+    # Prefer the explicit full-train-split record (present from the
+    # min_images_per_unit change onward): classes may be a strict subset of
+    # the train split when singleton units were dropped from ArcFace, and
+    # eval exclusion must cover the whole split.
+    recorded = payload.get("train_identities")
+    if recorded:
+        return {str(i) for i in recorded}
     classes = payload.get("classes") or []
     return {str(c[0]) for c in classes if isinstance(c, (list, tuple)) and len(c) > 0}
 
@@ -248,6 +255,33 @@ def _augment(img, rng, hflip=False):
     return Image.fromarray(np.clip(arr, 0, 255).astype(np.uint8))
 
 
+def _filter_min_images_per_unit(train_df, min_images_per_unit):
+    """Training-side filter: drop (identity, side) units with too few images.
+
+    Singleton ArcFace classes teach nothing and bloat the head (~2.5
+    images/identity means there are many). TRAINING-SIDE ONLY by contract:
+    callers must keep using the unfiltered frame for ``split_identities.json``
+    and the checkpoint's train-identity record, so eval exclusion still
+    covers every identity in the train split, dropped units included.
+
+    Returns ``(filtered_df, n_units_dropped, n_rows_dropped)``.
+    """
+    k = int(min_images_per_unit)
+    if k <= 1:
+        return train_df, 0, 0
+    sizes = train_df.groupby(["identity", "side"])["image_id"].transform("size")
+    kept = sizes >= k
+    n_rows_dropped = int((~kept).sum())
+    before = train_df.groupby(["identity", "side"]).ngroups
+    filtered = train_df[kept].reset_index(drop=True)
+    after = filtered.groupby(["identity", "side"]).ngroups if len(filtered) else 0
+    if len(filtered) == 0:
+        raise ProtocolViolation(
+            "min_images_per_unit=%d removed every training row" % k
+        )
+    return filtered, before - after, n_rows_dropped
+
+
 def _class_units(train_df):
     """Sorted (identity, side) units and per-row integer labels."""
     pairs = list(
@@ -305,6 +339,7 @@ def train_finetune(
     seed=0,
     arc_s=30.0,
     arc_m=0.5,
+    min_images_per_unit=1,
 ):
     """ArcFace fine-tuning over an identity-disjoint train split.
 
@@ -325,7 +360,26 @@ def train_finetune(
 
     df = melops_data.load_melops(root, bbox=bbox)
     train_df, eval_df = split_identities(df, train_frac=train_frac, seed=seed)
-    units, labels = _class_units(train_df)
+    # Training-side only: ArcFace classes and batches come from the filtered
+    # frame; split_identities.json and the checkpoint's train-identity record
+    # stay on the FULL train_df so eval exclusion is unaffected.
+    train_fit_df, n_units_dropped, n_rows_dropped = _filter_min_images_per_unit(
+        train_df, min_images_per_unit
+    )
+    if n_units_dropped:
+        print(
+            "min_images_per_unit=%d: dropped %d singleton-ish units (%d rows) "
+            "from ArcFace classes; %d units remain. Eval exclusion still "
+            "covers all %d train identities."
+            % (
+                int(min_images_per_unit),
+                n_units_dropped,
+                n_rows_dropped,
+                train_fit_df.groupby(["identity", "side"]).ngroups,
+                train_df["identity"].nunique(),
+            )
+        )
+    units, labels = _class_units(train_fit_df)
 
     model = timm.create_model(backbone, pretrained=bool(pretrained), num_classes=0)
     _apply_freeze(model, freeze_backbone, unfreeze_last_n)
@@ -341,7 +395,7 @@ def train_finetune(
         groups.append({"params": trainable, "lr": float(backbone_lr)})
     optimizer = torch.optim.Adam(groups)
 
-    n = len(train_df)
+    n = len(train_fit_df)
     if n == 0:
         raise ProtocolViolation("empty train split")
     model.train()
@@ -356,7 +410,7 @@ def train_finetune(
             idx = order[start : start + int(batch_size)]
             batch = []
             for i in idx:
-                img = melops_data.load_crop(root, train_df.iloc[int(i)])
+                img = melops_data.load_crop(root, train_fit_df.iloc[int(i)])
                 img = _augment(img, rng, hflip=hflip)
                 batch.append(_preprocess(img, img_size))
             x = torch.from_numpy(np.stack(batch)).float().to(device)
@@ -396,6 +450,9 @@ def train_finetune(
         "arc_m": float(arc_m),
         "n_train_images": int(n),
         "n_train_classes": len(units),
+        "min_images_per_unit": int(min_images_per_unit),
+        "n_units_dropped_min_images": int(n_units_dropped),
+        "n_rows_dropped_min_images": int(n_rows_dropped),
     }
     model.eval()
     torch.save(
@@ -407,6 +464,9 @@ def train_finetune(
             "backbone_state_dict": model.state_dict(),
             "head_state_dict": head.state_dict(),
             "classes": [list(u) for u in units],
+            # Full train split, NOT just trained classes: units dropped by
+            # min_images_per_unit must still be excluded from eval.
+            "train_identities": sorted(set(train_df["identity"].astype(str))),
             "config": config,
         },
         ckpt_path,
@@ -533,6 +593,11 @@ def main(argv=None):
                              "sides are separate identities; mirroring aliases flanks")
     parser.add_argument("--device", default=None, help="auto: cuda if available else cpu")
     parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--min-images-per-unit", dest="min_images_per_unit", type=int,
+                        default=1,
+                        help="drop (identity, side) units with fewer than this many "
+                             "images from the ArcFace classes (training-side only; "
+                             "eval exclusion still covers the full train split)")
     args = parser.parse_args(argv)
 
     result = train_finetune(
@@ -552,6 +617,7 @@ def main(argv=None):
         hflip=args.hflip,
         device=args.device,
         seed=args.seed,
+        min_images_per_unit=args.min_images_per_unit,
     )
     for entry in result["epochs"]:
         print("epoch %2d  mean ArcFace loss %.4f  (%d batches)"
