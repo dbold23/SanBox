@@ -39,6 +39,7 @@ import sys
 import time
 
 import numpy as np
+import pandas as pd
 from PIL import Image
 
 import embedders
@@ -282,6 +283,58 @@ def _filter_min_images_per_unit(train_df, min_images_per_unit):
     return filtered, before - after, n_rows_dropped
 
 
+def _build_probe(train_fit_df, probe_units):
+    """Fixed early-stopping probe, train-side only (run 3 Leg B).
+
+    Deterministic: for up to ``probe_units`` sorted (identity, side) units
+    with >= 2 images, gallery = the unit's earliest image, query = its
+    latest. Never touches eval identities, so early stopping cannot select
+    a checkpoint on the held-out split.
+    Returns ``(gallery_rows, query_rows)`` as lists of catalogue rows;
+    gallery_rows[i] and query_rows[i] belong to the same unit.
+    """
+    df = train_fit_df.copy()
+    df["_date"] = pd.to_datetime(df["date"])
+    gallery_rows, query_rows = [], []
+    for _unit, group in df.groupby(["identity", "side"], sort=True):
+        if len(group) < 2:
+            continue
+        group = group.sort_values(["_date", "image_id"])
+        gallery_rows.append(group.iloc[0])
+        query_rows.append(group.iloc[-1])
+        if len(gallery_rows) >= int(probe_units):
+            break
+    if not gallery_rows:
+        raise ProtocolViolation("no multi-image units available for the probe")
+    return gallery_rows, query_rows
+
+
+def _probe_rank1(model, probe, root, img_size, device, autocast_factory, pool):
+    """Rank-1 of the probe queries against the probe gallery (cosine)."""
+    gallery_rows, query_rows = probe
+    model.eval()
+    feats = []
+    with torch.no_grad():
+        for rows in (gallery_rows, query_rows):
+            out = []
+            for start in range(0, len(rows), 32):
+                chunk = rows[start : start + 32]
+                crops = list(pool.map(
+                    lambda r: melops_data.load_crop(root, r), chunk))
+                batch = np.stack([_preprocess(c, img_size) for c in crops])
+                x = torch.from_numpy(batch).float().to(device)
+                with autocast_factory():
+                    f = model(x)
+                out.append(f.float().cpu().numpy())
+            m = np.concatenate(out).astype(np.float64)
+            norms = np.linalg.norm(m, axis=1, keepdims=True)
+            norms[norms == 0] = 1.0
+            feats.append(m / norms)
+    model.train()
+    sims = feats[1] @ feats[0].T
+    return float((sims.argmax(axis=1) == np.arange(len(query_rows))).mean())
+
+
 def _class_units(train_df):
     """Sorted (identity, side) units and per-row integer labels."""
     pairs = list(
@@ -340,6 +393,11 @@ def train_finetune(
     arc_s=30.0,
     arc_m=0.5,
     min_images_per_unit=1,
+    bf16=False,
+    grad_checkpointing=False,
+    grad_accum=1,
+    early_stop_patience=None,
+    probe_units=500,
 ):
     """ArcFace fine-tuning over an identity-disjoint train split.
 
@@ -398,36 +456,110 @@ def train_finetune(
     n = len(train_fit_df)
     if n == 0:
         raise ProtocolViolation("empty train split")
+
+    if grad_checkpointing:
+        try:
+            model.set_grad_checkpointing(True)
+            print("gradient checkpointing ON")
+        except Exception as exc:  # timm models without the hook
+            print("gradient checkpointing unavailable (%s); continuing without" % exc)
+    if bf16:
+        print("bf16 autocast ON")
+    accum = max(1, int(grad_accum))
+    if accum > 1:
+        print("gradient accumulation x%d (effective batch %d)"
+              % (accum, accum * int(batch_size)))
+
+    probe = None
+    if early_stop_patience is not None:
+        probe = _build_probe(train_fit_df, probe_units)
+        print("early stopping ON: patience %d on probe Rank-1 (%d probe units)"
+              % (int(early_stop_patience), len(probe[0])))
+
+    from concurrent.futures import ThreadPoolExecutor
+
+    def _autocast():
+        if bf16:
+            return torch.autocast(device_type="cuda" if "cuda" in str(device) else "cpu",
+                                  dtype=torch.bfloat16)
+        import contextlib
+        return contextlib.nullcontext()
+
     model.train()
     head.train()
     epoch_log = []
+    best = {"rank1": -1.0, "epoch": None, "model": None, "head": None}
+    bad_epochs = 0
+    early_stopped = False
     t0 = time.time()
+    pool = ThreadPoolExecutor(max_workers=16)
     for epoch in range(int(epochs)):
         rng = np.random.default_rng([int(seed), 1000 + epoch])
         order = rng.permutation(n)
         losses = []
-        for start in range(0, n, int(batch_size)):
+        optimizer.zero_grad()
+        pending = False
+        for step_i, start in enumerate(range(0, n, int(batch_size))):
             idx = order[start : start + int(batch_size)]
-            batch = []
-            for i in idx:
-                img = melops_data.load_crop(root, train_fit_df.iloc[int(i)])
-                img = _augment(img, rng, hflip=hflip)
-                batch.append(_preprocess(img, img_size))
+            rows = [train_fit_df.iloc[int(i)] for i in idx]
+            # loads consume no rng, so threading them preserves the exact
+            # augmentation stream of the serial loop
+            crops = list(pool.map(lambda r: melops_data.load_crop(root, r), rows))
+            batch = [_preprocess(_augment(img, rng, hflip=hflip), img_size)
+                     for img in crops]
             x = torch.from_numpy(np.stack(batch)).float().to(device)
             y = torch.from_numpy(labels[idx]).to(device)
-            logits = head(model(x), y)
-            loss = F.cross_entropy(logits, y)
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
+            with _autocast():
+                logits = head(model(x), y)
+                loss = F.cross_entropy(logits, y)
+            (loss / accum).backward()
+            pending = True
+            if (step_i + 1) % accum == 0:
+                optimizer.step()
+                optimizer.zero_grad()
+                pending = False
             losses.append(float(loss.item()))
-        epoch_log.append(
-            {
-                "epoch": epoch,
-                "mean_loss": float(np.mean(losses)),
-                "n_batches": len(losses),
-            }
-        )
+        if pending:
+            optimizer.step()
+            optimizer.zero_grad()
+        entry = {
+            "epoch": epoch,
+            "mean_loss": float(np.mean(losses)),
+            "n_batches": len(losses),
+        }
+        if probe is not None:
+            r1 = _probe_rank1(model, probe, root, img_size, device, _autocast, pool)
+            entry["probe_rank1"] = r1
+            print("epoch %2d  mean ArcFace loss %.4f  probe Rank-1 %.4f"
+                  % (epoch, entry["mean_loss"], r1), flush=True)
+        else:
+            print("epoch %2d  mean ArcFace loss %.4f" % (epoch, entry["mean_loss"]),
+                  flush=True)
+        epoch_log.append(entry)
+        if probe is not None:
+            if entry["probe_rank1"] > best["rank1"] + 1e-9:
+                best = {
+                    "rank1": entry["probe_rank1"],
+                    "epoch": epoch,
+                    "model": {k: v.detach().cpu().clone()
+                              for k, v in model.state_dict().items()},
+                    "head": {k: v.detach().cpu().clone()
+                             for k, v in head.state_dict().items()},
+                }
+                bad_epochs = 0
+            else:
+                bad_epochs += 1
+                if bad_epochs >= int(early_stop_patience):
+                    early_stopped = True
+                    print("EARLY_STOP at epoch %d (best probe Rank-1 %.4f at epoch %d)"
+                          % (epoch, best["rank1"], best["epoch"]), flush=True)
+                    break
+    pool.shutdown()
+    if probe is not None and best["model"] is not None:
+        model.load_state_dict(best["model"])
+        head.load_state_dict(best["head"])
+        print("restored best-probe weights (epoch %d, probe Rank-1 %.4f)"
+              % (best["epoch"], best["rank1"]))
 
     os.makedirs(out_dir, exist_ok=True)
     ckpt_path = os.path.join(out_dir, "checkpoint.pt")
@@ -453,6 +585,14 @@ def train_finetune(
         "min_images_per_unit": int(min_images_per_unit),
         "n_units_dropped_min_images": int(n_units_dropped),
         "n_rows_dropped_min_images": int(n_rows_dropped),
+        "bf16": bool(bf16),
+        "grad_checkpointing": bool(grad_checkpointing),
+        "grad_accum": int(grad_accum),
+        "early_stop_patience": None if early_stop_patience is None else int(early_stop_patience),
+        "probe_units": int(probe_units),
+        "early_stopped": bool(early_stopped),
+        "best_probe_epoch": best["epoch"],
+        "best_probe_rank1": None if best["epoch"] is None else float(best["rank1"]),
     }
     model.eval()
     torch.save(
@@ -598,6 +738,20 @@ def main(argv=None):
                         help="drop (identity, side) units with fewer than this many "
                              "images from the ArcFace classes (training-side only; "
                              "eval exclusion still covers the full train split)")
+    parser.add_argument("--bf16", action="store_true",
+                        help="bfloat16 autocast for forward/loss (run 3 Leg B)")
+    parser.add_argument("--grad-checkpointing", action="store_true",
+                        help="timm gradient checkpointing to cut activation memory")
+    parser.add_argument("--grad-accum", type=int, default=1,
+                        help="optimizer step every N micro-batches "
+                             "(effective batch = batch-size x N)")
+    parser.add_argument("--early-stop-patience", dest="early_stop_patience", type=int,
+                        default=None,
+                        help="stop after N epochs without probe Rank-1 improvement; "
+                             "--epochs becomes the maximum. Restores best-probe weights.")
+    parser.add_argument("--probe-units", dest="probe_units", type=int, default=500,
+                        help="max (identity, side) units in the early-stop probe "
+                             "(train-side only, deterministic)")
     args = parser.parse_args(argv)
 
     result = train_finetune(
@@ -618,6 +772,11 @@ def main(argv=None):
         device=args.device,
         seed=args.seed,
         min_images_per_unit=args.min_images_per_unit,
+        bf16=args.bf16,
+        grad_checkpointing=args.grad_checkpointing,
+        grad_accum=args.grad_accum,
+        early_stop_patience=args.early_stop_patience,
+        probe_units=args.probe_units,
     )
     for entry in result["epochs"]:
         print("epoch %2d  mean ArcFace loss %.4f  (%d batches)"

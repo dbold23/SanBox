@@ -100,13 +100,37 @@ def _exclude_train_identities(df, backbone):
     return out, n_ids, n_rows
 
 
+def _filter_dense_units(df, min_images):
+    """Catalogue-level dense-subset filter (run 3 Leg A, CAMPAIGN.md).
+
+    Keeps (identity, side) units with >= ``min_images`` images. Applied
+    BEFORE the split and identically for every arm -- it depends only on
+    identity/side counts, never on the crop, so all arms see the same rows.
+    Returns ``(filtered_df, n_units_kept, n_units_before)``.
+    """
+    k = int(min_images)
+    sizes = df.groupby(["identity", "side"])["image_id"].transform("size")
+    kept = df[sizes >= k].reset_index(drop=True)
+    if len(kept) == 0:
+        raise protocol.ProtocolViolation(
+            "dense-subset filter min_images=%d removed the whole catalogue" % k
+        )
+    n_before = df.groupby(["identity", "side"]).ngroups
+    n_kept = kept.groupby(["identity", "side"]).ngroups
+    return kept, n_kept, n_before
+
+
 def run_experiment(root, backbone="hist", arms=ALL_ARMS, seed=0, cutoff_fraction=0.5,
-                   emb_cache_dir=None):
+                   emb_cache_dir=None, dense_min_images=None):
     """Run the requested arms; returns the full results dict (JSON-safe).
 
     ``emb_cache_dir=None`` keeps the uncached behavior; a directory enables
     the npz embedding cache (keyed by backbone + bbox arm + image-id list, so
     head/body/headless never collide). Use one cache dir per corpus root.
+
+    ``dense_min_images`` (run 3 Leg A): restrict the catalogue to
+    (identity, side) units with at least that many images, BEFORE the split,
+    identically for every arm. ``None`` keeps the full catalogue.
     """
     for arm in arms:
         if arm not in ALL_ARMS:
@@ -115,17 +139,25 @@ def run_experiment(root, backbone="hist", arms=ALL_ARMS, seed=0, cutoff_fraction
     # The random chance-floor embedder depends on its seed; key it apart so
     # two seeds never share a cache entry. All other backbones are seed-free.
     cache_backbone = backbone if backbone != "random" else "random-seed%d" % int(seed)
+    if dense_min_images is not None:
+        cache_backbone = "%s-dense%d" % (cache_backbone, int(dense_min_images))
     results = {
         "backbone": backbone,
         "seed": int(seed),
         "cutoff_fraction": float(cutoff_fraction),
         "root": os.path.abspath(root),
+        "dense_min_images": None if dense_min_images is None else int(dense_min_images),
         "arms": {},
     }
     for arm in arms:
         t0 = time.time()
         if arm == "cross_orientation":
             df = melops_data.load_melops(root, bbox="body")
+            if dense_min_images is not None:
+                df, n_units_kept, n_units_before = _filter_dense_units(df, dense_min_images)
+                results["n_units_retained"] = int(n_units_kept)
+                results["n_units_before_filter"] = int(n_units_before)
+                results["n_images_retained"] = int(len(df))
             df, n_tid, n_trow = _exclude_train_identities(df, backbone)
             gallery_df, query_df = protocol.cross_orientation_split(
                 df, enroll_side="L", query_side="R", cutoff_fraction=cutoff_fraction, seed=seed
@@ -133,6 +165,11 @@ def run_experiment(root, backbone="hist", arms=ALL_ARMS, seed=0, cutoff_fraction
             cross = True
         else:
             df = melops_data.load_melops(root, bbox=arm)
+            if dense_min_images is not None:
+                df, n_units_kept, n_units_before = _filter_dense_units(df, dense_min_images)
+                results["n_units_retained"] = int(n_units_kept)
+                results["n_units_before_filter"] = int(n_units_before)
+                results["n_images_retained"] = int(len(df))
             df, n_tid, n_trow = _exclude_train_identities(df, backbone)
             gallery_df, query_df = protocol.one_shot_open_set_split(
                 df, cutoff_fraction=cutoff_fraction, seed=seed
@@ -275,6 +312,10 @@ def main(argv=None):
     parser.add_argument("--out", default="results")
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--cutoff-fraction", type=float, default=0.5)
+    parser.add_argument("--dense-min-images", type=int, default=None,
+                        help="run 3 Leg A: keep only (identity, side) units with at "
+                             "least this many images, applied to the catalogue BEFORE "
+                             "the split and identically for every arm")
     parser.add_argument("--emb-cache", default=None, metavar="DIR",
                         help="optional embedding-cache directory (npz per backbone/arm/"
                              "id-list); default None keeps the uncached behavior. Use "
@@ -298,8 +339,12 @@ def main(argv=None):
     results = run_experiment(
         args.root, backbone=args.backbone, arms=arms,
         seed=args.seed, cutoff_fraction=args.cutoff_fraction,
-        emb_cache_dir=args.emb_cache,
+        emb_cache_dir=args.emb_cache, dense_min_images=args.dense_min_images,
     )
+    if results.get("dense_min_images") is not None:
+        print("DENSE-SUBSET min_images=%d: retained %d/%d units, %d images"
+              % (results["dense_min_images"], results["n_units_retained"],
+                 results["n_units_before_filter"], results["n_images_retained"]))
     json_path, report_path = write_report(results, args.out)
 
     for arm, m in results["arms"].items():
