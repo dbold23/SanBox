@@ -118,3 +118,26 @@ on `digitallife3d.org` before sending**; if the site now routes enquiries throug
 | **GREEN requires** | (i) the Sketchfab licence string read first-hand and pasted here, **and** (ii) a written reply to §5 covering redistribution of derivatives, **or** an explicit PI decision to proceed on CC BY-NC alone with the §4.3 asset-licensing note in place |
 | **RED would require** | the model turning out to be `ND` (no derivatives), or the download carrying different terms from the display page. Then Approach 2 needs a commissioned or scanned mesh instead — check MorphoSource/oVert first (`Imageomics/pyMorphoSource`, MIT), noting CT resolves calcified cartilage, not skin |
 | **Cost of staying AMBER** | low for now: Approach 2 is gated behind Phase 1B results anyway (`03-candidate-approaches.md` sequencing, months 9–18), so the licence answer is not on the critical path this quarter — but the email is free and the reply may take weeks, so **send it now** |
+
+---
+
+## Owner decision — 2026-09-01
+
+The project owner has designated this use as **personal, non-commercial research** and directed the
+programme to proceed under CC-BY-NC as-is. The gate moves **AMBER → CLEARED for internal research
+use**. The permission-request draft above becomes optional courtesy (recommended before any
+publication that redistributes a derived mesh), not a blocker.
+
+Three obligations remain in force under CC-BY-NC and are now the compliance checklist:
+
+1. **Attribution** — credit the Digital Life Project (Model 92A) wherever the mesh or a derivative
+   appears: code, figures, acknowledgements.
+2. **NC travels with derivatives** — a retopologised sevengill template derived from the mesh is
+   itself CC-BY-NC. It may be used and shared for research, but never relicensed (not MIT, not
+   CC-BY) and never used commercially.
+3. **Do not commit the mesh or a derivative into an MIT-licensed repo without a licence carve-out**
+   — `shark-pose-3d` is MIT; if the template lands there, add a `LICENSE-ASSETS` note stating the
+   mesh-derived assets are CC-BY-NC and excluded from the MIT grant.
+
+Revisit only if the programme's outputs stop being non-commercial (a paid product, a funded service
+deliverable) or a derived mesh is redistributed publicly — then send the request letter first.
