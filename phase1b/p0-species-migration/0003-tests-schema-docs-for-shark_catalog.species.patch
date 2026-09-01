@@ -1,0 +1,541 @@
+From f5e5db2a2b33b9e01c86928bd603fef5a4fe19a7 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Tue, 1 Sep 2026 17:23:26 +0000
+Subject: [PATCH 3/3] tests + schema docs for shark_catalog.species
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Behavioural tests for the ways a species column quietly corrupts a catalog: the
+one-time backfill not running (legacy rows lose a meaning the data always
+carried), the backfill running a second time (white shark stamped over rows
+deliberately left blank or belonging to another animal), and a species reaching
+dwc:scientificName in a way that disagrees with the scientificNameID published
+beside it — pinned on the row that actually breaks the pair, scientific_name
+NULL with scientific_name_id set and species set, where the fallback name must
+travel without the identifier. Also covers the mixed-species round trip that is
+the whole point, an export against a database that predates the column, both
+directions of the dataset-level default (a per-individual species beats it; an
+untaxonomised individual still gets filled by it), and the field's trip through
+POST/PATCH /api/admin/catalog, which the db-layer tests cannot see a route drop.
+
+CLAUDE.md / AGENTS.md schema blocks record the column, the backfill rule and the
+name/identifier pairing, so the next reader does not have to infer any of them
+from the ALTER.
+---
+ AGENTS.md                           |  14 +-
+ CLAUDE.md                           |  12 +
+ tests/test_shark_catalog_species.py | 452 ++++++++++++++++++++++++++++
+ 3 files changed, 477 insertions(+), 1 deletion(-)
+ create mode 100644 tests/test_shark_catalog_species.py
+
+diff --git a/AGENTS.md b/AGENTS.md
+index fbfaeb7..4e0f2d5 100644
+--- a/AGENTS.md
++++ b/AGENTS.md
+@@ -206,7 +206,19 @@ id INTEGER PK, display_name TEXT UNIQUE, first_seen TEXT, last_seen TEXT,
+ notes TEXT, created_at TEXT, updated_at TEXT,
+ organism_id TEXT UNIQUE (dwc:organismID, stable uuid minted on create),
+ scientific_name TEXT, scientific_name_id TEXT (WoRMS AphiaID URI)   -- Phase 1 structure-now
+-```
++species TEXT   -- what animal this individual is; NULL = nobody has said
++```
++`species` is added by `init_catalog_dwc_columns()` with a ONE-TIME backfill of
++pre-existing rows to `database.DEFAULT_SPECIES` ('Carcharodon carcharias') — the
++value this app has always meant implicitly. The backfill is fused to the ALTER and
++never re-runs, so a row deliberately left blank (or one belonging to another
++species) is never re-stamped on a later boot. `create_shark` applies the same
++default when the caller passes no species at all; passing `""` stores NULL.
++The DwC export prefers the curated `scientific_name`/`scientific_name_id` pair and
++falls back to `species` (`dwc_adapter._taxon`). The AphiaID is published only
++beside the name it identifies: a fallback to `species` emits no
++`scientificNameID`, because the two curated columns can be written independently
++and an ID beside a name from another column would name a different taxon.
+ 
+ ### Indices
+ - `encounter_priority(site)`, `encounter_priority(completion_count)`, `encounter_priority(shark_catalog_id)`
+diff --git a/CLAUDE.md b/CLAUDE.md
+index 1f22b48..2ab8034 100644
+--- a/CLAUDE.md
++++ b/CLAUDE.md
+@@ -257,7 +257,19 @@ id INTEGER PK, display_name TEXT UNIQUE, first_seen TEXT, last_seen TEXT,
+ notes TEXT, created_at TEXT, updated_at TEXT,
+ organism_id TEXT UNIQUE (dwc:organismID, stable uuid minted on create),
+ scientific_name TEXT, scientific_name_id TEXT (WoRMS AphiaID URI)   -- Phase 1 structure-now
++species TEXT   -- what animal this individual is; NULL = nobody has said
+ ```
++`species` is added by `init_catalog_dwc_columns()` with a ONE-TIME backfill of
++pre-existing rows to `database.DEFAULT_SPECIES` ('Carcharodon carcharias') — the
++value this app has always meant implicitly. The backfill is fused to the ALTER and
++never re-runs, so a row deliberately left blank (or one belonging to another
++species) is never re-stamped on a later boot. `create_shark` applies the same
++default when the caller passes no species at all; passing `""` stores NULL.
++The DwC export prefers the curated `scientific_name`/`scientific_name_id` pair and
++falls back to `species` (`dwc_adapter._taxon`). The AphiaID is published only
++beside the name it identifies: a fallback to `species` emits no
++`scientificNameID`, because the two curated columns can be written independently
++and an ID beside a name from another column would name a different taxon.
+ 
+ **Answer keys** (created by `db_gold.init_gold_tables()`, like `spec_practice` — see
+ "Migrations don't auto-run in prod")
+diff --git a/tests/test_shark_catalog_species.py b/tests/test_shark_catalog_species.py
+new file mode 100644
+index 0000000..2ef4097
+--- /dev/null
++++ b/tests/test_shark_catalog_species.py
+@@ -0,0 +1,452 @@
++"""P0 — `shark_catalog.species`: what animal a catalogued individual actually is.
++
++The app was written for one study animal and never had a species field, so every
++row it has ever written means *Carcharodon carcharias* by convention alone. This
++column makes that explicit, which is the prerequisite for cataloguing a second
++species (the sevengill work) in the same platform.
++
++The failure modes pinned here are the ones that quietly corrupt a catalog:
++
++  * the one-time backfill not running, so legacy rows lose a meaning the data has
++    always carried;
++  * the backfill running AGAIN on a later boot, stamping white shark onto rows
++    that were deliberately left blank or belong to another animal;
++  * a species reaching dwc:scientificName in a way that disagrees with the
++    scientificNameID published beside it.
++"""
++from __future__ import annotations
++
++import os
++import sqlite3
++import sys
++from pathlib import Path
++
++import pytest
++
++ROOT = Path(__file__).resolve().parent.parent
++if str(ROOT) not in sys.path:
++    sys.path.insert(0, str(ROOT))
++
++from annotation import database as db  # noqa: E402
++
++SEVENGILL = "Notorynchus cepedianus"
++
++# The pre-species catalog, exactly as migrate_schema_v9 left it: no organism_id,
++# no taxon columns, no species. This is the shape the backfill has to heal.
++LEGACY_CATALOG = """
++CREATE TABLE shark_catalog (
++    id INTEGER PRIMARY KEY AUTOINCREMENT,
++    display_name TEXT UNIQUE,
++    first_seen TEXT, last_seen TEXT, notes TEXT,
++    created_at TEXT, updated_at TEXT
++);
++CREATE TABLE encounter_priority (
++    encounter_id TEXT PRIMARY KEY, site TEXT, video_id TEXT,
++    completion_count INTEGER DEFAULT 0, shark_catalog_id INTEGER
++);
++"""
++
++
++def _fresh_db(tmp_path, monkeypatch, seed_rows=()):
++    path = tmp_path / "species_test.db"
++    conn = sqlite3.connect(str(path))
++    conn.executescript(LEGACY_CATALOG)
++    for name in seed_rows:
++        conn.execute("INSERT INTO shark_catalog (display_name, created_at, updated_at) "
++                     "VALUES (?, 't', 't')", (name,))
++    conn.commit()
++    conn.close()
++    monkeypatch.setattr(db, "DB_PATH", path)
++    db.close_conn()
++    return path
++
++
++def _species_by_name(path):
++    conn = sqlite3.connect(str(path))
++    try:
++        return {r[0]: r[1] for r in
++                conn.execute("SELECT display_name, species FROM shark_catalog")}
++    finally:
++        conn.close()
++
++
++@pytest.fixture()
++def temp_db(tmp_path, monkeypatch):
++    _fresh_db(tmp_path, monkeypatch)
++    db.init_catalog_dwc_columns()
++    yield
++    db.close_conn()
++
++
++# ───────────────────────── migration ─────────────────────────────────
++
++def test_init_adds_the_species_column(temp_db):
++    with db.get_conn() as conn:
++        cols = {r[1] for r in conn.execute("PRAGMA table_info(shark_catalog)")}
++    assert "species" in cols
++
++
++def test_init_backfills_legacy_rows_to_the_implicit_species(tmp_path, monkeypatch):
++    """Rows written before the column existed mean white shark. Leaving them NULL
++    would erase that, so the ALTER carries a one-time UPDATE."""
++    path = _fresh_db(tmp_path, monkeypatch, seed_rows=("Legacy1", "Legacy2"))
++    db.init_catalog_dwc_columns()
++    assert _species_by_name(path) == {"Legacy1": db.DEFAULT_SPECIES,
++                                      "Legacy2": db.DEFAULT_SPECIES}
++    db.close_conn()
++
++
++def test_init_is_idempotent(tmp_path, monkeypatch):
++    """Running init twice must not raise (duplicate ALTER) or rewrite anything."""
++    path = _fresh_db(tmp_path, monkeypatch, seed_rows=("L1",))
++    db.init_catalog_dwc_columns()
++    first = _species_by_name(path)
++    db.close_conn()
++    db.init_catalog_dwc_columns()
++    assert _species_by_name(path) == first
++    db.close_conn()
++
++
++def test_reinit_does_not_re_stamp_a_deliberately_cleared_species(tmp_path, monkeypatch):
++    """The heart of the backfill design. NULL is a legitimate value once the
++    column exists — "nobody has said what this is" — and a bare catalog row is
++    exactly what db_reid.decide_reid_individual inserts on a re-ID acceptance.
++    A backfill that re-ran on every boot (the way the organism_id heal does)
++    would keep asserting white shark over those rows, which is precisely the
++    corruption this column is meant to prevent. So it is fused to the ALTER and
++    must never fire a second time.
++    """
++    path = _fresh_db(tmp_path, monkeypatch)
++    db.init_catalog_dwc_columns()
++    sid = db.create_shark("Cleared", species="")["id"]
++    other = db.create_shark("Sevengill 01", species=SEVENGILL)["id"]
++    db.close_conn()
++
++    db.init_catalog_dwc_columns()          # a later boot
++    assert db.get_shark(sid)["species"] is None
++    assert db.get_shark(other)["species"] == SEVENGILL
++    db.close_conn()
++
++
++def test_init_creates_species_on_a_bare_database(tmp_path, monkeypatch):
++    """A fresh volume has no shark_catalog at all; init builds it and the column
++    lands there too, with nothing to backfill."""
++    path = tmp_path / "bare.db"
++    sqlite3.connect(str(path)).close()
++    monkeypatch.setattr(db, "DB_PATH", path)
++    db.close_conn()
++    db.init_catalog_dwc_columns()
++    with db.get_conn() as conn:
++        cols = {r[1] for r in conn.execute("PRAGMA table_info(shark_catalog)")}
++        rows = conn.execute("SELECT COUNT(*) FROM shark_catalog").fetchone()[0]
++    assert "species" in cols
++    assert rows == 0          # nothing to backfill on a fresh volume
++    db.close_conn()
++
++
++# ──────────────────────── CRUD round-trip ────────────────────────────
++
++def test_new_row_defaults_to_the_historically_implicit_species(temp_db):
++    """A caller that says nothing about species keeps recording what this app has
++    always recorded — that is what makes the column additive."""
++    res = db.create_shark("Unspecified")
++    assert res["species"] == db.DEFAULT_SPECIES
++    assert db.get_shark(res["id"])["species"] == db.DEFAULT_SPECIES
++
++
++def test_new_row_honours_an_explicit_species(temp_db):
++    res = db.create_shark("Sevengill 01", species=SEVENGILL)
++    assert res["species"] == SEVENGILL
++    assert db.get_shark(res["id"])["species"] == SEVENGILL
++
++
++def test_explicit_blank_species_is_stored_as_unstated(temp_db):
++    """"" is a caller saying "I am not asserting a species" — distinct from the
++    omission that triggers the default, and stored as NULL, not as the default."""
++    sid = db.create_shark("Blank", species="")["id"]
++    assert db.get_shark(sid)["species"] is None
++
++
++def test_update_sets_and_clears_species(temp_db):
++    sid = db.create_shark("Reassigned")["id"]
++    assert "error" not in db.update_shark(sid, species=SEVENGILL)
++    assert db.get_shark(sid)["species"] == SEVENGILL
++    db.update_shark(sid, species="")            # clear, do not re-default
++    assert db.get_shark(sid)["species"] is None
++
++
++def test_update_without_species_leaves_it_alone(temp_db):
++    """None means "not part of this patch" for every field in update_shark."""
++    sid = db.create_shark("Renamed", species=SEVENGILL)["id"]
++    db.update_shark(sid, display_name="Renamed twice")
++    after = db.get_shark(sid)
++    assert after["display_name"] == "Renamed twice"
++    assert after["species"] == SEVENGILL
++
++
++def test_species_is_surfaced_by_the_list_read(temp_db):
++    db.create_shark("A")
++    db.create_shark("B", species=SEVENGILL)
++    assert {s["display_name"]: s["species"] for s in db.list_sharks()} == {
++        "A": db.DEFAULT_SPECIES, "B": SEVENGILL}
++
++
++def test_a_mixed_species_catalog_round_trips(temp_db):
++    """The whole point: two species coexisting in one catalog without either
++    being rewritten by the other's default."""
++    db.create_shark("White 01")
++    db.create_shark("Sevengill 01", species=SEVENGILL)
++    db.create_shark("Unknown 01", species="")
++    got = {s["display_name"]: s["species"] for s in db.list_sharks()}
++    assert got == {"White 01": db.DEFAULT_SPECIES,
++                   "Sevengill 01": SEVENGILL,
++                   "Unknown 01": None}
++
++
++# ────────────────────── Darwin Core mapping ──────────────────────────
++
++DWC_SCHEMA = """
++CREATE TABLE shark_catalog (
++    id INTEGER PRIMARY KEY AUTOINCREMENT, display_name TEXT UNIQUE,
++    first_seen TEXT, last_seen TEXT, notes TEXT, created_at TEXT, updated_at TEXT,
++    organism_id TEXT, scientific_name TEXT, scientific_name_id TEXT, species TEXT
++);
++CREATE TABLE encounter_priority (
++    encounter_id TEXT PRIMARY KEY, site TEXT, video_id TEXT,
++    completion_count INTEGER DEFAULT 0, shark_catalog_id INTEGER
++);
++CREATE TABLE videos (
++    id TEXT PRIMARY KEY, encounter_code TEXT, video_name TEXT, video_path TEXT,
++    drive_id TEXT, site TEXT, year INTEGER, date TEXT, media_type TEXT
++);
++CREATE TABLE annotations (
++    id TEXT PRIMARY KEY, video_id TEXT, frame_number INTEGER, encounter_code TEXT,
++    annotator TEXT, annotation_date TEXT, json_data TEXT, export_date TEXT,
++    n_scars INTEGER, n_keypoints INTEGER
++);
++"""
++
++
++def _dwc_db(tmp_path, monkeypatch, *, catalog_rows):
++    """One annotation occurrence per catalogued individual, so each row's taxon
++    is observable in the export."""
++    path = tmp_path / "dwc_species.db"
++    conn = sqlite3.connect(str(path))
++    conn.executescript(DWC_SCHEMA)
++    for i, (name, sci, sci_id, species) in enumerate(catalog_rows, start=1):
++        code = "AN1211130%d" % i
++        conn.execute("INSERT INTO shark_catalog (id, display_name, organism_id, "
++                     "scientific_name, scientific_name_id, species, created_at) "
++                     "VALUES (?,?,?,?,?,?, 't')",
++                     (i, name, "org-%d" % i, sci, sci_id, species))
++        conn.execute("INSERT INTO encounter_priority (encounter_id, site, "
++                     "shark_catalog_id) VALUES (?, 'AN', ?)", (code, i))
++        conn.execute("INSERT INTO videos (id, encounter_code, video_name, site, year, "
++                     "date, media_type) VALUES (?,?,'d.mp4','AN',2012,'','video')",
++                     ("v%d" % i, code))
++        conn.execute("INSERT INTO annotations (id, video_id, frame_number, "
++                     "encounter_code, annotator, annotation_date, json_data, n_scars, "
++                     "n_keypoints) VALUES (?,?,1,?, 'a@x.edu', '2026-03-03T00:00:00', "
++                     "'{}', 0, 0)", ("ann-%d" % i, "v%d" % i, code))
++    conn.commit()
++    conn.close()
++    monkeypatch.setattr(db, "DB_PATH", path)
++    db.close_conn()
++    return path
++
++
++def _occurrences_by_name():
++    from annotation.dwc_adapter import SharkScarAdapter
++    return {o.organism_name: o for o in SharkScarAdapter().occurrences()
++            if o.organism_name}
++
++
++def test_species_becomes_dwc_scientific_name(tmp_path, monkeypatch):
++    """The mapping the sevengill catalog depends on: a per-individual species
++    reaches dwc:scientificName with no AphiaID lookup and no dataset default."""
++    _dwc_db(tmp_path, monkeypatch,
++            catalog_rows=[("Sevengill 01", None, None, SEVENGILL)])
++    occ = _occurrences_by_name()["Sevengill 01"]
++    assert occ.scientific_name == SEVENGILL
++    assert occ.scientific_name_id is None
++    db.close_conn()
++
++
++def test_curated_scientific_name_wins_over_species(tmp_path, monkeypatch):
++    """scientific_name and scientific_name_id are one curated pair. Publishing
++    the name from `species` beside that ID would emit a record whose name and
++    identifier disagree, so the pair stays intact."""
++    _dwc_db(tmp_path, monkeypatch, catalog_rows=[
++        ("Scarlett", "Carcharodon carcharias",
++         "urn:lsid:marinespecies.org:taxname:105838", SEVENGILL)])
++    occ = _occurrences_by_name()["Scarlett"]
++    assert occ.scientific_name == "Carcharodon carcharias"
++    assert occ.scientific_name_id.endswith("105838")
++    db.close_conn()
++
++
++def test_an_individual_with_no_species_stays_untaxonomised(tmp_path, monkeypatch):
++    """No species and no curated taxon must export blank, not guessed. The only
++    way to fill a taxon in bulk stays the dataset-level default_scientific_name,
++    which is unset by default because a wrong species applied to a whole dataset
++    is worse than a missing one."""
++    _dwc_db(tmp_path, monkeypatch, catalog_rows=[("Unknown 01", None, None, None)])
++    occ = _occurrences_by_name()["Unknown 01"]
++    assert occ.scientific_name is None
++    db.close_conn()
++
++
++def test_an_aphia_id_is_never_published_beside_a_species_fallback(tmp_path,
++                                                                  monkeypatch):
++    """The pairing invariant, on the row that breaks it: nothing constrains the
++    two curated columns to be written together, so a catalog row can carry a
++    scientific_name_id with no scientific_name beside it. Publishing that AphiaID
++    next to a name taken from `species` would emit a record whose name and
++    identifier resolve to different taxa. The identifier travels with the name it
++    identifies or not at all — including on the second row here, where dropping
++    the name leaves nothing for the ID to identify."""
++    _dwc_db(tmp_path, monkeypatch, catalog_rows=[
++        ("Half-curated", None, "urn:lsid:marinespecies.org:taxname:105838",
++         SEVENGILL),
++        ("Id only", None, "urn:lsid:marinespecies.org:taxname:105838", None)])
++    occs = _occurrences_by_name()
++    assert occs["Half-curated"].scientific_name == SEVENGILL
++    assert occs["Half-curated"].scientific_name_id is None
++    assert occs["Id only"].scientific_name is None
++    assert occs["Id only"].scientific_name_id is None
++    db.close_conn()
++
++
++def _defaulted_occurrence(cfg, name):
++    """The occurrence as a writer sees it. Dataset-level defaults are applied by
++    the archive/flat writers via DatasetMeta.apply_defaults, never by
++    occurrences(), so reading the raw stream would pin nothing about them."""
++    from annotation.dwc_adapter import SharkScarAdapter
++    adapter = SharkScarAdapter.from_config(cfg)
++    meta = adapter.dataset_meta()
++    occ = next(o for o in adapter.occurrences() if o.organism_name == name)
++    return meta.apply_defaults(occ)
++
++
++def test_a_per_individual_species_beats_the_dataset_default(tmp_path, monkeypatch):
++    """Configuring a dataset default must not silently overwrite what a human
++    recorded against one animal: apply_defaults only fills blanks, and species
++    means the field is no longer blank."""
++    _dwc_db(tmp_path, monkeypatch,
++            catalog_rows=[("Sevengill 01", None, None, SEVENGILL)])
++    occ = _defaulted_occurrence(
++        {"dwc": {"default_scientific_name": "Carcharodon carcharias"}},
++        "Sevengill 01")
++    assert occ.scientific_name == SEVENGILL
++    db.close_conn()
++
++
++def test_the_dataset_default_still_fills_an_untaxonomised_individual(tmp_path,
++                                                                    monkeypatch):
++    """The other half of that contract, and the reason the default exists: an
++    individual nobody has assigned a species to is exactly what it is for. The
++    species column narrows what the default has left to fill; it must not
++    disable it."""
++    _dwc_db(tmp_path, monkeypatch, catalog_rows=[("Unknown 01", None, None, None)])
++    occ = _defaulted_occurrence(
++        {"dwc": {"default_scientific_name": "Carcharodon carcharias"}},
++        "Unknown 01")
++    assert occ.scientific_name == "Carcharodon carcharias"
++    db.close_conn()
++
++
++def test_export_still_runs_against_a_database_without_the_species_column(tmp_path,
++                                                                        monkeypatch):
++    """The adapter is read-only and gets pointed at backups and older volumes.
++    A missing additive column must not fail the whole export."""
++    path = tmp_path / "old.db"
++    conn = sqlite3.connect(str(path))
++    conn.executescript(DWC_SCHEMA.replace(", species TEXT", ""))
++    conn.execute("INSERT INTO shark_catalog (id, display_name, organism_id, "
++                 "scientific_name, created_at) VALUES (1,'Scarlett','org-1',"
++                 "'Carcharodon carcharias','t')")
++    conn.execute("INSERT INTO encounter_priority (encounter_id, site, "
++                 "shark_catalog_id) VALUES ('AN12111301','AN',1)")
++    conn.execute("INSERT INTO videos (id, encounter_code, video_name, site, year, date, "
++                 "media_type) VALUES ('v1','AN12111301','d.mp4','AN',2012,'','video')")
++    conn.execute("INSERT INTO annotations (id, video_id, frame_number, encounter_code, "
++                 "annotator, annotation_date, json_data, n_scars, n_keypoints) VALUES "
++                 "('ann-1','v1',1,'AN12111301','a@x.edu','2026-03-03T00:00:00','{}',0,0)")
++    conn.commit()
++    conn.close()
++    monkeypatch.setattr(db, "DB_PATH", path)
++    db.close_conn()
++
++    occ = _occurrences_by_name()["Scarlett"]
++    assert occ.scientific_name == "Carcharodon carcharias"
++    db.close_conn()
++
++
++# ─────────────────────── admin route surface ─────────────────────────
++
++# The catalog endpoints live on app.py's module-level Flask app, not on a
++# blueprint that takes its auth decorators as parameters, so the pass-through
++# stubs tests/test_dataset_routes.py injects have nowhere to go. The equivalent
++# seam here is `app._get_auth`, the single lookup `require_login` performs;
++# stubbing it exercises the real decorators. Importing app is slow (~3s) and
++# needs cv2/google-auth, hence the skip guards and the fixture-local import,
++# with DISABLE_SYNC_QUEUE keeping the drain daemon off our temp DB exactly as
++# tests/test_app_wiring.py does.
++
++TOKEN = "species-test-token"
++
++
++class _StubUser:
++    def to_dict(self):
++        return {"email": "admin@x.edu", "name": "Admin", "is_admin": True}
++
++
++class _StubAuth:
++    def verify_session_token(self, token):
++        return _StubUser() if token == TOKEN else None
++
++
++@pytest.fixture()
++def admin_client(tmp_path, monkeypatch):
++    pytest.importorskip("flask", reason="Flask not installed in this interpreter")
++    os.environ.setdefault("DISABLE_SYNC_QUEUE", "true")
++    application = pytest.importorskip(
++        "app", reason="app.py needs cv2 / google-auth to import")
++    _fresh_db(tmp_path, monkeypatch)
++    db.init_catalog_dwc_columns()
++    monkeypatch.setattr(application, "_get_auth", lambda: _StubAuth())
++    application.app.config["TESTING"] = True
++    client = application.app.test_client()
++    client.environ_base["HTTP_AUTHORIZATION"] = "Bearer " + TOKEN
++    # app.csrf_check rejects any unsafe /api/ request without this header.
++    client.environ_base["HTTP_X_REQUESTED_WITH"] = "XMLHttpRequest"
++    yield client
++    db.close_conn()
++
++
++def test_species_round_trips_through_the_admin_catalog_routes(admin_client):
++    """End to end over HTTP, because the db-layer tests above cannot see a route
++    dropping the field: POST honours an explicit species, POST without the key
++    keeps recording what this app always recorded (the back-compat contract for
++    an admin UI written before the field existed), and PATCH reassigns it."""
++    created = admin_client.post("/api/admin/catalog",
++                                json={"display_name": "Sevengill 01",
++                                      "species": SEVENGILL})
++    assert created.status_code == 201
++    assert created.get_json()["species"] == SEVENGILL
++
++    legacy = admin_client.post("/api/admin/catalog",
++                               json={"display_name": "White 01"})
++    assert legacy.status_code == 201
++    assert legacy.get_json()["species"] == db.DEFAULT_SPECIES
++
++    sid = created.get_json()["id"]
++    patched = admin_client.patch("/api/admin/catalog/%d" % sid,
++                                 json={"species": "Carcharodon carcharias"})
++    assert patched.status_code == 200
++    assert admin_client.get("/api/admin/catalog/%d" % sid).get_json()["species"] \
++        == "Carcharodon carcharias"
++
++    assert {s["display_name"]: s["species"]
++            for s in admin_client.get("/api/admin/catalog").get_json()["sharks"]} == {
++        "Sevengill 01": "Carcharodon carcharias", "White 01": db.DEFAULT_SPECIES}
+-- 
+2.43.0
+

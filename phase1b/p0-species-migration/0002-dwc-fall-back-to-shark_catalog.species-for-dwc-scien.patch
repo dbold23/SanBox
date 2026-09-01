@@ -1,0 +1,137 @@
+From 52077617fa0e7ef7477252f48d3189b295b2f697 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Tue, 1 Sep 2026 17:23:25 +0000
+Subject: [PATCH 2/3] dwc: fall back to shark_catalog.species for
+ dwc:scientificName
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Two columns can now name an individual's taxon, and they are not
+interchangeable. scientific_name is the curated Darwin Core value and travels
+with scientific_name_id (a WoRMS AphiaID URI), so it wins when set. species is
+the app-layer designation every catalog row now carries, and is the fallback,
+which is what lets a non-white-shark individual export correctly without anyone
+having to look up an AphiaID first.
+
+The identifier only ever accompanies the name it identifies: it is published
+with scientific_name and dropped on the species fallback. Nothing constrains the
+two curated columns to be written together — the admin routes accept either
+alone — so a row can carry an AphiaID with no name beside it, and publishing
+that ID next to a name taken from species would emit a record whose name and
+identifier resolve to different taxa. That is worse than the missing identifier,
+because no consumer can tell which of the two the record is about. A curator who
+wants the ID published fills in the name it belongs to.
+
+Nothing is inferred. An individual with neither column set still exports
+untaxonomised, and the only way to fill a taxon in bulk is still the
+dataset-level default_scientific_name — left unset by default, because a wrong
+species applied to a whole dataset is far more damaging than a missing one. That
+guard is untouched; this reads only what a human recorded against one animal.
+
+The organism lookup selects species only when the column is present. This
+adapter is read-only and gets pointed at backups and older volumes, and an
+additive column that has not reached a given DB must not fail the whole export
+with "no such column".
+---
+ annotation/dwc_adapter.py | 54 +++++++++++++++++++++++++++++++++------
+ 1 file changed, 46 insertions(+), 8 deletions(-)
+
+diff --git a/annotation/dwc_adapter.py b/annotation/dwc_adapter.py
+index 969f737..7915ee6 100644
+--- a/annotation/dwc_adapter.py
++++ b/annotation/dwc_adapter.py
+@@ -99,6 +99,39 @@ def _iso_datetime(date: Optional[str], time_obs: Optional[str]) -> Optional[str]
+     return date
+ 
+ 
++def _taxon(org: Dict[str, Any]) -> Dict[str, Optional[str]]:
++    """dwc:scientificName / dwc:scientificNameID for a catalogued individual.
++
++    Two columns can name the taxon and they are not interchangeable.
++    `scientific_name` is the curated Darwin Core value and travels with
++    `scientific_name_id` (a WoRMS AphiaID URI), so it wins when set. `species` is
++    the app-layer designation every catalog row now carries and is the fallback —
++    that is what lets a non-white-shark individual export correctly without
++    anyone having to look up an AphiaID first.
++
++    The identifier only ever accompanies the name it identifies, so it is
++    published with `scientific_name` and dropped on the fallback. Nothing
++    constrains the two curated columns to be written together — the admin routes
++    accept either alone — so a row can carry an AphiaID with no name beside it.
++    Publishing that ID next to a name taken from `species` would emit a record
++    whose name and identifier resolve to different taxa, which no consumer can
++    untangle and which is worse than the missing identifier. A curator who wants
++    the ID published fills in the name it belongs to.
++
++    Nothing is inferred here. An individual with neither stays untaxonomised, and
++    filling a taxon in bulk is still only the dataset-level
++    `default_scientific_name`, which stays unset by default because a wrong
++    species applied to a whole dataset is far more damaging than a missing one.
++    This reads what a human recorded against one individual; it never widens.
++    """
++    curated = org.get("scientific_name")
++    if curated:
++        return {"scientific_name": curated,
++                "scientific_name_id": org.get("scientific_name_id")}
++    return {"scientific_name": org.get("species") or None,
++            "scientific_name_id": None}
++
++
+ def _json_field(raw: Optional[str]) -> Dict[str, Any]:
+     """Parse an annotation's json_data blob; never raise on malformed rows."""
+     if not raw:
+@@ -204,10 +237,18 @@ class SharkScarAdapter(BaseAdapter):
+     def _organism_map(self, conn) -> Dict[str, Dict[str, Any]]:
+         """encounter_code → the catalogued individual, where one is linked."""
+         if self._organism_by_encounter is None:
+-            rows = conn.execute("""
++            # shark_catalog.species is additive and arrives via
++            # init_catalog_dwc_columns. This adapter is read-only and is run
++            # against whatever DB it is pointed at — a backup, an older volume —
++            # so it selects the column only when it is actually there rather than
++            # failing the whole export on "no such column".
++            has_species = any(r[1] == "species" for r in
++                              conn.execute("PRAGMA table_info(shark_catalog)").fetchall())
++            species_col = "s.species" if has_species else "NULL AS species"
++            rows = conn.execute(f"""
+                 SELECT ep.encounter_id, ep.site,
+                        s.organism_id, s.display_name,
+-                       s.scientific_name, s.scientific_name_id
++                       s.scientific_name, s.scientific_name_id, {species_col}
+                   FROM encounter_priority ep
+                   JOIN shark_catalog s ON s.id = ep.shark_catalog_id
+                  WHERE ep.shark_catalog_id IS NOT NULL
+@@ -279,8 +320,7 @@ class SharkScarAdapter(BaseAdapter):
+                 event_date=_iso_datetime(row.get("obs_date"), row.get("time_obs")),
+                 organism_id=org.get("organism_id"),
+                 organism_name=org.get("display_name"),
+-                scientific_name=org.get("scientific_name"),
+-                scientific_name_id=org.get("scientific_name_id"),
++                **_taxon(org),
+                 sex=normalize_sex(row.get("sex")),
+                 recorded_by=row.get("survey_crew") or row.get("user") or None,
+                 catalog_number=photo_id,
+@@ -351,8 +391,7 @@ class SharkScarAdapter(BaseAdapter):
+                 year=date_info.get("obs_year"),
+                 organism_id=org.get("organism_id"),
+                 organism_name=org.get("display_name"),
+-                scientific_name=org.get("scientific_name"),
+-                scientific_name_id=org.get("scientific_name_id"),
++                **_taxon(org),
+                 recorded_by=row.get("annotator"),
+                 identified_by=row.get("annotator"),
+                 date_identified=row.get("annotation_date"),
+@@ -402,8 +441,7 @@ class SharkScarAdapter(BaseAdapter):
+                 year=row.get("year"),
+                 organism_id=org.get("organism_id"),
+                 organism_name=org.get("display_name") or row.get("nickname"),
+-                scientific_name=org.get("scientific_name"),
+-                scientific_name_id=org.get("scientific_name_id"),
++                **_taxon(org),
+                 sex=normalize_sex(row.get("sex")),
+                 catalog_number=code,
+                 sampling_protocol="re-identification catalogue",
+-- 
+2.43.0
+

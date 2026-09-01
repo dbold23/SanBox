@@ -1,0 +1,1069 @@
+From 5457f1fb5176fd5d0c2e14af012e646ba8212195 Mon Sep 17 00:00:00 2001
+From: Phase1B P0-a <dsambold@csumb.edu>
+Date: Tue, 1 Sep 2026 17:23:15 +0000
+Subject: [PATCH] Add sevengill keypoint schema S1 and a species-parameterised
+ schema loader
+
+config/keypoints_16.yaml is a lamniform schema: five gill slits, two dorsal
+fins, an anterior first dorsal. Notorynchus cepedianus is a hexanchiform, so
+two of its sixteen points have no referent (second_dorsal_*) and id 3 is
+defined as "back edge of last (5th) gill slit", which is wrong for an animal
+with seven.
+
+This commit is additive. Nothing existing is modified, so the white-shark
+pipeline is bit-identical.
+
+  config/keypoints_sevengill_v1.yaml
+      Schema S1, 30 points, authored rather than ported: 19 Type I/II anchors
+      (snout, naris, eye, rictus, spiracle, gill-slit-1 and gill-slit-7
+      dorsal/ventral termini, pectoral origin and insertion, pelvic origin,
+      cloaca, single-dorsal origin and insertion, anal origin and insertion,
+      precaudal pit, caudal subterminal notch) + 4 Type III fin tips, which
+      are shape channels and NOT anchors, + a deterministic seven-point trunk
+      midline chain at fractions k/8 of the snout-to-precaudal centerline arc
+      length. Every point carries a Bookstein type, an anatomical definition,
+      an expected lateral underwater visibility, and a note where the anatomy
+      departs from the white-shark schema. Fin tips are demoted to optional
+      shape-only points. Mirror augmentation is forbidden and the reason is
+      recorded in the file.
+
+      Two constraints the file states rather than assumes. skeleton_edges is
+      the computed contraction of the sevengill kinematic tree onto the
+      keypoint set, not a hand-drawn graph; it is a forest of 19 edges over 11
+      roots, because the joint-tree root is an unlabelled cranial spine
+      station and no connected contraction exists. And pelvic_origin,
+      dorsal_fin_origin and cloaca carry NO antero-posterior ordering: the
+      sources disagree, the cloaca is defined between the pelvic fin bases,
+      and any specific order among the three is UNVERIFIED.
+
+  scripts/shared/schema.py
+      Loads and validates either config yaml by species key, so new code can
+      stop pasting name lists. Existing imports of shared/constants.py are
+      untouched.
+
+  tests/test_keypoint_schemas.py
+      First tests in the repo. Pins that Schema v2's names, order and
+      permissive flip default are unchanged, and that the sevengill schema
+      has no second dorsal, brackets seven gill slits, and disables flips.
+
+The repo still duplicates the v2 name list in 23 modules and hardcodes the
+count 16 in a further dozen places. Those are inventoried by file and line in
+the phase1b COMPAT.md and are deliberately not rewritten here: the repo has no
+test coverage against which a 23-file edit could be shown safe.
+---
+ .../config/keypoints_sevengill_v1.yaml        | 704 ++++++++++++++++++
+ shark_pose_project/scripts/shared/schema.py   | 164 ++++
+ .../tests/test_keypoint_schemas.py            | 119 +++
+ 3 files changed, 987 insertions(+)
+ create mode 100644 shark_pose_project/config/keypoints_sevengill_v1.yaml
+ create mode 100644 shark_pose_project/scripts/shared/schema.py
+ create mode 100644 shark_pose_project/tests/test_keypoint_schemas.py
+
+diff --git a/shark_pose_project/config/keypoints_sevengill_v1.yaml b/shark_pose_project/config/keypoints_sevengill_v1.yaml
+new file mode 100644
+index 0000000..7f73aac
+--- /dev/null
++++ b/shark_pose_project/config/keypoints_sevengill_v1.yaml
+@@ -0,0 +1,704 @@
++# 30 Anatomical Keypoints for Broadnose Sevengill (Notorynchus cepedianus) — Schema S1
++#
++# Authored, not ported. Schema v2 (shark_pose_project/config/keypoints_16.yaml) is a LAMNIFORM
++# schema: five gill slits, two dorsal fins, an anterior first dorsal.
++# Notorynchus is a HEXANCHIFORM: seven gill
++# slits, ONE dorsal fin set far posterior over/behind the pelvics, no second dorsal, anal fin
++# present, broad blunt head, elongate laterally flexible trunk, strongly heterocercal caudal with
++# a long upper lobe and a weak lower lobe. Two of the sixteen v2 points (second_dorsal_*) have no
++# referent on this animal and one (gill_slit_back, "back edge of last (5th) gill slit") is
++# factually wrong for it.
++#
++# Design (traced in RATIONALE.md):
++#   (a) a small Type I/II ANCHOR set that is fully defined for Notorynchus with nothing undefined;
++#   (b) a deterministic 7-point TRUNK MIDLINE semilandmark chain, because Phase 1B's primary arm
++#       is flank matching under midline rectification and the rectifier needs a centerline;
++#   (c) fin TIPS demoted to optional Type III shape-only points, never skeleton joints.
++#
++# Every point carries a Bookstein type. Type I = juxtaposition of tissues (true homology,
++# constrained in all directions); Type II = curvature maximum with a morphogenetic justification;
++# Type III = extremal or constructed point, informative in one direction only, formally
++# non-homologous — it SLIDES. Type III points are shape/measurement channels; they are not
++# correspondences and must not be used as skeleton roots or as re-ID anchors.
++#
++# Girth / body outline via SAM 2 silhouette (not keypoints), as in Schema v2.
++
++schema:
++  name: keypoints_sevengill_v1
++  version: S1
++  species: Notorynchus cepedianus
++  common_name: broadnose sevengill shark
++  order: Hexanchiformes
++  supersedes_for_this_species: keypoints_16.yaml  # Schema v2, white shark, DO NOT reuse here
++  num_keypoints: 30
++  view: single lateral flank per annotation record
++  status: >-
++    v1 DRAFT. Not field-validated. Requires sign-off from a hexanchiform authority before any
++    annotation campaign spends hours against it (P0-a; the named reviewer is David A. Ebert,
++    Pacific Shark Research Center, Moss Landing Marine Laboratories).
++
++# ─────────────────────────────────────────────────────────────────────────────
++# Side convention. One flank per annotation record; the schema is single-sided.
++# ─────────────────────────────────────────────────────────────────────────────
++side_convention:
++  field: side                       # stored on the annotation record, NOT as duplicate keypoints
++  values: [L, R, unknown]
++  rule: >-
++    Orient the frame so the dorsum is up. If the head points to the viewer's LEFT, the visible
++    flank is the animal's LEFT (L). If the head points to the viewer's RIGHT, the visible flank is
++    the animal's RIGHT (R). Record `unknown` for dorsal, ventral, head-on and tail-on views; do not
++    guess.
++  identity_unit: (individual, side)
++  sided_keypoints_note: >-
++    Every paired landmark below (naris, eye, rictus, spiracle, all gill-slit points, pectoral,
++    pelvic) is annotated ONLY on the visible flank and takes its side from the record-level `side`
++    field. There is no left/right pair inside one annotation, so there is no flip pairing to
++    define.
++
++no_mirror_augmentation:
++  allow_horizontal_flip: false
++  reason: >-
++    (1) The identity signal is speckle and scarring, which is NOT bilaterally symmetric — a
++    mirrored left-flank image is not a valid right-flank exemplar of that individual, it is a
++    fabricated one. (2) Measured: in the Melops campaign, once same-session opposite-flank
++    contamination was removed, cross-flank Rank-1 fell to 0.70% zero-shot — left and right flanks
++    behave as separate identities, so mirroring injects false-positive pairs into training and
++    contaminates the gallery. (3) A mirror silently inverts the `side` field and reverses the
++    antero-posterior direction that the chart's arc-length anchoring depends on. Horizontal flip is
++    disabled at the augmentation level, not merely made index-safe by flip_idx.
++  training_override: {fliplr: 0.0}
++
++# ─────────────────────────────────────────────────────────────────────────────
++# Keypoints
++#   type              : Bookstein I / II / III
++#   lateral_visibility: expected from a SINGLE LATERAL UNDERWATER VIEW of a free-swimming animal
++#                       (high | moderate | low | never)
++#   sevengill_note    : present only where this point differs from the white-shark Schema v2
++# ─────────────────────────────────────────────────────────────────────────────
++keypoints:
++
++  # ── Head / branchial anchor block ──────────────────────────────────────────
++  - id: 0
++    name: snout_tip
++    description: "Anteriormost point of the rostrum on the mid-sagittal profile, with the mouth closed"
++    placement_guide: "Click the frontmost point of the snout outline"
++    type: II
++    tier: 1
++    lateral_visibility: high
++    visual_anchor: "Convex extremum of the head silhouette against water"
++    sevengill_note: >-
++      DEGRADED relative to Schema v2. The sevengill head is broad and bluntly rounded, so the
++      anterior profile has no sharp curvature maximum; this point drifts along a flat arc and
++      behaves closer to Type III than the white shark's Type II. Use it as the origin of the
++      midline axis (a scalar station) and for length proxies — do not use it as a re-ID anchor.
++
++  - id: 1
++    name: naris_anterior_margin
++    description: "Anterior margin of the nasal aperture on the visible flank, at the junction of the nasal flap and the snout skin"
++    placement_guide: "Click the front edge of the nostril opening"
++    type: I
++    tier: 2
++    lateral_visibility: moderate
++    visual_anchor: "Tissue junction at the nasal flap; a dark aperture on a pale ventro-lateral snout"
++    sevengill_note: >-
++      NEW, and load-bearing. The operating La Jolla sevengill programme matches individuals on the
++      freckle patch between the nares and the gill slits. This point is the ANTERIOR bound of that
++      patch and therefore defines the crop for the secondary (head-patch) arm of Phase 1B. Schema
++      v2 has no equivalent because white-shark ID does not use this region.
++
++  - id: 2
++    name: eye_center
++    description: "Centre of the exposed eyeball, midway between the anterior and posterior canthi and midway between the upper and lower eyelid margins"
++    placement_guide: "Click the middle of the visible eye"
++    type: I
++    tier: 1
++    lateral_visibility: high
++    visual_anchor: "High-contrast circular feature"
++    sevengill_note: >-
++      Transfers cleanly from Schema v2 and is one of the ~5 v2 points that does. Notorynchus has a
++      relatively small eye with no nictitating membrane; in turbid water it can be the only
++      reliable head landmark.
++
++  - id: 3
++    name: mouth_rictus
++    description: "Posterior corner of the mouth (the labial commissure), at the junction of the upper and lower labial folds"
++    placement_guide: "Click the back corner of the mouth where the upper and lower jaw lines meet"
++    type: I
++    tier: 2
++    lateral_visibility: moderate
++    visual_anchor: "Convergence of two skin folds; strong on a pale-jawed animal, lost in low contrast"
++    sevengill_note: >-
++      NEW. Gives a second Type I head anchor so that the head patch can be rectified from a
++      three-point frame (naris, eye, rictus) rather than a two-point one. Not in Schema v2.
++
++  - id: 4
++    name: spiracle
++    description: "Centre of the spiracular opening, posterodorsal to the eye"
++    placement_guide: "Click the small opening just behind and above the eye"
++    type: I
++    tier: 3
++    lateral_visibility: low
++    visual_anchor: "Small dark aperture; frequently closed and effectively invisible"
++    sevengill_note: >-
++      NEW and OPTIONAL. Hexanchiforms retain small spiracles. Recorded because it is a genuine
++      Type I point in the rigid head region, but it is small, often closed, and must never be a
++      required annotation. Expect a high missing rate; it is a bonus anchor, not a dependency.
++
++  - id: 5
++    name: gill_slit_1_dorsal_origin
++    description: "Dorsal (upper) terminus of the FIRST gill slit, where the slit margin meets the unbroken dorsolateral body skin"
++    placement_guide: "Follow the frontmost gill slit up to its top end and click where it stops"
++    type: I
++    tier: 1
++    lateral_visibility: high
++    visual_anchor: "Termination of a high-contrast linear skin crease"
++    sevengill_note: >-
++      REPLACES v2 id 2 (`gill_slit_front`). Defined on slit ONE explicitly, and as a slit TERMINUS
++      rather than an edge midpoint, so it is a true tissue juxtaposition. This is also the
++      canonical chart anchor: s = 0 for the (arc-length x circumference) tube chart is taken at the
++      gill-slit-1 contour, and the chart is re-anchored on the gill-slit contours to correct
++      accumulated arc-length drift.
++
++  - id: 6
++    name: gill_slit_1_ventral_terminus
++    description: "Ventral (lower) terminus of the FIRST gill slit"
++    placement_guide: "Follow the frontmost gill slit down to its bottom end and click where it stops"
++    type: I
++    tier: 2
++    lateral_visibility: moderate
++    visual_anchor: "Termination of a linear skin crease, low on the flank"
++    sevengill_note: >-
++      NEW. Sevengill gill slits extend much further ventrally than a lamnid's — the first pair very
++      nearly meets on the throat. The dorsal/ventral pair therefore brackets a near-circumferential
++      contour, which is exactly the ordered transverse curve the chart uses for re-anchoring.
++      Occluded whenever the animal is viewed above the horizontal.
++
++  - id: 7
++    name: gill_slit_7_dorsal_origin
++    description: "Dorsal (upper) terminus of the SEVENTH (last) gill slit"
++    placement_guide: "Count back to the LAST gill slit — there are seven — and click its top end"
++    type: I
++    tier: 1
++    lateral_visibility: high
++    visual_anchor: "Termination of the hindmost linear skin crease, immediately anterior to the pectoral origin"
++    sevengill_note: >-
++      REPLACES v2 id 3, which reads verbatim "Back edge of last (5th) gill slit" and is simply
++      false for this order. SEVEN slits. Annotators must count; the seventh slit sits directly in
++      front of the pectoral origin, which is the reliable check.
++
++  - id: 8
++    name: gill_slit_7_ventral_terminus
++    description: "Ventral (lower) terminus of the SEVENTH (last) gill slit"
++    placement_guide: "Follow the last gill slit down to its bottom end and click where it stops"
++    type: I
++    tier: 2
++    lateral_visibility: moderate
++    visual_anchor: "Termination of a linear skin crease, low on the flank"
++    sevengill_note: "NEW. Pairs with id 7 as the posterior branchial contour."
++
++  # Slits 2-6 are deliberately NOT individual keypoints — see ordered_ap_sequence below.
++
++  # ── Paired-fin and ventral anchor block ────────────────────────────────────
++  - id: 9
++    name: pectoral_origin
++    description: "Anterior insertion of the pectoral fin: the point where the fin's leading edge meets the body wall"
++    placement_guide: "Click where the front edge of the pectoral fin joins the body"
++    type: I
++    tier: 1
++    lateral_visibility: high
++    visual_anchor: "Fin-body boundary edge"
++    sevengill_note: >-
++      Transfers from Schema v2 id 4. One of the most reliable Type I points on the animal from a
++      lateral view and the posterior bound of the rigid anterior region.
++
++  - id: 10
++    name: pectoral_insertion
++    description: "Posterior insertion of the pectoral fin: the point where the fin's trailing edge meets the body wall"
++    placement_guide: "Click where the back edge of the pectoral fin joins the body"
++    type: I
++    tier: 2
++    lateral_visibility: moderate
++    visual_anchor: "Fin-body boundary edge"
++    sevengill_note: "Transfers from Schema v2 id 6. Self-occluded when the fin is depressed against the flank."
++
++  - id: 11
++    name: pectoral_fin_tip
++    description: "Distal extremity of the pectoral fin, measured as the point of the fin outline furthest from the pectoral origin"
++    placement_guide: "Click the far tip of the pectoral fin"
++    type: III
++    tier: 3
++    lateral_visibility: moderate
++    visual_anchor: "Rounded distal apex against water"
++    sevengill_note: >-
++      DEMOTED. In Schema v2 this is a skeleton joint. Here it is a shape/measurement channel only
++      and is never a joint: it is a Type III extremal point on a broadly rounded sevengill pectoral
++      (not the falcate lamnid fin), so it slides along the distal margin and its apparent position
++      is dominated by fin pitch relative to the camera.
++
++  - id: 12
++    name: pelvic_origin
++    description: "Anterior insertion of the pelvic fin: the point where the fin's leading edge meets the body wall on the visible flank"
++    placement_guide: "Click where the front edge of the pelvic fin joins the underside of the body"
++    type: I
++    tier: 2
++    lateral_visibility: moderate
++    visual_anchor: "Fin-body boundary edge, low on the posterior flank"
++    sevengill_note: >-
++      NEW as an INSERTION point (Schema v2 carries only `pelvic_fin_tip`, a Type III tip). Required
++      here because the single dorsal sits over or behind the pelvics, so the pelvic station is the
++      landmark that localises the dorsal station rather than the other way round.
++
++  - id: 13
++    name: cloaca
++    description: "Posterior margin of the cloacal aperture on the mid-ventral line, between the pelvic fin bases"
++    placement_guide: "Click the vent on the belly midline between the pelvic fins"
++    type: I
++    tier: 3
++    lateral_visibility: low
++    visual_anchor: "Mid-ventral aperture; visible only from below or from a strongly ventro-lateral angle"
++    sevengill_note: >-
++      NEW and OPTIONAL. A true Type I point, but it is MID-VENTRAL and therefore essentially never
++      visible in the lateral free-swimming view that Phase 1B is built on. Annotate when the
++      geometry allows; never require it.
++      ⚠ NOT a member of the ordered antero-posterior sequence. This description places the cloaca
++      between the PELVIC FIN BASES, i.e. at the pelvic station; the single dorsal sits over or
++      behind the pelvics. The relative A-P order of cloaca, pelvic_origin and dorsal_fin_origin is
++      individual- and size-dependent and is [UNVERIFIED] — see `unordered_posterior_trio` under
++      ordered_ap_sequence. Do not enforce any order among the three.
++      Claspers are deliberately NOT keypoints — they are conditionally present (mature males only),
++      which is poison for a fixed-topology schema. Record sex as a covariate instead.
++
++  # ── Median-fin block. This is where Schema v2 breaks hardest. ──────────────
++  - id: 14
++    name: dorsal_fin_origin
++    description: "Anterior insertion of the SINGLE dorsal fin: the point where the fin's leading edge meets the dorsal body outline"
++    placement_guide: "Click where the front edge of the (only) dorsal fin meets the back"
++    type: I
++    tier: 1
++    lateral_visibility: high
++    visual_anchor: "Fin-body boundary edge on the dorsal outline"
++    sevengill_note: >-
++      RELOCATED, not renamed. Schema v2's `first_dorsal_base` sits at roughly mid-body on a lamnid.
++      Notorynchus has ONE dorsal fin, small and set far posterior, over or behind the pelvic
++      origins and well behind the mid-point of the trunk. Any rest pose, bone length, PCA shape
++      prior or temporal prior learned at the v2 station is invalid here. Do not initialise a pose
++      fit from the v2 position.
++
++  - id: 15
++    name: dorsal_fin_insertion
++    description: "Posterior insertion of the dorsal fin: the point where the free rear tip's trailing edge meets the dorsal body outline"
++    placement_guide: "Click where the back edge of the dorsal fin meets the back"
++    type: I
++    tier: 3
++    lateral_visibility: moderate
++    visual_anchor: "Fin-body boundary edge on the dorsal outline"
++    sevengill_note: "Corresponds to v2 id 9 (`dorsal_base_back`) but at the relocated posterior station."
++
++  - id: 16
++    name: dorsal_fin_apex
++    description: "Distal extremity of the dorsal fin, measured as the point of the fin outline furthest from the chord joining dorsal_fin_origin to dorsal_fin_insertion"
++    placement_guide: "Click the top of the dorsal fin"
++    type: III
++    tier: 3
++    lateral_visibility: high
++    visual_anchor: "Apex against water"
++    sevengill_note: >-
++      DEMOTED to shape-only, as for all tips. The sevengill dorsal is small and rounded, so the
++      apex slides badly; it is retained for a dorsal-height measurement and for silhouette-based
++      quality scoring, not as a joint or a re-ID anchor.
++
++  - id: 17
++    name: anal_fin_origin
++    description: "Anterior insertion of the anal fin: the point where the fin's leading edge meets the ventral body outline"
++    placement_guide: "Click where the front edge of the anal fin meets the belly line"
++    type: I
++    tier: 2
++    lateral_visibility: moderate
++    visual_anchor: "Fin-body boundary edge on the ventral outline"
++    sevengill_note: >-
++      NEW as an INSERTION point. Schema v2 carries only `anal_fin_tip` (Type III, body-occluded and
++      listed among the worst v2 points). Notorynchus has an anal fin, set beneath and slightly
++      behind the dorsal; the origin is a usable Type I whenever the ventral outline is in view.
++
++  - id: 18
++    name: anal_fin_insertion
++    description: "Posterior insertion of the anal fin: the point where the trailing edge meets the ventral body outline"
++    placement_guide: "Click where the back edge of the anal fin meets the belly line"
++    type: I
++    tier: 3
++    lateral_visibility: low
++    visual_anchor: "Fin-body boundary edge on the ventral outline"
++    sevengill_note: "NEW and OPTIONAL. Frequently occluded by the fin itself or lost against a dark ventral background."
++
++  # ── Caudal block. The tube chart TERMINATES at id 19. ──────────────────────
++  - id: 19
++    name: precaudal_pit
++    description: "Deepest point of the dorsal precaudal pit — the constriction of the body outline immediately anterior to the origin of the upper caudal lobe"
++    placement_guide: "Click the narrowest point where the body pinches in just before the tail"
++    type: II
++    tier: 1
++    lateral_visibility: high
++    visual_anchor: "Concave curvature maximum of the dorsal outline — a strong shape feature"
++    sevengill_note: >-
++      Corresponds to v2 id 13 (`caudal_notch`), renamed to the measurement-protocol term to avoid
++      collision with `caudal_subterminal_notch` (id 20), a different structure entirely. This point
++      is the POSTERIOR TERMINATOR of the trunk midline axis and of the tube chart: aft of it the
++      section compresses into a keel and stops being star-shaped about the medial axis, so the
++      chart's one-ray-one-surface-hit assumption fails. The caudal fin is a separate 2D patch.
++
++  - id: 20
++    name: caudal_subterminal_notch
++    description: "Vertex of the subterminal notch on the posterior margin of the upper caudal lobe"
++    placement_guide: "Click into the small notch cut out of the trailing edge near the tail tip"
++    type: II
++    tier: 2
++    lateral_visibility: moderate
++    visual_anchor: "Concave curvature maximum in the caudal outline"
++    sevengill_note: >-
++      NEW. Absent from Schema v2. It is a genuine Type II curvature landmark on a strongly
++      heterocercal tail and is a far better tail correspondence than the upper-lobe tip, which
++      slides and is frequently out of frame. Added specifically because the sevengill's long upper
++      lobe makes the terminal region unreliable.
++
++  - id: 21
++    name: caudal_upper_lobe_tip
++    description: "Distal extremity of the upper caudal lobe"
++    placement_guide: "Click the very tip of the long upper tail lobe"
++    type: III
++    tier: 1
++    lateral_visibility: moderate
++    visual_anchor: "Pointed tip against water"
++    tier_note: >-
++      TIER 1 WITH A VISIBILITY CAVEAT, and the caveat is part of the tier. "Required" here means
++      required WHENEVER THE TIP IS IN FRAME AND DISCERNIBLE; when it is not, record visibility 0
++      and move on — never guess a position off-frame, and never treat a missing id 21 as a failed
++      annotation. This is the one tier-1 point whose lateral_visibility is only `moderate`, which
++      is why the caveat is stated inline rather than left to the reader.
++    sevengill_note: >-
++      Transfers in name from v2 id 14 but degrades: the sevengill upper lobe is long and the tip
++      shifts substantially through the tailbeat and is often outside the frame. Kept at tier 1 only
++      because it is the endpoint of the total-length proxy, under the tier_note caveat above;
++      treated as Type III everywhere else. Frames missing it still yield precaudal_length, which
++      is the length measure to prefer.
++
++  - id: 22
++    name: caudal_lower_lobe_tip
++    description: "Distal extremity of the lower caudal lobe"
++    placement_guide: "Click the tip of the short lower tail lobe, if one is discernible"
++    type: III
++    tier: 3
++    lateral_visibility: low
++    visual_anchor: "Weak or absent apex"
++    sevengill_note: >-
++      NEARLY MEANINGLESS on this species and demoted to tier 3 accordingly. Schema v2 makes this a
++      tier-1 point because a lamnid caudal is near-homocercal with a well-developed lower lobe. The
++      sevengill lower lobe is weakly developed, so this point has no repeatable referent. Retained
++      only so that caudal_span remains computable when the lobe IS discernible.
++
++  # ── Trunk midline semilandmark chain (Type III by construction). ───────────
++  # Deterministic. See midline_definition below. These are NOT placed by eye.
++  - id: 23
++    name: midline_01
++    description: "Trunk midline semilandmark at fractional centerline arc length t = 0.125 of the snout-to-precaudal axis"
++    placement_guide: "Do not place by hand — accept the tool's tick at 1/8 of the body axis, or nudge it onto the mid-depth line if the silhouette is ragged"
++    type: III
++    tier: 1
++    lateral_visibility: high
++    axis_fraction: 0.125
++    visual_anchor: "Constructed — no visual referent by design"
++
++  - id: 24
++    name: midline_02
++    description: "Trunk midline semilandmark at fractional centerline arc length t = 0.250 of the snout-to-precaudal axis"
++    placement_guide: "Accept the tool's tick at 2/8 of the body axis"
++    type: III
++    tier: 1
++    lateral_visibility: high
++    axis_fraction: 0.250
++    visual_anchor: "Constructed — no visual referent by design"
++
++  - id: 25
++    name: midline_03
++    description: "Trunk midline semilandmark at fractional centerline arc length t = 0.375 of the snout-to-precaudal axis"
++    placement_guide: "Accept the tool's tick at 3/8 of the body axis"
++    type: III
++    tier: 1
++    lateral_visibility: high
++    axis_fraction: 0.375
++    visual_anchor: "Constructed — no visual referent by design"
++
++  - id: 26
++    name: midline_04
++    description: "Trunk midline semilandmark at fractional centerline arc length t = 0.500 of the snout-to-precaudal axis"
++    placement_guide: "Accept the tool's tick at 4/8 of the body axis"
++    type: III
++    tier: 1
++    lateral_visibility: high
++    axis_fraction: 0.500
++    visual_anchor: "Constructed — no visual referent by design"
++
++  - id: 27
++    name: midline_05
++    description: "Trunk midline semilandmark at fractional centerline arc length t = 0.625 of the snout-to-precaudal axis"
++    placement_guide: "Accept the tool's tick at 5/8 of the body axis"
++    type: III
++    tier: 1
++    lateral_visibility: high
++    axis_fraction: 0.625
++    visual_anchor: "Constructed — no visual referent by design"
++
++  - id: 28
++    name: midline_06
++    description: "Trunk midline semilandmark at fractional centerline arc length t = 0.750 of the snout-to-precaudal axis"
++    placement_guide: "Accept the tool's tick at 6/8 of the body axis"
++    type: III
++    tier: 1
++    lateral_visibility: high
++    axis_fraction: 0.750
++    visual_anchor: "Constructed — no visual referent by design"
++
++  - id: 29
++    name: midline_07
++    description: "Trunk midline semilandmark at fractional centerline arc length t = 0.875 of the snout-to-precaudal axis"
++    placement_guide: "Accept the tool's tick at 7/8 of the body axis"
++    type: III
++    tier: 1
++    lateral_visibility: high
++    axis_fraction: 0.875
++    visual_anchor: "Constructed — no visual referent by design"
++
++# ─────────────────────────────────────────────────────────────────────────────
++# Midline definition. DETERMINISTIC — "evenly spaced by eye" is not a definition.
++# ─────────────────────────────────────────────────────────────────────────────
++midline_definition:
++  axis: snout-to-precaudal
++  axis_origin: snout_tip            # id 0,  t = 0
++  axis_terminus: precaudal_pit      # id 19, t = 1
++  n_points: 7
++  fractions: [0.125, 0.250, 0.375, 0.500, 0.625, 0.750, 0.875]
++  fraction_rule: "t_k = k / (n_points + 1), k = 1..n_points"
++
++  authoritative_procedure: >-
++    Machine-placed from the segmentation, not from clicks. (1) Take the SAM 2 foreground mask of
++    the animal. (2) Run the deterministic medial-axis centerline extractor
++    (prototypes/02-centerline-chart/centerline.py: extract_centerline, largest component + hole
++    fill + medial-weighted shortest path, head-first by the widest-end rule) at n_stations = 256.
++    (3) Truncate the polyline at the station nearest snout_tip (t = 0) and the station nearest
++    precaudal_pit (t = 1). (4) Reparameterise the truncated polyline by CUMULATIVE ARC LENGTH and
++    emit the points at the fractions above. Arc length is measured ON THE CENTERLINE, never
++    integrated along the skin: that is what keeps the coordinate bend-invariant and pushes bending
++    strain into the image metric instead of into the coordinate.
++
++  human_fallback: >-
++    When no mask is available, the annotation tool divides the visible DORSAL body outline between
++    snout_tip and precaudal_pit into eight equal arc-length segments, draws the seven ticks, and
++    the annotator drops each point to the mid-depth of the body on the local outline normal. This
++    is an APPROXIMATION and it is biased: on a bent animal the dorsal outline is the convex fibre
++    on one side of the bend and the concave fibre on the other, so the ticks run tail-ward or
++    head-ward of the true centerline fractions. The bias scales with the same longitudinal strain
++    bracket measured by sonomicrometry in a swimming leopard shark at ~1 BL/s, +/-3.9-6.6%
++    (Donley & Shadwick, J. Exp. Biol. 206, 2003; [SEARCH]-grade, do not promote). Records placed by
++    the fallback must be flagged `midline_source: outline_fallback` so they can be excluded from
++    any strain measurement.
++
++  why_seven: >-
++    Seven interior points give eight equal spans, an odd count with a true mid-body point at
++    t = 0.500, and it sits within the 4-8 range the schema recommendation specifies while
++    staying below the density at which collinear, visually near-identical points are known to be
++    hard to associate. The count is a hyperparameter of the schema, not an anatomical fact:
++    N_midline can be raised or lowered without changing any anchor id if the pose model's
++    per-point accuracy justifies it.
++
++  why_uniform: >-
++    Uniform in the ANNOTATION schema, so the placement rule is simple, checkable and reproducible
++    between annotators. Non-uniform (sparse anterior, dense posterior, following the amplitude
++    envelope of an undulating swimmer) DOF allocation belongs downstream in the skeleton, which
++    resamples the fitted spline and is free to choose its own station spacing. Do not bake a
++    kinematic assumption into a measurement protocol.
++
++# ─────────────────────────────────────────────────────────────────────────────
++# Ordered antero-posterior sequence. The cheap correspondence mechanism.
++# ─────────────────────────────────────────────────────────────────────────────
++ordered_ap_sequence:
++  rationale: >-
++    Ordered landmark sequences carry correspondence through large deformation because the ORDER
++    does not change with body position — the mechanism the colon-registration literature uses on
++    haustral folds. A sevengill supplies exactly such a sequence and, unlike Schema v2, every point
++    it names is FULLY DEFINED for this species. The extra pair of gill slits is an asset here.
++    What the sequence does NOT contain is as load-bearing as what it does — see `scope` below.
++  scope: >-
++    This block covers ONLY the uncontested part of the antero-posterior spine of points. The
++    pelvic / dorsal / cloaca trio is deliberately absent from `sequence` — see
++    `unordered_posterior_trio` immediately below. Do not re-add them.
++  sequence:
++    - gill_slit_1
++    - gill_slit_2      # slits 2-6 are an ORDERED CONTOUR CHANNEL, not keypoints (see below)
++    - gill_slit_3
++    - gill_slit_4
++    - gill_slit_5
++    - gill_slit_6
++    - gill_slit_7
++    - pectoral_origin
++    # --- pelvic_origin, dorsal_fin_origin and cloaca fall in here, in an order this schema
++    # --- does NOT fix. See unordered_posterior_trio.
++    - anal_fin_origin
++    - precaudal_pit
++  unordered_posterior_trio:
++    members: [pelvic_origin, dorsal_fin_origin, cloaca]      # ids 12, 14, 13
++    constraint: none
++    rule: >-
++      NO ordering constraint may be enforced among these three points. Not by an annotation
++      validator, not by a matching cost, not by a sequence-consistency check, not by a synthetic
++      training label. They are bounded ANTERIORLY by pectoral_origin and POSTERIORLY by
++      anal_fin_origin, and that is the only ordering this schema asserts about them.
++    why: >-
++      (1) Their relative A-P order is individual- and size-dependent: the single dorsal sits
++      "over or behind the pelvics", which is a range, not a point, and the pelvic-to-dorsal
++      offset changes with growth. (2) The sources DISAGREE. The programme scan's prose gives
++      "seven gill slits -> single dorsal -> pelvics -> cloaca"; an earlier draft of this schema
++      asserted pelvic -> dorsal -> cloaca, the reverse for the first pair. (3) That earlier
++      assertion also contradicted this schema's OWN definition of id 13, which places the cloaca
++      on the mid-ventral line BETWEEN THE PELVIC FIN BASES — i.e. at the pelvic station, not
++      posterior to the dorsal. Nothing retrieved resolves the disagreement.
++    grade: >-
++      [UNVERIFIED] for any specific order among these three. Any code or document that states one
++      is asserting something no source in this programme supports. If the order matters
++      downstream, measure it on the first annotated frames per individual and record it as a
++      measurement, never as a schema constraint.
++  intermediate_slits_note: >-
++    Slits 2-6 are deliberately NOT individual keypoints. Adding ten more near-identical collinear
++    creases would degrade pose-model association for no correspondence gain, and their ORDER — the
++    only property that carries correspondence — is already fixed by bracketing slits 1 and 7.
++    Capture them, if at all, as an optional ordered polyline channel (`gill_contours`, a list of
++    open curves) alongside the keypoints, never inside the fixed-topology keypoint tensor.
++
++# ─────────────────────────────────────────────────────────────────────────────
++# Chart / rectification contract (consumed by the Phase 1B midline rectifier).
++# ─────────────────────────────────────────────────────────────────────────────
++chart:
++  arc_length_origin: gill_slit_1_dorsal_origin   # s = 0; re-anchor on gill contours to kill drift
++  arc_length_terminus: precaudal_pit             # tube ends here; caudal fin is a separate patch
++  head_patch_bounds: [naris_anterior_margin, gill_slit_1_dorsal_origin]   # the La Jolla freckle patch
++  identity_surface: trunk flank only; fins excluded, fin insertion curves retained as landmarks
++  excluded_from_identity_surface:
++    - pectoral_fin_tip
++    - dorsal_fin_apex
++    - caudal_upper_lobe_tip
++    - caudal_lower_lobe_tip
++  note: >-
++    Excluding the fins from the identity surface also DISPOSES of the second-dorsal problem rather
++    than patching it: a fin-free trunk chart does not care how many dorsals the animal has.
++
++# ─────────────────────────────────────────────────────────────────────────────
++# Annotation / drawing graph.
++#
++# This is the TRUE CONTRACTION of skeleton_sevengill.py's KINEMATIC_TREE onto the
++# keypoint set, computed — not hand-drawn — as: for each keypoint k with joint
++# j(k), walk j(k)'s ancestors to the nearest ancestor that is itself the image of
++# some keypoint k', and emit the edge (k', k). A keypoint whose joint has no
++# keypoint ancestor emits no edge. `tests/test_skeleton_sevengill.py` recomputes
++# this list from KINEMATIC_TREE and asserts equality, so the two cannot drift.
++#
++# ⚠ THE RESULT IS A FOREST, NOT A TREE: 19 edges over 30 keypoints, in 11
++# components. An earlier hand-drawn version of this list had 29 edges and formed
++# a spanning tree, but 11 of those edges joined SIBLINGS or COUSINS (e.g. eye ->
++# gill_slit_1, gill_slit_1 -> gill_slit_7, snout -> midline_01) and so asserted a
++# parent/child relation the skeleton does not contain. Those edges are gone.
++#
++# The 11 roots are ids 0-9 and 23. They are roots because the whole cranial and
++# branchial block hangs off spine_00_cranium, spine_01_branchial_1 and
++# spine_02_branchial_7, and NONE of those three spine stations is the image of a
++# keypoint — the joint-tree root is unlabelled, so the contraction cannot be
++# connected. Ids 1-8 are therefore isolated vertices here. That is a real
++# property of the skeleton, not a gap in this list: an annotation tool wanting a
++# connected head guide must either add a keypoint at a cranial spine station or
++# draw its own guide lines and not call them bones.
++# ─────────────────────────────────────────────────────────────────────────────
++skeleton_edges:
++  - [9, 10]    # pectoral_origin -> pectoral_insertion
++  - [9, 11]    # pectoral_origin -> pectoral_fin_tip
++  - [14, 15]   # dorsal_fin_origin -> dorsal_fin_insertion
++  - [14, 16]   # dorsal_fin_origin -> dorsal_fin_apex
++  - [17, 18]   # anal_fin_origin -> anal_fin_insertion
++  - [19, 20]   # precaudal_pit -> caudal_subterminal_notch
++  - [19, 21]   # precaudal_pit -> caudal_upper_lobe_tip
++  - [19, 22]   # precaudal_pit -> caudal_lower_lobe_tip
++  - [23, 24]   # midline_01 -> midline_02
++  - [24, 25]   # midline_02 -> midline_03
++  - [25, 26]   # midline_03 -> midline_04
++  - [26, 27]   # midline_04 -> midline_05
++  - [27, 12]   # midline_05 -> pelvic_origin
++  - [27, 13]   # midline_05 -> cloaca
++  - [27, 14]   # midline_05 -> dorsal_fin_origin
++  - [27, 28]   # midline_05 -> midline_06
++  - [28, 17]   # midline_06 -> anal_fin_origin
++  - [28, 29]   # midline_06 -> midline_07
++  - [29, 19]   # midline_07 -> precaudal_pit
++
++# The keypoints that emit no edge, i.e. the roots of the forest above. Listed so a consumer can
++# assert the partition (19 edges + 11 roots = 30 keypoints) instead of rediscovering it.
++skeleton_contraction_roots: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 23]
++
++# ─────────────────────────────────────────────────────────────────────────────
++# Morphometrics. Compagno nomenclature; these are point-to-point distances on a
++# possibly-bent animal and are NOT the caliper measurements of a landed specimen.
++# ─────────────────────────────────────────────────────────────────────────────
++morphometric_pairs:
++  total_length_proxy:      [0, 21]   # snout -> upper caudal lobe tip; a PROXY, the standard TL is
++                                     # measured with the caudal depressed to the body axis
++  precaudal_length:        [0, 19]   # snout -> precaudal pit
++  head_length:             [0, 7]    # snout -> last (7th) gill slit
++  prebranchial_length:     [0, 5]    # snout -> first gill slit
++  branchial_span:          [5, 7]    # gill slit 1 origin -> gill slit 7 origin (SEVEN slits spanned)
++  gill_slit_1_height:      [5, 6]
++  gill_slit_7_height:      [7, 8]
++  prepectoral_length:      [0, 9]
++  predorsal_length:        [0, 14]   # far larger a fraction of TL than in any lamnid
++  prepelvic_length:        [0, 12]
++  preanal_length:          [0, 17]
++  pectoral_anterior_margin: [9, 11]
++  pectoral_base_chord:     [9, 10]
++  dorsal_base_chord:       [14, 15]
++  dorsal_height:           [14, 16]
++  anal_base_chord:         [17, 18]
++  caudal_upper_lobe_length: [19, 21]
++  caudal_span:             [21, 22]  # unreliable on this species; lower lobe weak (see id 22)
++undefined_for_this_species:
++  interdorsal_space: "no second dorsal fin — Hexanchiformes"
++  second_dorsal_height: "no second dorsal fin — Hexanchiformes"
++
++tier_classification:
++  tier_1: [0, 2, 5, 7, 9, 14, 19, 21, 23, 24, 25, 26, 27, 28, 29]   # required
++  tier_2: [1, 3, 6, 8, 10, 12, 17, 20]                              # annotate when visible
++  tier_3: [4, 11, 13, 15, 16, 18, 22]                               # optional; high missing rate expected
++
++type_classification:
++  type_I:   [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 13, 14, 15, 17, 18]
++  type_II:  [0, 19, 20]
++  type_III: [11, 16, 21, 22, 23, 24, 25, 26, 27, 28, 29]
++  note: >-
++    16 of 30 are Type I, against 4-6 of 16 in Schema v2. The gain is entirely from replacing fin
++    TIPS with fin INSERTIONS and from the seven-slit termini. The 7 Type III midline points are
++    Type III BY CONSTRUCTION and that is intended — they are sliding semilandmarks whose job is to
++    define a curve, not a correspondence.
++
++yolo_config:
++  kpt_shape: [30, 3]
++  num_keypoints: 30
++  nc: 1
++  names: ["notorynchus_cepedianus"]
++  flip_idx: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
++             16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29]
++  flip_idx_note: >-
++    Identity, because the schema is single-sided and no keypoint has a left/right partner within a
++    record. An identity flip_idx makes a horizontal flip index-SAFE, which is exactly the trap: it
++    would let ultralytics flip images silently. Horizontal flip must be disabled outright — see
++    no_mirror_augmentation above.
++  augment_overrides:
++    fliplr: 0.0
++
++open_questions:
++  - "Pose-model accuracy on 7 collinear, visually near-identical midline points is UNKNOWN. The lab's Schema-v2 model reaches Pose mAP50 0.578 on 16 distinctive landmarks; a denser, less distinctive chain may score worse. Measure per-point PCK before trusting the rectifier."
++  - "Fin STATIONS (the axis fractions at which dorsal, pelvic and anal origins fall) are provisional. No published Notorynchus cepedianus fin-station proportions were retrieved [UNVERIFIED]; re-derive them from the first 50 annotated frames and update the skeleton's parent assignments."
++  - "Whether the seventh slit is reliably countable in turbid water at typical La Jolla / Humboldt visibility is untested. If not, id 7 must fall back to 'posteriormost discernible slit' with a recorded count, which changes its Bookstein type from I to III."
++  - "Ontogenetic stability of the speckle pattern is unmeasured for this species (P0-d). Nothing in this schema fixes a pattern that changes."
+diff --git a/shark_pose_project/scripts/shared/schema.py b/shark_pose_project/scripts/shared/schema.py
+new file mode 100644
+index 0000000..c60a662
+--- /dev/null
++++ b/shark_pose_project/scripts/shared/schema.py
+@@ -0,0 +1,164 @@
++"""
++Species-parameterised keypoint schema loader.
++
++Additive. Nothing in this file changes existing behaviour: `shared/constants.py` still ships the
++white-shark Schema v2 lists verbatim and every script that imports them keeps working unchanged.
++This module exists so that new code — starting with the sevengill work — can ask for a schema by
++species instead of hardcoding a name list, and so that the two config yamls can be validated.
++
++    from shared.schema import load_schema
++    s = load_schema("sevengill")
++    s.num_keypoints            # 30
++    s.names[19]                # 'precaudal_pit'
++    s.index("precaudal_pit")   # 19
++    s.tier(19)                 # 1
++    s.allow_horizontal_flip    # False  -- sevengill records are single-flank
++
++Schemas:
++    "white_shark" -> config/keypoints_16.yaml            (Schema v2, 16 points, Lamniformes)
++    "sevengill"   -> config/keypoints_sevengill_v1.yaml  (Schema S1, 30 points, Hexanchiformes)
++
++The two are NOT interchangeable and no code should silently fall back from one to the other:
++Notorynchus has seven gill slits and a single posterior dorsal fin, so two of Schema v2's points
++have no referent on it and one is defined against the wrong slit count.
++
++The repo still hardcodes the v2 name list in 23 modules (counted, not estimated). Those call sites
++are inventoried, with file and line, in the phase1b deliverable `COMPAT.md`; they are deliberately
++left untouched here because the repo carries no test coverage against which such an edit could be
++shown safe.
++"""
++
++from __future__ import annotations
++
++from pathlib import Path
++
++import yaml
++
++CONFIG_DIR = Path(__file__).resolve().parents[2] / "config"
++
++SCHEMA_FILES = {
++    "white_shark": "keypoints_16.yaml",
++    "sevengill": "keypoints_sevengill_v1.yaml",
++}
++
++
++class KeypointSchema:
++    """A loaded keypoint schema. Read-only view over one config yaml."""
++
++    def __init__(self, key, path, raw):
++        self.key = key
++        self.path = path
++        self.raw = raw
++        self.keypoints = list(raw["keypoints"])
++        self.names = [kp["name"] for kp in self.keypoints]
++        self.ids = [kp["id"] for kp in self.keypoints]
++        self._name_to_idx = {name: i for i, name in enumerate(self.names)}
++        self.skeleton_edges = [tuple(e) for e in raw.get("skeleton_edges", [])]
++        self.morphometric_pairs = {
++            k: tuple(v) for k, v in raw.get("morphometric_pairs", {}).items()
++        }
++        self.yolo_config = dict(raw.get("yolo_config", {}))
++
++    # -- basic accessors ----------------------------------------------------
++
++    @property
++    def num_keypoints(self):
++        """Number of keypoints in the schema."""
++        return len(self.names)
++
++    def index(self, name):
++        """Index of a keypoint by name."""
++        return self._name_to_idx[name]
++
++    def has(self, name):
++        """True if the schema defines a keypoint with this name."""
++        return name in self._name_to_idx
++
++    def tier(self, kp_id):
++        """Annotation tier (1 = required) for a keypoint id."""
++        return self.keypoints[self.ids.index(kp_id)]["tier"]
++
++    def bookstein_type(self, kp_id):
++        """Bookstein landmark type ('I', 'II', 'III') if the schema records one, else None."""
++        return self.keypoints[self.ids.index(kp_id)].get("type")
++
++    # -- training-relevant policy ------------------------------------------
++
++    @property
++    def allow_horizontal_flip(self):
++        """Whether mirror augmentation is permitted for this species.
++
++        Defaults to True for schemas that predate the flag (Schema v2), because that is the
++        behaviour those scripts already have.
++        """
++        block = self.raw.get("no_mirror_augmentation")
++        if block is None:
++            return True
++        return bool(block.get("allow_horizontal_flip", True))
++
++    @property
++    def flip_idx(self):
++        """Keypoint index permutation under a horizontal flip."""
++        return list(self.yolo_config.get("flip_idx", range(self.num_keypoints)))
++
++    def yolo_dataset_fields(self, class_names=None):
++        """Return the kpt_shape / flip_idx / nc / names block for an ultralytics dataset yaml."""
++        return {
++            "kpt_shape": list(self.yolo_config.get("kpt_shape", [self.num_keypoints, 3])),
++            "flip_idx": self.flip_idx,
++            "nc": self.yolo_config.get("nc", 1),
++            "names": list(class_names or self.yolo_config.get("names", [self.key])),
++        }
++
++    # -- validation ---------------------------------------------------------
++
++    def validate(self):
++        """Raise ValueError if the schema is internally inconsistent."""
++        if self.ids != list(range(len(self.ids))):
++            raise ValueError("{0}: keypoint ids must be 0..n-1".format(self.key))
++        if len(set(self.names)) != len(self.names):
++            raise ValueError("{0}: duplicate keypoint names".format(self.key))
++        for a, b in self.skeleton_edges:
++            if a not in self.ids or b not in self.ids or a == b:
++                raise ValueError(
++                    "{0}: skeleton edge {1} references an unknown id".format(self.key, (a, b))
++                )
++        for name, pair in self.morphometric_pairs.items():
++            if len(pair) != 2 or any(i not in self.ids for i in pair):
++                raise ValueError(
++                    "{0}: morphometric pair {1} references an unknown id".format(self.key, name)
++                )
++        declared = self.yolo_config.get("num_keypoints")
++        if declared is not None and declared != self.num_keypoints:
++            raise ValueError(
++                "{0}: yolo_config.num_keypoints {1} != {2} keypoints".format(
++                    self.key, declared, self.num_keypoints
++                )
++            )
++        shape = self.yolo_config.get("kpt_shape")
++        if shape is not None and list(shape)[0] != self.num_keypoints:
++            raise ValueError(
++                "{0}: yolo_config.kpt_shape {1} disagrees with {2} keypoints".format(
++                    self.key, shape, self.num_keypoints
++                )
++            )
++        if len(self.flip_idx) != self.num_keypoints:
++            raise ValueError("{0}: flip_idx length != num_keypoints".format(self.key))
++        return self
++
++
++def schema_path(key):
++    """Path to the config yaml for a schema key."""
++    if key not in SCHEMA_FILES:
++        raise KeyError(
++            "unknown schema {0!r}; known: {1}".format(key, sorted(SCHEMA_FILES))
++        )
++    return CONFIG_DIR / SCHEMA_FILES[key]
++
++
++def load_schema(key="white_shark", path=None):
++    """Load and validate a keypoint schema by key (or from an explicit path)."""
++    resolved = Path(path) if path is not None else schema_path(key)
++    with open(resolved, "r") as fh:
++        raw = yaml.safe_load(fh)
++    return KeypointSchema(key, resolved, raw).validate()
+diff --git a/shark_pose_project/tests/test_keypoint_schemas.py b/shark_pose_project/tests/test_keypoint_schemas.py
+new file mode 100644
+index 0000000..024e331
+--- /dev/null
++++ b/shark_pose_project/tests/test_keypoint_schemas.py
+@@ -0,0 +1,119 @@
++"""Tests for the two shipped keypoint schemas and the species-parameterised loader.
++
++    cd shark_pose_project && python -m pytest tests/ -q
++
++Requires only pyyaml and pytest.
++"""
++
++from __future__ import annotations
++
++import sys
++from pathlib import Path
++
++import pytest
++
++sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
++
++from shared.schema import SCHEMA_FILES, load_schema, schema_path  # noqa: E402
++
++
++@pytest.fixture(scope="module")
++def white_shark():
++    return load_schema("white_shark")
++
++
++@pytest.fixture(scope="module")
++def sevengill():
++    return load_schema("sevengill")
++
++
++def test_every_declared_schema_file_exists():
++    for key in SCHEMA_FILES:
++        assert schema_path(key).is_file(), key
++
++
++def test_unknown_schema_key_raises():
++    with pytest.raises(KeyError):
++        load_schema("basking_shark")
++
++
++def test_both_schemas_load_and_validate(white_shark, sevengill):
++    assert white_shark.num_keypoints == 16
++    assert sevengill.num_keypoints == 30
++
++
++def test_loader_leaves_schema_v2_semantics_untouched(white_shark):
++    # Whatever else changes, the existing white-shark pipeline must see the same 16 names in
++    # the same order it always has.
++    assert white_shark.names[0] == "snout_tip"
++    assert white_shark.names[10] == "second_dorsal_tip"
++    assert white_shark.names[15] == "caudal_lower_tip"
++    assert white_shark.index("caudal_notch") == 13
++
++
++def test_the_two_schemas_are_not_interchangeable(white_shark, sevengill):
++    assert white_shark.num_keypoints != sevengill.num_keypoints
++    assert set(white_shark.names) != set(sevengill.names)
++
++
++def test_sevengill_schema_has_no_second_dorsal(sevengill):
++    # Hexanchiformes have a single dorsal fin; 2 of Schema v2's 16 points have no referent.
++    assert not any("second_dorsal" in name for name in sevengill.names)
++    assert not sevengill.has("second_dorsal_tip")
++
++
++def test_sevengill_schema_brackets_seven_gill_slits(sevengill):
++    assert sevengill.has("gill_slit_1_dorsal_origin")
++    assert sevengill.has("gill_slit_7_dorsal_origin")
++    # and the v2 point that is factually wrong for this order is gone
++    assert not sevengill.has("gill_slit_back")
++
++
++def test_sevengill_schema_forbids_mirror_augmentation(sevengill):
++    assert sevengill.allow_horizontal_flip is False
++    assert sevengill.yolo_config["augment_overrides"]["fliplr"] == 0.0
++
++
++def test_schema_v2_keeps_its_pre_existing_flip_behaviour(white_shark):
++    # No `no_mirror_augmentation` block in keypoints_16.yaml -> unchanged permissive default.
++    assert white_shark.allow_horizontal_flip is True
++
++
++def test_flip_idx_is_identity_in_both_schemas(white_shark, sevengill):
++    assert white_shark.flip_idx == list(range(16))
++    assert sevengill.flip_idx == list(range(30))
++
++
++def test_yolo_dataset_fields_track_the_schema(sevengill):
++    fields = sevengill.yolo_dataset_fields()
++    assert fields["kpt_shape"] == [30, 3]
++    assert fields["nc"] == 1
++    assert fields["names"] == ["notorynchus_cepedianus"]
++    assert len(fields["flip_idx"]) == 30
++
++
++def test_tier_and_type_lookups(sevengill):
++    assert sevengill.tier(sevengill.index("snout_tip")) == 1
++    assert sevengill.bookstein_type(sevengill.index("eye_center")) == "I"
++    assert sevengill.bookstein_type(sevengill.index("precaudal_pit")) == "II"
++    assert sevengill.bookstein_type(sevengill.index("midline_04")) == "III"
++
++
++def test_schema_v2_has_no_bookstein_types_and_that_is_not_an_error(white_shark):
++    assert white_shark.bookstein_type(0) is None
++
++
++def test_morphometric_pairs_resolve_in_both_schemas(white_shark, sevengill):
++    for schema in (white_shark, sevengill):
++        for name, pair in schema.morphometric_pairs.items():
++            assert all(0 <= i < schema.num_keypoints for i in pair), (schema.key, name)
++
++
++def test_sevengill_midline_chain_is_present_and_ordered(sevengill):
++    midline = [n for n in sevengill.names if n.startswith("midline_")]
++    assert midline == ["midline_{0:02d}".format(k) for k in range(1, 8)]
++    idxs = [sevengill.index(n) for n in midline]
++    assert idxs == sorted(idxs)
++    fractions = [sevengill.keypoints[i]["axis_fraction"] for i in idxs]
++    assert fractions == sorted(fractions)
++    assert fractions == [k / 8.0 for k in range(1, 8)]
+-- 
+2.43.0
+

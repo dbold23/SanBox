@@ -1,0 +1,211 @@
+From 62054e71b9527b3acef99fd3d6ba294cd9de76e4 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Tue, 1 Sep 2026 17:23:13 +0000
+Subject: [PATCH 1/3] shark_catalog: record species, defaulting to the value it
+ always implied
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+The platform has never had a species field anywhere: it was written for one
+study animal, so every catalog row it has ever produced means Carcharodon
+carcharias by convention alone. Cataloguing a second species in the same
+platform needs that convention written down first.
+
+Adds shark_catalog.species (TEXT, nullable) in init_catalog_dwc_columns(),
+which is where schema actually lands in production — the running app calls the
+init_*_tables() functions against the mounted volume and never executes the
+versioned migration chain, which runs at Docker build time on a throwaway DB.
+
+The backfill of pre-existing rows to DEFAULT_SPECIES is fused to the ALTER so
+it runs exactly once, at the moment the column appears. That is deliberate and
+load-bearing: once the column exists, NULL is a legitimate value meaning "nobody
+has said" — it is what db_reid.decide_reid_individual writes on a re-ID
+acceptance, and what an operator gets by clearing the field. A backfill that
+re-ran on every boot the way the organism_id heal does would keep stamping white
+shark onto exactly those rows, which is the corruption this column exists to
+prevent. Backfilling to NULL instead would have been the mirror-image error: it
+would erase a meaning the data has carried since the first row.
+
+create_shark applies the same default when the caller passes no species at all,
+so a client written before this field existed records exactly what it recorded
+before. An explicit "" stores NULL. The default lives in the app layer rather
+than as a schema DEFAULT precisely so it does NOT reach the bare INSERTs in
+db_reid, which genuinely do not know what they caught. update_shark follows the
+file's existing idiom — None leaves the field alone, "" clears it — and does not
+re-default on clear.
+
+The admin catalog create/patch routes thread the field through unchanged in
+every other respect.
+---
+ annotation/database.py | 72 ++++++++++++++++++++++++++++++++++++++----
+ app.py                 |  7 ++++
+ 2 files changed, 72 insertions(+), 7 deletions(-)
+
+diff --git a/annotation/database.py b/annotation/database.py
+index 6909220..6c85273 100644
+--- a/annotation/database.py
++++ b/annotation/database.py
+@@ -3811,6 +3811,18 @@ def recompute_all_track_consensus() -> int:
+ 
+ # ─── Polish 5 D — shark catalog (manual today, embedding-driven later) ────
+ 
++# The species this catalog has always meant without ever saying so. The app was
++# written for one study animal and has no species field anywhere, so every row
++# that predates `shark_catalog.species` is a white shark — that is what the data
++# has always asserted, and it is the value the one-time backfill writes.
++#
++# It is also the create-time default (see create_shark), which is what keeps this
++# column additive: a caller that says nothing about species goes on recording
++# exactly what it recorded before. A deployment working on another animal names
++# its species explicitly per row; making that a config-driven default is a
++# follow-up, and this constant is the single place it would hook in.
++DEFAULT_SPECIES = "Carcharodon carcharias"
++
+ 
+ def init_catalog_dwc_columns():
+     """Phase 1 (structure-now): give shark_catalog — which IS a dwc:Organism (one
+@@ -3820,6 +3832,10 @@ def init_catalog_dwc_columns():
+     other init_*_tables so every catalog entry gets a portable, rename-proof
+     identifier BEFORE the catalog is seeded — no retrofit later.
+ 
++    Also adds `species` (P0 for multi-species work) with a one-time backfill of
++    pre-existing rows to DEFAULT_SPECIES — see the comment at that ALTER for why
++    it runs once at column-add and never again.
++
+     Deliberately NO georeference / eventDate here: those are per-occurrence, have
+     no clean home in the current app tables, and there is no capture writing them
+     — they belong to the DwC export projection when that work begins."""
+@@ -3844,6 +3860,25 @@ def init_catalog_dwc_columns():
+         for col in ("organism_id", "scientific_name", "scientific_name_id"):
+             if not _column_exists(conn, "shark_catalog", col):
+                 conn.execute(f"ALTER TABLE shark_catalog ADD COLUMN {col} TEXT")
++
++        # `species` — what animal this individual is. Added on its own rather than
++        # in the loop above because it carries a ONE-TIME backfill that must run
++        # exactly when the column appears: rows written before it existed were
++        # recorded under the app's implicit white-shark assumption, so leaving
++        # them NULL would erase a meaning the data has always carried.
++        #
++        # The backfill is deliberately fused to the ALTER instead of running on
++        # every init like the organism_id heal below. NULL is a legitimate value
++        # here — "nobody has said" — and a repeating backfill would keep stamping
++        # DEFAULT_SPECIES onto rows that mean the opposite, including the bare
++        # rows db_reid.decide_reid_individual inserts on a re-ID acceptance and
++        # any row an operator cleared on purpose. Re-running init is then a
++        # no-op, which is the property the tests pin.
++        if not _column_exists(conn, "shark_catalog", "species"):
++            conn.execute("ALTER TABLE shark_catalog ADD COLUMN species TEXT")
++            conn.execute("UPDATE shark_catalog SET species=? WHERE species IS NULL",
++                         (DEFAULT_SPECIES,))
++
+         # Assign a stable organismID to any row missing one (idempotent; a no-op
+         # on the currently-empty catalog), then guard uniqueness.
+         for r in conn.execute(
+@@ -3868,23 +3903,36 @@ def init_catalog_dwc_columns():
+ 
+ 
+ def create_shark(display_name: str, notes: str = "", scientific_name: str = "",
+-                 scientific_name_id: str = "") -> Dict:
++                 scientific_name_id: str = "",
++                 species: Optional[str] = None) -> Dict:
+     """Insert a new shark catalog entry (a dwc:Organism). display_name must be
+-    unique; a stable organism_id (dwc:organismID) is minted automatically."""
++    unique; a stable organism_id (dwc:organismID) is minted automatically.
++
++    `species` distinguishes three cases on purpose. Omitted (None) means the
++    caller never had an opinion — the app's own historical position — so it gets
++    DEFAULT_SPECIES and behaviour is byte-identical to before this column
++    existed. An empty string means "explicitly unstated" and is stored NULL. Any
++    other value is stored verbatim; that is how a non-white-shark individual gets
++    catalogued. The default lives here, in the app layer, and NOT as a schema
++    DEFAULT — SQLite would then also apply it to the bare INSERTs in db_reid,
++    which genuinely do not know what they caught.
++    """
+     now = datetime.now().isoformat()
+     organism_id = uuid.uuid4().hex
++    species_value = DEFAULT_SPECIES if species is None else (species.strip() or None)
+     with get_conn() as conn:
+         try:
+             cur = conn.execute(
+                 """INSERT INTO shark_catalog
+                      (display_name, notes, organism_id, scientific_name,
+-                      scientific_name_id, created_at, updated_at)
+-                   VALUES (?, ?, ?, ?, ?, ?, ?)""",
++                      scientific_name_id, species, created_at, updated_at)
++                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                 (display_name.strip(), notes, organism_id,
+-                 scientific_name or None, scientific_name_id or None, now, now),
++                 scientific_name or None, scientific_name_id or None,
++                 species_value, now, now),
+             )
+             return {"id": cur.lastrowid, "display_name": display_name, "notes": notes,
+-                    "organism_id": organism_id}
++                    "organism_id": organism_id, "species": species_value}
+         except sqlite3.IntegrityError:
+             return {"error": f"shark display_name '{display_name}' already exists"}
+ 
+@@ -3922,7 +3970,14 @@ def get_shark(shark_id: int) -> Optional[Dict]:
+ 
+ def update_shark(shark_id: int, *, display_name: Optional[str] = None,
+                  notes: Optional[str] = None, scientific_name: Optional[str] = None,
+-                 scientific_name_id: Optional[str] = None) -> Dict:
++                 scientific_name_id: Optional[str] = None,
++                 species: Optional[str] = None) -> Dict:
++    """Patch a catalog entry. Every field follows the same rule: None means
++    "leave it alone", an empty string means "clear it". `species` deliberately
++    does NOT re-default to DEFAULT_SPECIES on clear — an update is someone
++    saying what they know, and re-asserting white shark over a deliberate
++    clear would be the app overruling them.
++    """
+     sets = []
+     params: List[Any] = []
+     if display_name is not None:
+@@ -3937,6 +3992,9 @@ def update_shark(shark_id: int, *, display_name: Optional[str] = None,
+     if scientific_name_id is not None:
+         sets.append("scientific_name_id=?")
+         params.append(scientific_name_id or None)
++    if species is not None:
++        sets.append("species=?")
++        params.append(species.strip() or None)
+     if not sets:
+         return {"error": "nothing to update"}
+     sets.append("updated_at=?")
+diff --git a/app.py b/app.py
+index 40e8f43..c98211f 100644
+--- a/app.py
++++ b/app.py
+@@ -3423,10 +3423,15 @@ def api_admin_catalog_create():
+     if not name:
+         return jsonify({"error": "display_name is required"}), 400
+     notes = str(data.get("notes", "")).strip()
++    # `species` absent from the body stays None, and db.create_shark then applies
++    # db.DEFAULT_SPECIES — so a client written before this field existed goes on
++    # cataloguing exactly what it always did. Sending "" stores NULL ("unstated").
++    species = data.get("species")
+     result = db.create_shark(
+         name, notes,
+         scientific_name=str(data.get("scientific_name", "")).strip(),
+         scientific_name_id=str(data.get("scientific_name_id", "")).strip(),
++        species=str(species).strip() if species is not None else None,
+     )
+     if "error" in result:
+         return jsonify(result), 400
+@@ -3450,12 +3455,14 @@ def api_admin_catalog_patch(shark_id):
+     notes = data.get("notes")
+     sci = data.get("scientific_name")
+     sci_id = data.get("scientific_name_id")
++    species = data.get("species")
+     result = db.update_shark(
+         shark_id,
+         display_name=str(name).strip() if name is not None else None,
+         notes=str(notes) if notes is not None else None,
+         scientific_name=str(sci).strip() if sci is not None else None,
+         scientific_name_id=str(sci_id).strip() if sci_id is not None else None,
++        species=str(species).strip() if species is not None else None,
+     )
+     if "error" in result:
+         return jsonify(result), 400
+-- 
+2.43.0
+
