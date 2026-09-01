@@ -1,0 +1,98 @@
+{
+  "backbone": "megadescriptor",
+  "seed": 0,
+  "cutoff_fraction": 0.5,
+  "root": "/root/data/Melops",
+  "arms": {
+    "cross_orientation": {
+      "n_gallery": 5168,
+      "n_known": 1281,
+      "n_novel": 5962,
+      "rank1": 0.00702576112412178,
+      "rank5": 0.02185792349726776,
+      "mAP": 0.017813528923802818,
+      "open_set_auroc": 0.39125023142928894,
+      "rejection_curve": [
+        {
+          "quantile": 0.0,
+          "threshold": 0.2933227554053295,
+          "known_acceptance_rate": 1.0,
+          "novel_rejection_rate": 0.0,
+          "rank1_at_threshold": 0.00702576112412178
+        },
+        {
+          "quantile": 0.1,
+          "threshold": 0.6316670907908338,
+          "known_acceptance_rate": 0.8665105386416861,
+          "novel_rejection_rate": 0.09292183830929218,
+          "rank1_at_threshold": 0.00702576112412178
+        },
+        {
+          "quantile": 0.2,
+          "threshold": 0.6744993401924742,
+          "known_acceptance_rate": 0.7072599531615925,
+          "novel_rejection_rate": 0.18014089231801408,
+          "rank1_at_threshold": 0.00624512099921936
+        },
+        {
+          "quantile": 0.3,
+          "threshold": 0.7045831503739719,
+          "known_acceptance_rate": 0.570647931303669,
+          "novel_rejection_rate": 0.2722240858772224,
+          "rank1_at_threshold": 0.00546448087431694
+        },
+        {
+          "quantile": 0.4,
+          "threshold": 0.7270705080116345,
+          "known_acceptance_rate": 0.4449648711943794,
+          "novel_rejection_rate": 0.36665548473666554,
+          "rank1_at_threshold": 0.0039032006245121
+        },
+        {
+          "quantile": 0.5,
+          "threshold": 0.7453893732133622,
+          "known_acceptance_rate": 0.351288056206089,
+          "novel_rejection_rate": 0.4679637705467964,
+          "rank1_at_threshold": 0.0039032006245121
+        },
+        {
+          "quantile": 0.6,
+          "threshold": 0.7613555969405568,
+          "known_acceptance_rate": 0.2615144418423107,
+          "novel_rejection_rate": 0.5702784300570278,
+          "rank1_at_threshold": 0.00312256049960968
+        },
+        {
+          "quantile": 0.7,
+          "threshold": 0.7774899845010819,
+          "known_acceptance_rate": 0.1959406713505074,
+          "novel_rejection_rate": 0.6776249580677625,
+          "rank1_at_threshold": 0.00312256049960968
+        },
+        {
+          "quantile": 0.8,
+          "threshold": 0.7923435461162636,
+          "known_acceptance_rate": 0.13192818110850899,
+          "novel_rejection_rate": 0.7853069439785307,
+          "rank1_at_threshold": 0.00234192037470726
+        },
+        {
+          "quantile": 0.9,
+          "threshold": 0.8102535205222904,
+          "known_acceptance_rate": 0.0663544106167057,
+          "novel_rejection_rate": 0.8926534719892654,
+          "rank1_at_threshold": 0.00156128024980484
+        }
+      ],
+      "n_same_date_excluded": 5222,
+      "n_train_identities_excluded": 0,
+      "n_train_identity_rows_excluded": 0,
+      "elapsed_s": 604.25
+    }
+  },
+  "verdict": {
+    "verdict": null,
+    "note": "arms missing or without known queries: ['head', 'body', 'headless']"
+  },
+  "caveat": "Do not overread: Melops fish are board-mounted (photographed against a standardised white board) and are not laterally bending in frame. This experiment settles WHERE identity lives (rigid part vs deformable flank), never what unwrapping buys on a bending body."
+}

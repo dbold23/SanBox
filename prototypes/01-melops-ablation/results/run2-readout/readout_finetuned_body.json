@@ -1,0 +1,61 @@
+{
+  "backbone": "finetuned:/root/runs/ft-mega/checkpoint.pt",
+  "arm": "body",
+  "seed": 0,
+  "cutoff_fraction": 0.5,
+  "baseline_seed": 17,
+  "n_gallery": 4182,
+  "n_known": 1055,
+  "n_novel": 4480,
+  "n_train_identities_excluded": 5917,
+  "assortativity": {
+    "index": 0.33094418674248105,
+    "mean_absdiff_argmax_mm": 16.1622989336707,
+    "mean_absdiff_random_mm": 24.156876920296405,
+    "n_queries_used": 5533,
+    "n_queries_missing_length": 2
+  },
+  "length_stratified_rank1": {
+    "terciles": [
+      {
+        "tercile": 1,
+        "absdiff_range_mm": [
+          null,
+          8.0
+        ],
+        "n": 365,
+        "rank1": 0.038356164383561646,
+        "mean_absdiff_mm": 3.1232876712328768
+      },
+      {
+        "tercile": 2,
+        "absdiff_range_mm": [
+          8.0,
+          22.0
+        ],
+        "n": 348,
+        "rank1": 0.011494252873563218,
+        "mean_absdiff_mm": 15.206896551724139
+      },
+      {
+        "tercile": 3,
+        "absdiff_range_mm": [
+          22.0,
+          null
+        ],
+        "n": 342,
+        "rank1": 0.005847953216374269,
+        "mean_absdiff_mm": 38.42397660818713
+      }
+    ],
+    "n_known_used": 1055,
+    "n_known_missing_length": 0
+  },
+  "length_matched_auroc": {
+    "auroc": 0.40685657895294125,
+    "band_fraction": 0.1,
+    "n_known_used": 1055,
+    "n_novel_used": 4476,
+    "n_excluded_no_inband_gallery_or_no_length": 4
+  }
+}

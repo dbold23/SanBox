@@ -1,0 +1,61 @@
+{
+  "backbone": "megadescriptor",
+  "arm": "body",
+  "seed": 0,
+  "cutoff_fraction": 0.5,
+  "baseline_seed": 17,
+  "n_gallery": 10410,
+  "n_known": 2596,
+  "n_novel": 11276,
+  "n_train_identities_excluded": 0,
+  "assortativity": {
+    "index": 0.3379114953078346,
+    "mean_absdiff_argmax_mm": 16.03987597346409,
+    "mean_absdiff_random_mm": 24.22618103137396,
+    "n_queries_used": 13868,
+    "n_queries_missing_length": 4
+  },
+  "length_stratified_rank1": {
+    "terciles": [
+      {
+        "tercile": 1,
+        "absdiff_range_mm": [
+          null,
+          9.0
+        ],
+        "n": 919,
+        "rank1": 0.023939064200217627,
+        "mean_absdiff_mm": 3.4461371055495102
+      },
+      {
+        "tercile": 2,
+        "absdiff_range_mm": [
+          9.0,
+          24.0
+        ],
+        "n": 829,
+        "rank1": 0.0048250904704463205,
+        "mean_absdiff_mm": 16.43546441495778
+      },
+      {
+        "tercile": 3,
+        "absdiff_range_mm": [
+          24.0,
+          null
+        ],
+        "n": 848,
+        "rank1": 0.0,
+        "mean_absdiff_mm": 40.404481132075475
+      }
+    ],
+    "n_known_used": 2596,
+    "n_known_missing_length": 0
+  },
+  "length_matched_auroc": {
+    "auroc": 0.3498145656745487,
+    "band_fraction": 0.1,
+    "n_known_used": 2596,
+    "n_novel_used": 11272,
+    "n_excluded_no_inband_gallery_or_no_length": 4
+  }
+}
