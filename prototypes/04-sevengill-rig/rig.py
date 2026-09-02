@@ -578,6 +578,7 @@ def compute_weights(
     label_names=None,
     faces=None,
     fin_blend_rings=DEFAULT_FIN_BLEND_RINGS,
+    fin_blend_dist=None,
 ):
     """Linear blend skinning weights, (N, J), rows summing to 1.
 
@@ -615,6 +616,13 @@ def compute_weights(
         faces: (F, 3) triangle indices of the SAME vertex array, used only to find
             the seam rings.  None disables the fin-base blend.
         fin_blend_rings: ``R`` above; must be >= 1.  1 is a hard seam again.
+        fin_blend_dist: blend width in WORLD units instead of edge rings.  On a
+            dense scan (the Meshy sevengill: 1M vertices, ~0.5 mm edges) three
+            rings are 1.5 mm and the seam still reads as a slot at the fin base
+            under the fin drive; a body vertex within ``fin_blend_dist`` of a
+            fin island then gets root weight ``smoothstep(1 - d / D)`` from its
+            nearest island instead.  Takes precedence over ``fin_blend_rings``
+            and does not need ``faces``.
 
     At most ``max_influences`` (4, the glTF JOINTS_0/WEIGHTS_0 limit) nonzero
     entries per row; pruned weights are renormalised so rows still sum to 1.
@@ -665,7 +673,25 @@ def compute_weights(
     if unknown:
         raise ValueError("labels contain names with no fin in the skeleton: %r" % sorted(unknown))
 
-    if faces is not None:
+    if fin_blend_dist is not None:
+        from scipy.spatial import cKDTree
+
+        D = float(fin_blend_dist)
+        if D <= 0:
+            raise ValueError("fin_blend_dist must be > 0; got %r" % (fin_blend_dist,))
+        is_fin = lab != BODY_LABEL
+        if is_fin.any():
+            fin_idx = np.nonzero(is_fin)[0]
+            body_idx = np.nonzero(~is_fin)[0]
+            dist, near = cKDTree(verts[fin_idx]).query(verts[body_idx], distance_upper_bound=D)
+            hit = np.isfinite(dist)
+            for v, d, k in zip(body_idx[hit], dist[hit], near[hit]):
+                root_idx = int(skeleton.fins[str(lab[fin_idx[k]])][0])
+                u = 1.0 - d / D
+                ramp = u * u * (3.0 - 2.0 * u)
+                weights[v, :] *= 1.0 - ramp
+                weights[v, root_idx] += ramp
+    elif faces is not None:
         rings = int(fin_blend_rings)
         if rings < 1:
             raise ValueError("fin_blend_rings must be >= 1; got %r" % (fin_blend_rings,))

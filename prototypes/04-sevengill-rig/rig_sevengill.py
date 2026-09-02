@@ -165,7 +165,7 @@ def _frame_matrices_at(centerline, frames, fractions):
 
 def solve_as_scanned(skeleton, bent_centerline, frames=None, up=(0.0, 0.0, 1.0),
                      fps=30.0, ease_s=_AS_SCANNED_EASE_S, hold_s=_AS_SCANNED_HOLD_S,
-                     name=AS_SCANNED_NAME):
+                     name=AS_SCANNED_NAME, rest_centerline=None):
     """Joint rotations that bend the straight rig back onto the scanned centerline.
 
     The spine joints sit at known arc-length fractions of the rest centerline; the
@@ -186,6 +186,9 @@ def solve_as_scanned(skeleton, bent_centerline, frames=None, up=(0.0, 0.0, 1.0),
         bent_centerline: (M, 3) the extracted, scanned centerline.
         frames: its ``(T, N, B)``; recomputed from ``up`` when None.
         up: dorsal seed for the frames.
+        rest_centerline: the polyline the skeleton was built on when it is not
+            the canonical straight axis (a spine extended through a caudal lobe);
+            None means every rest bone points along -X.
         fps, ease_s, hold_s, name: clip shape.
 
     Returns:
@@ -200,6 +203,14 @@ def solve_as_scanned(skeleton, bent_centerline, frames=None, up=(0.0, 0.0, 1.0),
     spine_idx = np.asarray(skeleton.spine_indices, dtype=int)
     fractions = np.asarray(skeleton.fractions, dtype=float)[spine_idx]
     world, targets = _frame_matrices_at(cl, frames, fractions)
+    if rest_centerline is not None:
+        # The rest bones are not all along -X (the spine runs on into a
+        # caudal lobe): the world rotation must carry the REST frame, not the
+        # canonical one, onto the target.  W = M_target @ M_rest^T.
+        rest_cl = np.asarray(rest_centerline, dtype=float)
+        rest_world, _ = _frame_matrices_at(
+            rest_cl, mesh3d.tube_frames(rest_cl, up=(0.0, 0.0, 1.0)), fractions)
+        world = np.einsum("kab,kcb->kac", world, rest_world)
 
     n_joints = skeleton.num_joints
     rotmats = np.tile(np.eye(3), (n_joints, 1, 1))
@@ -368,6 +379,7 @@ def run_pipeline(
     core_radius_frac=0.17,
     hook_turn_mult=3.0,
     caudal_lobes="fins",
+    fin_blend_dist=None,
     sigma=None,
     fin_blend_rings=rig.DEFAULT_FIN_BLEND_RINGS,
     precaudal_fraction=rig.DEFAULT_PRECAUDAL_FRACTION,
@@ -387,6 +399,8 @@ def run_pipeline(
         voxel_pitch: None = ``max(extents)/128``.
         n_stations: chart resolution.
         up: the input mesh's DORSAL direction.  Load-bearing; see the module docstring.
+        fin_blend_dist: fin-base blend width in metres (see
+            ``rig.compute_weights``); None uses ``fin_blend_rings``.
         caudal_lobes: ``"fins"`` (default) keeps every caudal island as a driven
             fin, as the synthetic fixture expects; ``"auto"`` folds a caudal
             island that is a lobe (see ``LOBE_ASPECT``) into the body so it
@@ -457,6 +471,7 @@ def run_pipeline(
         detection.fins, straight_mesh.vertices, centerline=straight_centerline
     )
     labels = np.asarray(detection.labels).astype(str)
+    folded = []
     if caudal_lobes == "body" or caudal_lobes == "auto":
         fin_info, labels, folded = fold_caudal_lobes(
             fin_info, labels, detection.fins, straight_mesh.vertices, straight_centerline,
@@ -466,12 +481,35 @@ def run_pipeline(
                 "joints as body, no fin joints" % (name, ratio))
         if folded:
             detection = detection._replace(labels=labels)
-    skeleton = rig.build_skeleton(
-        straight_centerline, fin_info, precaudal_fraction=precaudal_fraction
-    )
+    # The spine polyline the skeleton is built on.  When a caudal lobe was
+    # folded into the body, the spine runs on from the chart's end to the
+    # lobe's tip so the two caudal-axis joints sit ON the lobe (the schema's
+    # own intent: "the vertebral axis turns up into the long upper lobe") and
+    # the wave continues into it instead of the lobe swinging as one rigid
+    # piece off the last joint.  The scanned polyline gets the same vertex's
+    # scanned position so as_scanned stays consistent, and the precaudal
+    # fraction is rescaled so the precaudal joint stays at the peduncle.
+    spine_straight, spine_bent, spine_frames = straight_centerline, centerline, frames
+    pf = precaudal_fraction
+    rest_for_solve = None
+    if folded:
+        lobe = max(folded, key=lambda nr: len(detection.fins[nr[0]]["vertex_indices"]))[0]
+        members = np.asarray(detection.fins[lobe]["vertex_indices"], dtype=int)
+        tip = int(members[np.argmin(np.asarray(straight_mesh.vertices)[members, 0])])
+        spine_straight = np.vstack([straight_centerline, np.asarray(straight_mesh.vertices)[tip]])
+        spine_bent = np.vstack([centerline, np.asarray(mesh.vertices)[tip]])
+        spine_frames = mesh3d.tube_frames(spine_bent, up=tuple(up))
+        l_chart = float(mesh3d.arc_length(straight_centerline)[-1])
+        l_ext = float(mesh3d.arc_length(spine_straight)[-1])
+        pf = float(precaudal_fraction) * l_chart / l_ext
+        rest_for_solve = spine_straight
+        log("spine extended through %s to its tip: %.4f -> %.4f m, precaudal fraction %.3f -> %.3f"
+            % (lobe, l_chart, l_ext, precaudal_fraction, pf))
+    skeleton = rig.build_skeleton(spine_straight, fin_info, precaudal_fraction=pf)
     weights = rig.compute_weights(
         straight_mesh.vertices, labels, skeleton, sigma=sigma,
         faces=straight_mesh.faces, fin_blend_rings=fin_blend_rings,
+        fin_blend_dist=fin_blend_dist,
     )
     timings["rig"] = time.time() - t0
     log("rig: %d joints (%d spine + %d fin), weights %s, max influences %d"
@@ -488,7 +526,8 @@ def run_pipeline(
     as_scanned_info = None
     if keep_bent:
         clips[AS_SCANNED_NAME], as_scanned_info = solve_as_scanned(
-            skeleton, centerline, frames, up=tuple(up), fps=fps
+            skeleton, spine_bent, spine_frames, up=tuple(up), fps=fps,
+            rest_centerline=rest_for_solve,
         )
         log("clip %-10s %d frames, %.2f s, spine joint error max %.5f"
             % (AS_SCANNED_NAME, clips[AS_SCANNED_NAME].num_frames,
@@ -891,6 +930,8 @@ def build_parser():
     ap.add_argument("-n", "--n-stations", type=int, default=64)
     ap.add_argument("--up", type=float, nargs=3, default=(0.0, 0.0, 1.0),
                     help="DORSAL direction of the input mesh (default +Z)")
+    ap.add_argument("--fin-blend-dist", type=float, default=None,
+                    help="fin-base weight blend width in metres (default: --fin-blend-rings edge rings)")
     ap.add_argument("--caudal-lobes", choices=("fins", "auto", "body"), default="fins",
                     help="fins (default): every caudal island is a driven fin; auto: a caudal island "
                          "that is a lobe (axial >= %.0fx radial extent) rides the spine as body instead, "
@@ -932,6 +973,7 @@ def main(argv=None):
         core_radius_frac=args.core_radius_frac,
         hook_turn_mult=args.hook_turn_mult,
         caudal_lobes=args.caudal_lobes,
+        fin_blend_dist=args.fin_blend_dist,
         sigma=args.sigma,
         fin_blend_rings=args.fin_blend_rings,
         precaudal_fraction=args.precaudal_fraction,

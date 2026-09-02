@@ -420,3 +420,19 @@ def test_pipeline_is_deterministic(demo_run):
     assert np.array_equal(a.straight_mesh.vertices, b.straight_mesh.vertices)
     assert np.array_equal(a.weights, b.weights)
     assert np.array_equal(a.clips["cruise"].quats, b.clips["cruise"].quats)
+
+
+def test_as_scanned_with_a_kinked_rest_spine_recovers_the_rest_pose():
+    """When the rest spine is not the canonical straight axis (extended through a
+    caudal lobe), solving for a target equal to the rest polyline must give the
+    identity pose: every joint lands on itself."""
+    import rig_sevengill
+    straight = np.column_stack([np.linspace(0.4, -0.3, 40), np.zeros(40), np.zeros(40)])
+    kinked = np.vstack([straight, [[-0.45, 0.04, 0.02]]])          # lobe segment, 18 deg off axis
+    sk = rig.build_skeleton(kinked, {}, precaudal_fraction=0.78 * 0.7 / 0.853)
+    frames = mesh3d.tube_frames(kinked, up=(0, 0, 1))
+    _, info = rig_sevengill.solve_as_scanned(sk, kinked, frames, up=(0, 0, 1), rest_centerline=kinked)
+    assert np.max(info["joint_error"]) < 1e-6
+    assert np.allclose(info["rotmats"], np.eye(3), atol=1e-9)
+    _, info2 = rig_sevengill.solve_as_scanned(sk, kinked, frames, up=(0, 0, 1))   # -X rest bones assumed
+    assert np.max(info2["joint_error"]) > 1e-3

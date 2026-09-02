@@ -644,3 +644,20 @@ def test_fold_caudal_lobes_folds_a_lobe_and_keeps_a_blade():
     assert set(new_labels[:60]) == {"body"} and set(new_labels[60:]) == {"caudal_lower"}
     out, new_labels, folded = rig_sevengill.fold_caudal_lobes(fin_info, labels, fins, verts, cl, force=True)
     assert set(n for n, _ in folded) == {"caudal_upper", "caudal_lower"} and not out
+
+
+def test_fin_blend_dist_ramps_root_weight_by_distance(capsule):
+    labels = capsule["labels"]
+    sk = rig.build_skeleton(capsule["centerline"], capsule["fin_info"])
+    from scipy.spatial import cKDTree
+    verts = np.asarray(capsule["vertices"]); lab = np.asarray([str(x) for x in labels])
+    root = sk.fins["dorsal"][0]; fin = np.nonzero(lab == "dorsal")[0]; body = np.nonzero(lab == "body")[0]
+    d, _ = cKDTree(verts[fin]).query(verts[body])
+    D = float(np.sort(d)[20])                          # a band that holds 20 body vertices
+    w = rig.compute_weights(capsule["vertices"], labels, sk, fin_blend_dist=D)
+    np.testing.assert_allclose(w.sum(axis=1), 1.0, atol=1e-12)
+    inside = body[d < D]; outside = body[d >= D]
+    assert np.all(w[inside, root] > 0) and np.all(w[outside, root] == 0)
+    order = np.argsort(d[d < D]); ramp = w[inside[order], root]
+    assert ramp[: len(ramp) // 2].mean() > ramp[len(ramp) // 2:].mean()   # closer -> more root weight
+    assert ramp[0] > 0.5                                # nearest the island the root dominates
