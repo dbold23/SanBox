@@ -1,0 +1,135 @@
+........................................................................ [ 30%]
+........................................................................ [ 61%]
+................................................s.EEEE.F...EEEEEEEEEEEEE [ 91%]
+EEEEEEEEEEEE..EEEEF.                                                     [100%]
+==================================== ERRORS ====================================
+______ ERROR at setup of test_chart_coords_produce_exactly_05s_convention ______
+E   FileNotFoundError: [Errno 2] No such file or directory: '/home/user/SanBox/phase1b/p0-sevengill-schema/keypoints_sevengill_v1.yaml'
+______________ ERROR at setup of test_chart_s_runs_snout_to_tail _______________
+E   FileNotFoundError: [Errno 2] No such file or directory: '/home/user/SanBox/phase1b/p0-sevengill-schema/keypoints_sevengill_v1.yaml'
+___ ERROR at setup of test_chart_phi_zero_is_dorsal_and_plus_half_pi_is_left ___
+E   FileNotFoundError: [Errno 2] No such file or directory: '/home/user/SanBox/phase1b/p0-sevengill-schema/keypoints_sevengill_v1.yaml'
+_ ERROR at setup of test_chart_normalisation_extent_keeps_the_caudal_overhang __
+E   FileNotFoundError: [Errno 2] No such file or directory: '/home/user/SanBox/phase1b/p0-sevengill-schema/keypoints_sevengill_v1.yaml'
+_________ ERROR at setup of test_the_real_texture_survives_the_debend __________
+E   FileNotFoundError: [Errno 2] No such file or directory: '/home/user/SanBox/phase1b/p0-sevengill-schema/keypoints_sevengill_v1.yaml'
+______________ ERROR at setup of test_chart_read_covers_the_body _______________
+E   FileNotFoundError: [Errno 2] No such file or directory: '/home/user/SanBox/phase1b/p0-sevengill-schema/keypoints_sevengill_v1.yaml'
+___ ERROR at setup of test_body_texel_alpha_drops_the_fins_and_nothing_else ____
+E   FileNotFoundError: [Errno 2] No such file or directory: '/home/user/SanBox/phase1b/p0-sevengill-schema/keypoints_sevengill_v1.yaml'
+_______ ERROR at setup of test_delighting_removes_the_lowfrequency_term ________
+E   FileNotFoundError: [Errno 2] No such file or directory: '/home/user/SanBox/phase1b/p0-sevengill-schema/keypoints_sevengill_v1.yaml'
+__________ ERROR at setup of test_delighting_keeps_the_identity_layer __________
+E   FileNotFoundError: [Errno 2] No such file or directory: '/home/user/SanBox/phase1b/p0-sevengill-schema/keypoints_sevengill_v1.yaml'
+__ ERROR at setup of test_the_skin_base_has_the_identity_layer_flattened_out ___
+E   FileNotFoundError: [Errno 2] No such file or directory: '/home/user/SanBox/phase1b/p0-sevengill-schema/keypoints_sevengill_v1.yaml'
+______________ ERROR at setup of test_delight_uses_bakes_own_path ______________
+E   FileNotFoundError: [Errno 2] No such file or directory: '/home/user/SanBox/phase1b/p0-sevengill-schema/keypoints_sevengill_v1.yaml'
+________ ERROR at setup of test_individual0_is_a_copy_of_the_real_skin _________
+E   FileNotFoundError: [Errno 2] No such file or directory: '/home/user/SanBox/phase1b/p0-sevengill-schema/keypoints_sevengill_v1.yaml'
+_ ERROR at setup of test_individual0_spot_count_matches_an_independent_segmentation _
+E   FileNotFoundError: [Errno 2] No such file or directory: '/home/user/SanBox/phase1b/p0-sevengill-schema/keypoints_sevengill_v1.yaml'
+___ ERROR at setup of test_individual0_round_trips_through_render_and_refit ____
+E   FileNotFoundError: [Errno 2] No such file or directory: '/home/user/SanBox/phase1b/p0-sevengill-schema/keypoints_sevengill_v1.yaml'
+____ ERROR at setup of test_no_individual_has_a_spot_in_an_exclusion_region ____
+E   FileNotFoundError: [Errno 2] No such file or directory: '/home/user/SanBox/phase1b/p0-sevengill-schema/keypoints_sevengill_v1.yaml'
+__ ERROR at setup of test_rendered_charts_are_blank_inside_the_exclusion_mask __
+E   FileNotFoundError: [Errno 2] No such file or directory: '/home/user/SanBox/phase1b/p0-sevengill-schema/keypoints_sevengill_v1.yaml'
+________ ERROR at setup of test_individual0_json_carries_the_spot_table ________
+E   FileNotFoundError: [Errno 2] No such file or directory: '/home/user/SanBox/phase1b/p0-sevengill-schema/keypoints_sevengill_v1.yaml'
+_____ ERROR at setup of test_fit_individual_pins_the_ambiguous_conventions _____
+E   FileNotFoundError: [Errno 2] No such file or directory: '/home/user/SanBox/phase1b/p0-sevengill-schema/keypoints_sevengill_v1.yaml'
+__________ ERROR at setup of test_resights_are_the_same_animal_later ___________
+E   FileNotFoundError: [Errno 2] No such file or directory: '/home/user/SanBox/phase1b/p0-sevengill-schema/keypoints_sevengill_v1.yaml'
+______ ERROR at setup of test_resight_similarity_beats_random_similarity _______
+E   FileNotFoundError: [Errno 2] No such file or directory: '/home/user/SanBox/phase1b/p0-sevengill-schema/keypoints_sevengill_v1.yaml'
+_ ERROR at setup of test_random_individuals_are_matched_in_density_but_not_in_pattern _
+E   FileNotFoundError: [Errno 2] No such file or directory: '/home/user/SanBox/phase1b/p0-sevengill-schema/keypoints_sevengill_v1.yaml'
+________ ERROR at setup of test_resight_series_rejects_a_negative_count ________
+E   FileNotFoundError: [Errno 2] No such file or directory: '/home/user/SanBox/phase1b/p0-sevengill-schema/keypoints_sevengill_v1.yaml'
+_____ ERROR at setup of test_every_emitted_glb_validates_with_zero_errors ______
+E   FileNotFoundError: [Errno 2] No such file or directory: '/home/user/SanBox/phase1b/p0-sevengill-schema/keypoints_sevengill_v1.yaml'
+_________ ERROR at setup of test_glbs_keep_the_geometry_and_the_atlas __________
+E   FileNotFoundError: [Errno 2] No such file or directory: '/home/user/SanBox/phase1b/p0-sevengill-schema/keypoints_sevengill_v1.yaml'
+___________ ERROR at setup of test_each_glb_carries_its_own_texture ____________
+E   FileNotFoundError: [Errno 2] No such file or directory: '/home/user/SanBox/phase1b/p0-sevengill-schema/keypoints_sevengill_v1.yaml'
+_ ERROR at setup of test_a_baked_texture_reads_back_as_the_identity_it_encodes _
+E   FileNotFoundError: [Errno 2] No such file or directory: '/home/user/SanBox/phase1b/p0-sevengill-schema/keypoints_sevengill_v1.yaml'
+______ ERROR at setup of test_write_textured_glb_rejects_an_invalid_file _______
+E   FileNotFoundError: [Errno 2] No such file or directory: '/home/user/SanBox/phase1b/p0-sevengill-schema/keypoints_sevengill_v1.yaml'
+__________ ERROR at setup of test_run_writes_every_documented_output ___________
+E   FileNotFoundError: [Errno 2] No such file or directory: '/home/user/SanBox/phase1b/p0-sevengill-schema/keypoints_sevengill_v1.yaml'
+__________ ERROR at setup of test_contact_sheet_has_one_row_per_stage __________
+E   FileNotFoundError: [Errno 2] No such file or directory: '/home/user/SanBox/phase1b/p0-sevengill-schema/keypoints_sevengill_v1.yaml'
+_______ ERROR at setup of test_summary_json_is_serialisable_and_complete _______
+E   FileNotFoundError: [Errno 2] No such file or directory: '/home/user/SanBox/phase1b/p0-sevengill-schema/keypoints_sevengill_v1.yaml'
+____________ ERROR at setup of test_side_view_render_shows_the_body ____________
+E   FileNotFoundError: [Errno 2] No such file or directory: '/home/user/SanBox/phase1b/p0-sevengill-schema/keypoints_sevengill_v1.yaml'
+_____ ERROR at setup of test_pipeline_runs_unmodified_on_the_bent_demo_glb _____
+E   FileNotFoundError: [Errno 2] No such file or directory: '/home/user/SanBox/phase1b/p0-sevengill-schema/keypoints_sevengill_v1.yaml'
+______ ERROR at setup of test_the_bent_input_recovers_the_same_individual ______
+E   FileNotFoundError: [Errno 2] No such file or directory: '/home/user/SanBox/phase1b/p0-sevengill-schema/keypoints_sevengill_v1.yaml'
+=================================== FAILURES ===================================
+E   FileNotFoundError: [Errno 2] No such file or directory: '/home/user/SanBox/phase1b/p0-sevengill-schema/keypoints_sevengill_v1.yaml'
+/Volumes/External Dive 2TB/projects/marine-cv/7Gill/.claude/worktrees/melops-ablation-vast-gpu-6d469d/prototypes/05-synthetic-identities/exclusions.py:184: FileNotFoundError: [Errno 2] No such file or directory: '/home/user/SanBox/phase1b/p0-sevengill-schema/keypoints_sevengill_v1.yaml'
+E   FileNotFoundError: [Errno 2] No such file or directory: '/home/user/SanBox/phase1b/p0-sevengill-schema/keypoints_sevengill_v1.yaml'
+/Volumes/External Dive 2TB/projects/marine-cv/7Gill/.claude/worktrees/melops-ablation-vast-gpu-6d469d/prototypes/05-synthetic-identities/exclusions.py:184: FileNotFoundError: [Errno 2] No such file or directory: '/home/user/SanBox/phase1b/p0-sevengill-schema/keypoints_sevengill_v1.yaml'
+=============================== warnings summary ===============================
+tests/test_mesh3d.py::test_sliver_fins_are_reported_not_silently_dropped
+  /Volumes/External Dive 2TB/projects/marine-cv/7Gill/.claude/worktrees/melops-ablation-vast-gpu-6d469d/prototypes/04-sevengill-rig/tests/test_mesh3d.py:444: RuntimeWarning: detect_fins: 2 disjoint islands classify as 'caudal_lower' and their station ranges do not touch, so they are not one fin: keeping the one closest to the anatomical prior (54 verts, stations 62-62, s 1.088-1.157) and demoting 36 verts, stations 52-55, s 0.831-0.875 to 'unassigned_island_*' entries whose vertices stay labelled 'body'.  An unexpected lump, a fin far from its prior, or a flipped up vector all look like this.
+    det = mesh3d.detect_fins(mesh, coords)
+
+tests/test_mesh3d.py::test_debend_warns_about_roll_and_straightens_it_no_worse
+  /Volumes/External Dive 2TB/projects/marine-cv/7Gill/.claude/worktrees/melops-ablation-vast-gpu-6d469d/prototypes/04-sevengill-rig/mesh3d.py:1157: RuntimeWarning: detect_fins: 2 disjoint islands classify as 'pelvic_L' and their station ranges do not touch, so they are not one fin: keeping the one closest to the anatomical prior (182 verts, stations 44-50, s 0.708-0.800) and demoting 314 verts, stations 60-62, s 0.962-1.324 to 'unassigned_island_*' entries whose vertices stay labelled 'body'.  An unexpected lump, a fin far from its prior, or a flipped up vector all look like this.
+    det = detect_fins(mesh, coords, check=False)
+
+tests/test_mesh3d.py::test_debend_warns_about_roll_and_straightens_it_no_worse
+  /Volumes/External Dive 2TB/projects/marine-cv/7Gill/.claude/worktrees/melops-ablation-vast-gpu-6d469d/prototypes/04-sevengill-rig/mesh3d.py:1157: RuntimeWarning: detect_fins: 3 disjoint islands classify as 'pelvic_R' and their station ranges do not touch, so they are not one fin: keeping the one closest to the anatomical prior (240 verts, stations 41-46, s 0.656-0.741) and demoting 108 verts, stations 50-54, s 0.801-0.877; 138 verts, stations 62-62, s 1.003-1.167 to 'unassigned_island_*' entries whose vertices stay labelled 'body'.  An unexpected lump, a fin far from its prior, or a flipped up vector all look like this.
+    det = detect_fins(mesh, coords, check=False)
+
+tests/test_mesh3d.py::test_check_anatomy_catches_a_wrong_sign_up_vector
+  /Volumes/External Dive 2TB/projects/marine-cv/7Gill/.claude/worktrees/melops-ablation-vast-gpu-6d469d/prototypes/04-sevengill-rig/tests/test_mesh3d.py:541: RuntimeWarning: detect_fins: 2 disjoint islands classify as 'dorsal' and their station ranges do not touch, so they are not one fin: keeping the one closest to the anatomical prior (240 verts, stations 41-46, s 0.660-0.746) and demoting 108 verts, stations 50-55, s 0.797-0.875 to 'unassigned_island_*' entries whose vertices stay labelled 'body'.  An unexpected lump, a fin far from its prior, or a flipped up vector all look like this.
+    return mesh3d.detect_fins(mesh, coords, check=check)
+
+tests/test_mesh3d.py::test_check_anatomy_catches_a_wrong_sign_up_vector
+  /Volumes/External Dive 2TB/projects/marine-cv/7Gill/.claude/worktrees/melops-ablation-vast-gpu-6d469d/prototypes/04-sevengill-rig/tests/test_mesh3d.py:541: RuntimeWarning: detect_fins: 2 of the 8 expected fins were not found (pelvic_L, pelvic_R) at margin=0.3, floor_frac=0.002, min_island=8 -- a blade that never reaches (1 + margin) * envelope + floor_frac * S is invisible to the detector.  Lower the margin, or check that the mesh really has them (and that ``up`` is right, which decides their names).
+    return mesh3d.detect_fins(mesh, coords, check=check)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_texture_identity.py::test_exclusion_mask_layouts_are_transposes
+FAILED tests/test_texture_identity.py::test_main_runs_end_to_end - FileNotFou...
+ERROR tests/test_texture_identity.py::test_chart_coords_produce_exactly_05s_convention
+ERROR tests/test_texture_identity.py::test_chart_s_runs_snout_to_tail - FileN...
+ERROR tests/test_texture_identity.py::test_chart_phi_zero_is_dorsal_and_plus_half_pi_is_left
+ERROR tests/test_texture_identity.py::test_chart_normalisation_extent_keeps_the_caudal_overhang
+ERROR tests/test_texture_identity.py::test_the_real_texture_survives_the_debend
+ERROR tests/test_texture_identity.py::test_chart_read_covers_the_body - FileN...
+ERROR tests/test_texture_identity.py::test_body_texel_alpha_drops_the_fins_and_nothing_else
+ERROR tests/test_texture_identity.py::test_delighting_removes_the_lowfrequency_term
+ERROR tests/test_texture_identity.py::test_delighting_keeps_the_identity_layer
+ERROR tests/test_texture_identity.py::test_the_skin_base_has_the_identity_layer_flattened_out
+ERROR tests/test_texture_identity.py::test_delight_uses_bakes_own_path - File...
+ERROR tests/test_texture_identity.py::test_individual0_is_a_copy_of_the_real_skin
+ERROR tests/test_texture_identity.py::test_individual0_spot_count_matches_an_independent_segmentation
+ERROR tests/test_texture_identity.py::test_individual0_round_trips_through_render_and_refit
+ERROR tests/test_texture_identity.py::test_no_individual_has_a_spot_in_an_exclusion_region
+ERROR tests/test_texture_identity.py::test_rendered_charts_are_blank_inside_the_exclusion_mask
+ERROR tests/test_texture_identity.py::test_individual0_json_carries_the_spot_table
+ERROR tests/test_texture_identity.py::test_fit_individual_pins_the_ambiguous_conventions
+ERROR tests/test_texture_identity.py::test_resights_are_the_same_animal_later
+ERROR tests/test_texture_identity.py::test_resight_similarity_beats_random_similarity
+ERROR tests/test_texture_identity.py::test_random_individuals_are_matched_in_density_but_not_in_pattern
+ERROR tests/test_texture_identity.py::test_resight_series_rejects_a_negative_count
+ERROR tests/test_texture_identity.py::test_every_emitted_glb_validates_with_zero_errors
+ERROR tests/test_texture_identity.py::test_glbs_keep_the_geometry_and_the_atlas
+ERROR tests/test_texture_identity.py::test_each_glb_carries_its_own_texture
+ERROR tests/test_texture_identity.py::test_a_baked_texture_reads_back_as_the_identity_it_encodes
+ERROR tests/test_texture_identity.py::test_write_textured_glb_rejects_an_invalid_file
+ERROR tests/test_texture_identity.py::test_run_writes_every_documented_output
+ERROR tests/test_texture_identity.py::test_contact_sheet_has_one_row_per_stage
+ERROR tests/test_texture_identity.py::test_summary_json_is_serialisable_and_complete
+ERROR tests/test_texture_identity.py::test_side_view_render_shows_the_body - ...
+ERROR tests/test_texture_identity.py::test_pipeline_runs_unmodified_on_the_bent_demo_glb
+ERROR tests/test_texture_identity.py::test_the_bent_input_recovers_the_same_individual
+2 failed, 200 passed, 1 skipped, 5 warnings, 33 errors in 13.07s

@@ -1,0 +1,80 @@
+==============================================================================
+prototype 04 -- sevengill de-bend + rig + swim, synthetic end-to-end demo
+==============================================================================
+
+[1] synthetic sevengill: 7150 verts, 14120 faces, 8 fins, texture yes
+    body length 1.0211, tube centerline length 0.8000, bent into a 120 deg C
+    input  -> /Volumes/External Dive 2TB/projects/marine-cv/7Gill/.claude/worktrees/melops-ablation-vast-gpu-6d469d/prototypes/04-sevengill-rig/demo/sevengill_synthetic_bent.glb (343.9 kB)
+
+[2] pipeline (rig_sevengill.run_pipeline, the same code path as the CLI)
+load: 7150 verts, 14120 faces, extents [0.4519 0.8005 0.2608]
+centerline: 64 stations, length 0.7270, pitch 0.00625, head/tail width 0.0428/0.0247
+de-bend: sagitta of the scanned centerline 0.1605 (22.1% of length), rest extents [1.0091 0.3651 0.2772]
+fins: 8 islands -- anal, caudal_lower, caudal_upper, dorsal, pectoral_L, pectoral_R, pelvic_L, pelvic_R
+rig: 29 joints (13 spine + 16 fin), weights (7150, 29), max influences 3
+clip cruise     134 frames, 4.44 s, loop=True
+clip turn       134 frames, 4.44 s, loop=True
+clip escape     16 frames, 0.49 s, loop=False
+clip as_scanned 46 frames, 1.50 s, spine joint error max 0.00094
+wrote /Volumes/External Dive 2TB/projects/marine-cv/7Gill/.claude/worktrees/melops-ablation-vast-gpu-6d469d/prototypes/04-sevengill-rig/demo/sevengill_rigged.glb (783.1 kB)
+validator: 0 errors, 0 warnings
+report: /Volumes/External Dive 2TB/projects/marine-cv/7Gill/.claude/worktrees/melops-ablation-vast-gpu-6d469d/prototypes/04-sevengill-rig/demo/report
+
+[3] de-bend round trip vs ground truth  (BL = 0.8000 world units, voxel pitch = 0.00625 = 0.782% BL)
+    all vertices   RMS 0.4939% BL (0.63 px)   max 3.5004% BL (4.48 px)
+    body only      RMS 0.1569% BL (0.20 px)   max 0.6745% BL (0.86 px)
+    centerline vs the exact C-curve: mean 0.00051 BL (0.07 px), max 0.00159 BL (0.20 px)
+
+[4] fin labels vs construction truth
+    fin             found  truth   purity   recall
+    anal              108    126   100.0%    85.7%
+    caudal_lower      144    162   100.0%    88.9%
+    caudal_upper      336    336   100.0%   100.0%
+    dorsal            182    216   100.0%    84.3%
+    pectoral_L        176    220   100.0%    80.0%
+    pectoral_R        176    220   100.0%    80.0%
+    pelvic_L          120    160   100.0%    75.0%
+    pelvic_R          120    160   100.0%    75.0%
+    body vertices given a fin label: 0
+
+[5] texture / topology through the de-bend and the GLB round trip
+    faces identical: True | UVs identical after de-bend (to float32): True | UV error after GLB write+reload: 0.00e+00
+
+[6] rig: 29 joints = 13 schema spine + 16 fin joints; weights 7150 x 29, <= 3 influences (mean 1.89), rows sum to 1 (2.2e-16)
+    anal           root parented to spine_11_caudal_axis_1
+    caudal_lower   root parented to spine_12_caudal_axis_2
+    caudal_upper   root parented to spine_12_caudal_axis_2
+    dorsal         root parented to spine_10_precaudal
+    pectoral_L     root parented to spine_05_trunk_03
+    pectoral_R     root parented to spine_05_trunk_03
+    pelvic_L       root parented to spine_09_trunk_07
+    pelvic_R       root parented to spine_09_trunk_07
+
+[7] 'as_scanned' clip: LBS-posed rig vs the mesh as scanned
+    spine joints land on the scanned centerline to max 0.00117 BL (0.15 px)
+    skinned surface vs the scan: RMS 0.604% BL, max 2.807% BL (LBS blending, not chart error)
+
+[8] swimming kinematics (cruise)
+    0.90 Hz, wavelength 0.90 BL, prescribed tail amplitude 0.110 BL, posed 0.103 BL (0.94 x)
+    implied longitudinal skin strain: anterior 5.5%, mid 10.8%, posterior 18.4%  (literature bracket 3.9-13.0%)
+    DCT bending-mode energy: 0.976 in 4 modes, 0.996 in 6
+    clip as_scanned   46 frames   1.50 s  loop=False
+    clip cruise      134 frames   4.44 s  loop=True 
+    clip escape       16 frames   0.49 s  loop=False
+    clip turn        134 frames   4.44 s  loop=True 
+
+[9] glTF validation (Khronos gltf-validator)
+    input  sevengill_synthetic_bent.glb    0 errors, 0 warnings
+    rest   sevengill_rest.glb              0 errors, 0 warnings
+    output sevengill_rigged.glb            0 errors, 0 warnings
+
+[10] outputs in /Volumes/External Dive 2TB/projects/marine-cv/7Gill/.claude/worktrees/melops-ablation-vast-gpu-6d469d/prototypes/04-sevengill-rig/demo  (total 1.1 s)
+    sevengill_rest.glb                    343.9 kB
+    sevengill_rigged.glb                  783.1 kB
+    sevengill_synthetic_bent.glb          343.9 kB
+    report/centerline.json                  8.9 kB
+    report/contact_strip.png              110.2 kB
+    report/fins.json                        4.7 kB
+    report/skeleton.json                    6.4 kB
+    report/weights.json                     1.5 kB
+==============================================================================
