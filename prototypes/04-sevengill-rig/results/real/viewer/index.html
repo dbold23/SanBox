@@ -6,6 +6,7 @@
 // Minimal glTF viewer for results/real/sevengill_rigged.glb (rig world: snout +X, dorsal +Z, left flank +Y).
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 const params = new URLSearchParams(location.search);
 const hud = document.getElementById('hud');
 const renderer = new THREE.WebGLRenderer({antialias:true, preserveDrawingBuffer:true}); document.body.appendChild(renderer.domElement);
@@ -15,6 +16,8 @@ const camera = new THREE.PerspectiveCamera(30, 16/9, 0.01, 100); camera.up.set(0
 function viewSize(){ return [innerWidth || document.documentElement.clientWidth || 1280, innerHeight || document.documentElement.clientHeight || 720]; }
 function fit(w, h){ if (!w) [w, h] = viewSize(); renderer.setSize(w, h); camera.aspect = w/h; camera.updateProjectionMatrix(); }
 fit(); addEventListener('resize', () => fit());
+const controls = new OrbitControls(camera, renderer.domElement); controls.enableDamping = true;
+let playing = params.get('play') !== '0';
 let mixer, clips = [], root, skel, action, box, c, L, curClip = 'cruise', curView = 'side';
 function setView(view){
   curView = view;
@@ -23,11 +26,11 @@ function setView(view){
   else if (view === 'top') camera.position.set(c.x + 0.0001, c.y, c.z + 2.2*L);
   else if (view === 'front') camera.position.set(c.x + 2.2*L, c.y, c.z + 0.05*L);
   else camera.position.set(c.x + 1.1*L, c.y - 1.5*L, c.z + 0.8*L);          // iso
-  camera.lookAt(c); camera.updateProjectionMatrix();
+  camera.lookAt(c); controls.target.copy(c); controls.update(); camera.updateProjectionMatrix();
 }
 function setClip(name){ curClip = name; if (action) action.stop(); const clip = clips.find(k => k.name === name) || clips[0]; action = mixer.clipAction(clip); action.reset().play(); mixer.setTime(0); return clip; }
 function render(){ renderer.render(scene, camera); }
-function status(){ hud.textContent = `clips: ${clips.map(k => k.name + ' ' + k.duration.toFixed(2) + 's').join(' | ')}\nclip: ${curClip}  view: ${curView}  t=${mixer ? mixer.time.toFixed(2) : '-'}  rest bbox: ${box ? [box.getSize(new THREE.Vector3()).x, box.getSize(new THREE.Vector3()).y, box.getSize(new THREE.Vector3()).z].map(v => v.toFixed(3)).join(' ') : ''}`; }
+function status(){ hud.textContent = `drag = orbit, wheel = zoom, right-drag = pan | space = play/pause | keys 1-5 = clip | b = bones\nclips: ${clips.map(k => k.name + ' ' + k.duration.toFixed(2) + 's').join(' | ')}\nclip: ${curClip}  view: ${curView}  t=${mixer ? mixer.time.toFixed(2) : '-'}  rest bbox: ${box ? [box.getSize(new THREE.Vector3()).x, box.getSize(new THREE.Vector3()).y, box.getSize(new THREE.Vector3()).z].map(v => v.toFixed(3)).join(' ') : ''}`; }
 new GLTFLoader().load('../sevengill_rigged.glb', (g) => {
   root = g.scene; scene.add(root); clips = g.animations;
   box = new THREE.Box3().setFromObject(root); c = box.getCenter(new THREE.Vector3()); L = Math.max(...box.getSize(new THREE.Vector3()).toArray());
@@ -42,5 +45,6 @@ new GLTFLoader().load('../sevengill_rigged.glb', (g) => {
   status(); render();
 }, (ev) => { hud.textContent = 'loading ' + (ev.loaded/1e6).toFixed(0) + ' MB'; }, (err) => { hud.textContent = 'ERROR ' + err; window.__error = String(err); });
 const clock = new THREE.Clock();
-(function loop(){ requestAnimationFrame(loop); if (mixer && params.get('play') === '1') { mixer.update(clock.getDelta()); status(); } render(); })();
+addEventListener('keydown', (e) => { if (!mixer) return; if (e.code === 'Space') { playing = !playing; e.preventDefault(); } const n = parseInt(e.key); if (n >= 1 && n <= clips.length) { setClip(clips[n-1].name); playing = true; } if (e.key === 'b') skel.visible = !skel.visible; status(); });
+(function loop(){ requestAnimationFrame(loop); const dt = clock.getDelta(); if (mixer && playing) { mixer.update(dt); status(); } controls.update(); render(); })();
 </script></body></html>
