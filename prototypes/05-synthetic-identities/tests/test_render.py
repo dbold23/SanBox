@@ -24,6 +24,7 @@ import numpy as np
 import pytest
 
 import module_r_fixtures as F
+import exclusions
 import render
 
 
@@ -333,6 +334,106 @@ def test_missing_exclusion_module_degrades_to_no_exclusion(monkeypatch):
     out = render.render([inst], cam, exclusion="auto")
     assert out["exclusion"].sum() == 0
     assert out["identity"].sum() > 0
+
+
+#: The yaml the DEFAULT ``exclusion="auto"`` path reads, resolved the same way
+#: the module resolves it -- the tests below compare against exactly the file
+#: the renderer used, not a second copy that could drift from it.
+_SCHEMA = render._default_schema_path()
+
+
+def test_default_exclusion_scores_no_pixel_of_any_region():
+    """The module guarantee, checked against the EXACT region test.
+
+    Not against the cell mask -- that would only re-assert the discretisation.
+    Every visible-skin pixel is asked ``exclusions.regions_contain(regions,
+    chart_s, chart_phi)``, i.e. is this pixel's own ``(s, phi)`` anatomically
+    inside an eye / naris / mouth / gill slit, and no such pixel may survive
+    into ``identity`` on the DEFAULT path.
+
+    Measured on this scene (256x256, fixture tube, ``exclusion="auto"``):
+    5468 visible-skin px, 918 of them inside a region, 0 leaks.  With the
+    UNDILATED mask -- what the default used to be -- 16 of those 918 escape
+    the exclusion mask and 5 reach the identity mask, which is why the second
+    half of this test exists: it fails if the dilation is removed.
+    """
+    _, inst = F.subject()
+    cam = F.side_camera(inst, resolution=(256, 256))
+    out = render.render([inst], cam, light=F.key_light(), exclusion="auto")
+
+    regions = exclusions.exclusion_regions(
+        exclusions.load_schema(_SCHEMA))
+    vis = out["visible_skin"] & np.isfinite(out["chart_s"])
+    in_region = vis & exclusions.regions_contain(
+        regions, np.where(vis, out["chart_s"], 0.0),
+        np.where(vis, out["chart_phi"], 0.0))
+    print("visible %d px, inside a region %d px, identity %d px"
+          % (vis.sum(), in_region.sum(), out["identity"].sum()))
+    assert in_region.sum() > 100                      # the regions are on screen
+    assert int((in_region & ~out["exclusion"]).sum()) == 0
+    assert int((in_region & out["identity"]).sum()) == 0
+
+    # ... and the check is not vacuous: the same scene WITHOUT the one-cell
+    # dilation does leak, so this test is measuring the fix, not the fixture.
+    raw = exclusions.build_exclusion_mask(_SCHEMA,
+                                          resolution=(128, 256))
+    undilated = render.render([inst], cam, light=F.key_light(),
+                              exclusion=(raw, "phi_major"))
+    print("undilated: %d px inside a region unexcluded, %d reach identity"
+          % ((in_region & ~undilated["exclusion"]).sum(),
+             (in_region & undilated["identity"]).sum()))
+    assert int((in_region & ~undilated["exclusion"]).sum()) > 0
+
+
+def test_the_collar_is_a_collar_not_a_blackout():
+    """One pixel outside every region, identity evidence still survives.
+
+    The dilation buys the guarantee with a half-cell collar of ordinary skin.
+    A collar that swallowed the neighbourhood would satisfy the leak test
+    vacuously, so: of the 149 visible pixels that are one pixel outside a
+    region and not inside one, 17 are still scored as identity here.
+    """
+    _, inst = F.subject()
+    cam = F.side_camera(inst, resolution=(256, 256))
+    out = render.render([inst], cam, light=F.key_light(), exclusion="auto")
+    regions = exclusions.exclusion_regions(
+        exclusions.load_schema(_SCHEMA))
+    vis = out["visible_skin"] & np.isfinite(out["chart_s"])
+    in_region = vis & exclusions.regions_contain(
+        regions, np.where(vis, out["chart_s"], 0.0),
+        np.where(vis, out["chart_phi"], 0.0))
+    ring = np.zeros_like(in_region)
+    ring[:-1] |= in_region[1:]
+    ring[1:] |= in_region[:-1]
+    ring[:, :-1] |= in_region[:, 1:]
+    ring[:, 1:] |= in_region[:, :-1]
+    ring &= vis & ~in_region
+    print("ring: %d px, %d of them identity" % (ring.sum(),
+                                                (ring & out["identity"]).sum()))
+    assert ring.sum() > 50
+    assert int((ring & out["identity"]).sum()) > 0
+    assert out["identity"].sum() > 500
+
+
+def test_auto_dilates_but_a_provided_mask_is_used_verbatim():
+    """Only the SCORING default is grown; an explicit mask is exact.
+
+    Spot PLACEMENT (``pattern.py``) must see the exact cell set -- a collar
+    there would push marks out of skin they are entitled to use -- so the
+    dilation lives on the ``"auto"`` path alone.
+    """
+    auto, order, note = render.resolve_exclusion_chart("auto")
+    raw = exclusions.build_exclusion_mask(_SCHEMA,
+                                          resolution=(128, 256))
+    assert order == "phi_major"
+    assert note.startswith("exclusions.")           # meta contract
+    assert "dilate" in note
+    assert np.array_equal(auto, render.dilate_chart_mask(raw, n_cells=1))
+    assert auto.sum() > raw.sum()                   # it really grew
+    passed, p_order, p_note = render.resolve_exclusion_chart((raw, "phi_major"))
+    assert np.array_equal(passed, raw) and p_order == "phi_major"
+    assert p_note == "provided"
+    assert np.array_equal(render.resolve_exclusion_chart(raw)[0], raw)
 
 
 def test_sample_chart_mask_is_nearest_wraps_phi_and_kills_nan():

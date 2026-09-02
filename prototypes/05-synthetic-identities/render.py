@@ -18,6 +18,16 @@ mask exact rather than heuristic: the chart-space exclusion regions from
 per-pixel chart ground truth, so no pixel of an eye is ever scored as
 identity evidence, at any pose, with no image-space eye detector.
 
+That guarantee is not free: the chart mask is CELL-CENTRE membership and it is
+sampled by NEAREST neighbour, which on its own leaks a half-cell sliver of
+every region (measured: 1.6% of eye pixels).  So the default ``"auto"``
+scoring mask is DILATED by one 8-connected cell -- see
+:func:`resolve_exclusion_chart` and :func:`dilate_chart_mask`.  The guarantee
+therefore holds in the conservative direction: a half-cell collar of ordinary
+skin around each region is excluded too.  An explicitly passed mask is used
+verbatim, so a caller that needs the exact cells (spot PLACEMENT) still gets
+them.
+
 THE IDENTITY MASK, in full::
 
     identity = visible_skin
@@ -82,6 +92,7 @@ __all__ = [
     "shadow_map",
     "sample_texture",
     "sample_chart_mask",
+    "dilate_chart_mask",
     "vertex_normals",
     "look_at_basis",
     "transform_instance",
@@ -666,6 +677,47 @@ def sample_chart_mask(mask, s, phi, axis_order="phi_major"):
     return np.asarray(vals, dtype=bool) & ok
 
 
+def dilate_chart_mask(mask, n_cells=1):
+    """Grow a ``(H_phi, W_s)`` boolean chart mask by ``n_cells`` in each
+    direction, with an 8-connected (full 3x3) structuring element.
+
+    WHY THIS EXISTS.  ``exclusions.mask_from_regions`` marks a chart CELL when
+    its CENTRE lies inside the region, and :func:`sample_chart_mask` then looks
+    the mask up by NEAREST neighbour (a boolean has no interpolant).  Composing
+    the two leaves a half-cell sliver along every region border where a pixel
+    is genuinely inside the anatomical region but its nearest cell centre is
+    outside it -- so the pixel is NOT excluded.  Measured before this fix, on
+    the 10x6 demo corpus: 62 of 3935 eye pixels (1.6%, at most 2 per frame)
+    reached the identity mask.  Small, but "the eye is excluded" is a
+    guarantee, and a guarantee with a 1.6% hole is not one.
+
+    The element is the FULL 3x3 neighbourhood, not the 4-connected cross:
+    nearest-neighbour lookup misplaces a point by up to half a cell in EACH
+    axis INDEPENDENTLY, so a point just inside a region's corner lands on the
+    DIAGONAL neighbour -- one cell away in both axes at once.  A cross-shaped
+    dilation misses exactly that case, and it was not hypothetical: with the
+    cross, one gill-slit pixel still leaked, sitting 0.17 cells past the ``s``
+    border and 0.17 cells past the ``phi`` border simultaneously.  One 3x3
+    dilation is then exactly enough.
+
+    The cost is a half-cell collar of ordinary skin around each region, which
+    is the right way to be wrong.
+
+    Rows are PERIODIC (``phi`` wraps at +-pi) and columns are CLAMPED (``s``
+    does not), matching the chart convention.
+    """
+    m = np.asarray(mask, dtype=bool)
+    for _ in range(int(n_cells)):
+        # Separable: dilate along s, then along phi.  Composing the two 1-D
+        # dilations gives the 3x3 element (a single pass over the union of
+        # both axes would give only the 4-connected cross).
+        cols = m.copy()
+        cols[:, :-1] |= m[:, 1:]          # s: clamped at both ends
+        cols[:, 1:] |= m[:, :-1]
+        m = cols | np.roll(cols, 1, axis=0) | np.roll(cols, -1, axis=0)
+    return m
+
+
 def resolve_exclusion_chart(exclusion, resolution=(128, 256)):
     """Normalise the ``exclusion`` argument of :func:`render`.
 
@@ -673,14 +725,31 @@ def resolve_exclusion_chart(exclusion, resolution=(128, 256)):
       * ``None``  -- no exclusion (identity mask keeps eyes; only sensible for
         a geometry test);
       * ``"auto"`` -- build it LAZILY from ``exclusions.build_exclusion_mask``
-        against the Schema S1 yaml.  If that import fails (module not present,
-        yaml missing) this returns ``None`` and the caller carries on with no
-        exclusion rather than failing the render -- module R must not be
-        blocked on module P.  The reason is returned for ``meta``;
+        against the Schema S1 yaml, then GROW IT BY ONE CELL with
+        :func:`dilate_chart_mask` (see below).  If that import fails (module
+        not present, yaml missing) this returns ``None`` and the caller carries
+        on with no exclusion rather than failing the render -- module R must
+        not be blocked on module P.  The reason is returned for ``meta``;
       * a 2-D boolean array in ``(H_phi, W_s)`` layout;
       * ``(array, axis_order)``.
 
     Returns ``(mask_or_None, axis_order, note)``.
+
+    WHY ``"auto"`` DILATES, AND WHY ONLY ``"auto"``.  The module guarantee is
+    that no pixel of an eye is ever scored as identity evidence.  A raw
+    ``mask_from_regions`` cannot deliver it: that mask is cell-centre
+    membership and :func:`sample_chart_mask` reads it by nearest neighbour, so
+    a pixel up to half a cell inside a region border can land on a cell centre
+    outside it and survive into the identity mask (measured: 1.6% of eye
+    pixels).  Growing the SCORING mask by one 8-connected cell closes that
+    hole, at the price of a HALF-CELL COLLAR of ordinary skin excluded around
+    every region -- deliberately conservative, and the right direction to be
+    wrong in: it costs a sliver of scorable skin, never a scored eye.
+
+    A mask passed in EXPLICITLY (array or ``(array, order)``) is used exactly
+    as given.  Callers that need the exact cell set -- spot PLACEMENT in
+    ``pattern.py``, which must not be pushed out of a region it is entitled to
+    use -- pass their own mask and get no collar.
     """
     if exclusion is None:
         return None, "phi_major", "none"
@@ -696,7 +765,9 @@ def resolve_exclusion_chart(exclusion, resolution=(128, 256)):
                                              if hasattr(_exc, "DEFAULT_SCHEMA_PATH")
                                              else _default_schema_path(),
                                              resolution=resolution)
-            return np.asarray(mask, dtype=bool), "phi_major", "exclusions.build_exclusion_mask"
+            mask = dilate_chart_mask(np.asarray(mask, dtype=bool), n_cells=1)
+            return (mask, "phi_major",
+                    "exclusions.build_exclusion_mask + dilate_chart_mask(1)")
         except Exception as exc:                      # pragma: no cover - env dependent
             return None, "phi_major", "unavailable: %s: %s" % (type(exc).__name__, exc)
     return np.asarray(exclusion, dtype=bool), "phi_major", "provided"

@@ -304,3 +304,24 @@ def test_drift_params_replace_and_validation():
     with pytest.raises(TypeError):
         dp.replace(not_a_field=1)
     assert "jitter_rate" in dp.as_dict()
+
+
+def test_default_jitter_rate_is_exactly_what_the_calibration_returns():
+    """The documented calibration must REPRODUCE, not merely be plausible.
+
+    ``DEFAULT_JITTER_RATE`` is licensed by one thing: the bisection in
+    :func:`drift.calibrate_jitter_rate`.  Every rng inside it is seeded, so a
+    re-run is bit-for-bit reproducible and the constant can be asserted
+    EXACTLY -- if it drifts from the function's output (as it had, 0.001244
+    documented against 0.0012828125 returned), the provenance comment is
+    fiction and this test says so.  Re-running the calibration is also the
+    only sanctioned way to change the constant.
+
+    ~10 s: 8 bisection steps x 6 individuals x 2 intervals at 192x384.
+    """
+    rate, ratio = D.calibrate_jitter_rate()
+    assert rate == D.DEFAULT_JITTER_RATE
+    # the loop stops at the first rate INSIDE tol, so the band is the contract
+    assert abs(ratio - D.MELOPS_RATIO) <= 0.004
+    print("calibrate_jitter_rate() -> rate %.10g, ratio %.10g (target %.10g)"
+          % (rate, ratio, D.MELOPS_RATIO))

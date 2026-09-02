@@ -101,19 +101,33 @@ MELOPS_RATIO = MELOPS_SIMILARITY_FAR / MELOPS_SIMILARITY_NEAR  # 0.7835
 #
 # HOW THIS DEFAULT WAS CHOSEN: calibrate_jitter_rate() bisects on the rate
 # until the mean chart NCC ratio similarity(t=730 d) / similarity(t=30 d),
-# over 6 seeded individuals at 192x384 with default PatternParams, equals
-# MELOPS_RATIO = 0.784. Re-run it after ANY change to the default spot size,
-# density or rendering:
+# over 6 seeded individuals at 192x384 with default PatternParams, is within
+# tol=0.004 of MELOPS_RATIO = 0.7835. Re-run it after ANY change to the
+# default spot size, density or rendering:
 #     python -c "import drift; print(drift.calibrate_jitter_rate())"
-# The bisection above returned rate 0.001244 -> ratio 0.786 (target 0.784) on
-# 2026-09-01 with the defaults in this file. 0.00124 s-units/sqrt(yr) is
-# 0.31 cm/sqrt(yr) at 250 cm TL: a mark wanders ~0.44 cm in two years, about
-# a third of its own 1.4 cm radius. Contrast fade and new scars carry the
-# rest of the decay.
+# VERBATIM OUTPUT of that bisection on 2026-09-02 with the defaults in this
+# file (calibrate_jitter_rate(verbose=True)):
+#     bracket: rate 0.00020 -> ratio 0.9230 | rate 0.02000 -> ratio 0.2005
+#       rate 0.01010 -> ratio 0.1808
+#       rate 0.00515 -> ratio 0.3258
+#       rate 0.00267 -> ratio 0.5634
+#       rate 0.00144 -> ratio 0.7537
+#       rate 0.00082 -> ratio 0.8521
+#       rate 0.00113 -> ratio 0.8040
+#       rate 0.00128 -> ratio 0.7797
+#     (0.0012828125, 0.7796889708078755)
+# The constant below is that returned rate EXACTLY -- it is a bisection
+# midpoint, so it is exactly representable and the function reproduces it
+# bit-for-bit (asserted in tests/test_drift.py). The bisection stops at the
+# first rate inside tol, so the achieved 0.7797 is 0.0038 below the 0.7835
+# target, not a converged root.
+# 0.0012828 s-units/sqrt(yr) is 0.32 cm/sqrt(yr) at 250 cm TL: a mark wanders
+# ~0.45 cm in two years, about a third of its own 1.4 cm radius. Contrast fade
+# and new scars carry the rest of the decay.
 # [CALIBRATED against a ratio, not measured. No sevengill mark-displacement
 # measurement exists; the campaign's own note is that no quantified per-year
 # mark-change rate exists for ANY shark species.]
-DEFAULT_JITTER_RATE = 0.001244
+DEFAULT_JITTER_RATE = 0.0012828125
 
 
 class GrowthModel(object):
@@ -460,6 +474,12 @@ def calibrate_jitter_rate(target_ratio=None, n_individuals=6,
     ``mean similarity(far_days) / mean similarity(near_days)`` over
     ``n_individuals`` seeded animals, and the target defaults to
     :data:`MELOPS_RATIO` = 0.784, the Melops true-mate decay 0.605 -> 0.474.
+
+    Deterministic: every individual and every resight rng is seeded, so a
+    re-run returns :data:`DEFAULT_JITTER_RATE` bit-for-bit (the verbatim
+    bisection log is quoted above that constant, and reproducing it is a test).
+    The loop stops at the FIRST rate within ``tol`` of the target, so the
+    returned ratio is inside the tolerance band, not a converged root.
 
     This function is how :data:`DEFAULT_JITTER_RATE` was chosen, and it is
     the only thing that licenses that constant. It is a CALIBRATION to a
