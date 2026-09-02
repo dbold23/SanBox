@@ -1,0 +1,69 @@
+/Volumes/External Dive 2TB/projects/marine-cv/7Gill/.claude/worktrees/melops-ablation-vast-gpu-6d469d/prototypes/04-sevengill-rig/mesh3d.py:1012: RuntimeWarning: detect_fins: 2 disjoint islands classify as 'anal' and their station ranges do not touch, so they are not one fin: keeping the one closest to the anatomical prior (5372 verts, stations 51-56, s 0.813-0.892) and demoting 93 verts, stations 0-0, s 0.014-0.016 to 'unassigned_island_*' entries whose vertices stay labelled 'body'.  An unexpected lump, a fin far from its prior, or a flipped up vector all look like this.
+  det = detect_fins(mesh, coords, check=False)
+/Volumes/External Dive 2TB/projects/marine-cv/7Gill/.claude/worktrees/melops-ablation-vast-gpu-6d469d/prototypes/04-sevengill-rig/mesh3d.py:1012: RuntimeWarning: detect_fins: 2 disjoint islands classify as 'caudal_upper' and their station ranges do not touch, so they are not one fin: keeping the one closest to the anatomical prior (29604 verts, stations 59-62, s 0.944-1.364) and demoting 10 verts, stations 57-57, s 0.905-0.907 to 'unassigned_island_*' entries whose vertices stay labelled 'body'.  An unexpected lump, a fin far from its prior, or a flipped up vector all look like this.
+  det = detect_fins(mesh, coords, check=False)
+/Volumes/External Dive 2TB/projects/marine-cv/7Gill/.claude/worktrees/melops-ablation-vast-gpu-6d469d/prototypes/04-sevengill-rig/mesh3d.py:1012: RuntimeWarning: detect_fins: 2 disjoint islands classify as 'pectoral_R' and their station ranges do not touch, so they are not one fin: keeping the one closest to the anatomical prior (45600 verts, stations 13-19, s 0.208-0.312) and demoting 1511 verts, stations 0-0, s -0.003-0.016 to 'unassigned_island_*' entries whose vertices stay labelled 'body'.  An unexpected lump, a fin far from its prior, or a flipped up vector all look like this.
+  det = detect_fins(mesh, coords, check=False)
+/Volumes/External Dive 2TB/projects/marine-cv/7Gill/.claude/worktrees/melops-ablation-vast-gpu-6d469d/prototypes/04-sevengill-rig/rig_sevengill.py:438: RuntimeWarning: estimate_roll: the body is rolled about its own axis by -138.8 deg end to end (-5.044 rad per unit s, r2 0.76), past the 0.35 rad threshold.  De-bending preserves (r, phi) by contract, so it will straighten this body and leave it just as rolled; the fin priors and the joint schema both assume an unrolled body, so fins will drift across phi sectors and can be mis-named.  Fix it upstream: pre-unroll the mesh before charting, or supply a per-station up (a twisting frame field), which this module does not implement.
+  straight_mesh, straight_centerline = mesh3d.debend(mesh, centerline, frames)
+/Volumes/External Dive 2TB/projects/marine-cv/7Gill/.claude/worktrees/melops-ablation-vast-gpu-6d469d/prototypes/04-sevengill-rig/rig_sevengill.py:450: RuntimeWarning: detect_fins: 2 disjoint islands classify as 'anal' and their station ranges do not touch, so they are not one fin: keeping the one closest to the anatomical prior (5372 verts, stations 51-56, s 0.813-0.892) and demoting 93 verts, stations 0-0, s 0.014-0.016 to 'unassigned_island_*' entries whose vertices stay labelled 'body'.  An unexpected lump, a fin far from its prior, or a flipped up vector all look like this.
+  detection = mesh3d.detect_fins(straight_mesh, straight_coords)
+/Volumes/External Dive 2TB/projects/marine-cv/7Gill/.claude/worktrees/melops-ablation-vast-gpu-6d469d/prototypes/04-sevengill-rig/rig_sevengill.py:450: RuntimeWarning: detect_fins: 2 disjoint islands classify as 'caudal_upper' and their station ranges do not touch, so they are not one fin: keeping the one closest to the anatomical prior (29528 verts, stations 59-62, s 0.944-1.364) and demoting 10 verts, stations 57-57, s 0.905-0.907 to 'unassigned_island_*' entries whose vertices stay labelled 'body'.  An unexpected lump, a fin far from its prior, or a flipped up vector all look like this.
+  detection = mesh3d.detect_fins(straight_mesh, straight_coords)
+/Volumes/External Dive 2TB/projects/marine-cv/7Gill/.claude/worktrees/melops-ablation-vast-gpu-6d469d/prototypes/04-sevengill-rig/rig_sevengill.py:450: RuntimeWarning: detect_fins: 2 disjoint islands classify as 'pectoral_R' and their station ranges do not touch, so they are not one fin: keeping the one closest to the anatomical prior (45519 verts, stations 13-21, s 0.208-0.334) and demoting 1511 verts, stations 0-0, s -0.003-0.016 to 'unassigned_island_*' entries whose vertices stay labelled 'body'.  An unexpected lump, a fin far from its prior, or a flipped up vector all look like this.
+  detection = mesh3d.detect_fins(straight_mesh, straight_coords)
+pipeline recomputed in 29 s
+/private/tmp/claude-501/-Volumes-External-Dive-2TB-projects-marine-cv-7Gill/6ea43ccf-094b-451b-9425-8952dbdf19df/scratchpad/verify_rig_real_v10.py:52: ResourceWarning: unclosed file <_io.TextIOWrapper name='results/real_v10/check/as_scanned_surface_check.json' mode='w' encoding='utf-8'>
+  json.dump(summary, open(os.path.join(OUT, "as_scanned_surface_check.json"), "w"), indent=2)
+ResourceWarning: Enable tracemalloc to get the object allocation traceback
+{
+  "chart_length_m": 0.4803003498178298,
+  "voxel_pitch_m": 0.0034000356681644917,
+  "straight_x_extent_m_BL": 0.6820039200880954,
+  "n_vertices": 1013814,
+  "n_body_vertices": 876354,
+  "as_scanned_spine_joint_error_max_m": 0.0008423357215027048,
+  "as_scanned_spine_joint_error_max_BL": 0.0012350892666333929,
+  "as_scanned_surface_rms_m": 0.005146678860511963,
+  "as_scanned_surface_max_m": 0.019698133866243615,
+  "as_scanned_surface_rms_pct_BL": 0.7546406565884781,
+  "as_scanned_surface_max_pct_BL": 2.8882728216135733,
+  "as_scanned_surface_rms_pct_BL_body_only": 0.45764244180688,
+  "as_scanned_surface_max_pct_BL_body_only": 2.1490622408821025,
+  "as_scanned_surface_rms_px": 1.5137131968060782,
+  "rest_extents_m": [
+    0.6820039200880954,
+    0.23015292080751065,
+    0.10763928511638596
+  ],
+  "scan_extents_m": [
+    0.3571882098913193,
+    0.12000000476837158,
+    0.43520456552505493
+  ],
+  "label_counts": {
+    "anal": 5372,
+    "body": 876354,
+    "caudal_lower": 3492,
+    "caudal_upper": 29528,
+    "dorsal": 11073,
+    "pectoral_L": 36674,
+    "pectoral_R": 45519,
+    "pelvic_L": 3031,
+    "pelvic_R": 2771
+  },
+  "timings_s": {
+    "load": 5.380793809890747,
+    "centerline": 0.7551860809326172,
+    "debend": 14.832017183303833,
+    "fins": 4.862483978271484,
+    "rig": 2.6561100482940674,
+    "motion": 0.005749940872192383
+  }
+}
+wrote results/real_v10/check/labels_rest_side_XZ.png
+wrote results/real_v10/check/labels_rest_top_XY.png
+wrote results/real_v10/check/labels_rest_front_YZ.png
+wrote results/real_v10/check/labels_scan_side_XY.png
+wrote results/real_v10/check/labels_scan_top_XZ.png
+done in 52 s

@@ -429,7 +429,22 @@ def fin_info_from_detection(fins, vertices, centerline=None):
                 # quartile that defines the insertion can sit mid-lobe, and the
                 # farthest vertex from there is the base, pointing the bone
                 # forward.)
-                tip = members[int(np.argmax((members - foot) @ tang))]
+                axial = (members - foot) @ tang
+                tip = members[int(np.argmax(axial))]
+                # ...and its ROOT must be where the lobe leaves the peduncle.
+                # A mid-lobe root turns the fin drive into a lever: the part of
+                # the lobe ahead of the root swings against the body and tears
+                # away as thin slivers.  When the island is a true lobe (axial
+                # extent >= 2x its radial extent) and the detected insertion is
+                # not within the anterior quarter of it, the root is moved to the
+                # centroid of the anterior 15% of the lobe.
+                a_lo, a_hi = float(axial.min()), float(axial.max())
+                rel = members - foot
+                radial_ext = float(np.ptp(np.linalg.norm(rel - np.outer(axial, tang), axis=1)))
+                a_ins = float((insertion - foot) @ tang)
+                if (a_hi - a_lo) >= 2.0 * max(radial_ext, 1e-9) and a_ins > a_lo + 0.25 * (a_hi - a_lo):
+                    slab = members[axial <= a_lo + 0.15 * (a_hi - a_lo)]
+                    insertion = slab.mean(axis=0)
             elif norm > 1e-9:
                 u = radial / norm
                 rel = members - foot

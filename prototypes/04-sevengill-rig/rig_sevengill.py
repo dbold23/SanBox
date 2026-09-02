@@ -320,6 +320,42 @@ def clip_for_mode(mskel, mode, fps=30.0, seconds=4.0, seed=0):
 # ---------------------------------------------------------------------------
 # The pipeline
 # ---------------------------------------------------------------------------
+#: A caudal island whose axial extent is at least this many times its radial
+#: extent is a LOBE (the real heterocercal upper lobe: 0.19 m long, 0.05 m
+#: tall), not a blade.  Driven as a fin about a root joint it tears against
+#: the peduncle -- a mid-lobe root levers its front half against the body, a
+#: base root shears its underside -- so a lobe is folded into the body and
+#: rides the last two spine joints.
+LOBE_ASPECT = 2.0
+
+
+def fold_caudal_lobes(fin_info, labels, fins, vertices, centerline, force=False):
+    """Drop caudal fins that are lobes from ``fin_info`` and relabel their
+    vertices ``body``.  Returns ``(fin_info, labels, [(name, aspect), ...])``.
+    ``force`` folds every caudal fin regardless of shape."""
+    verts = np.asarray(vertices, dtype=float)
+    labels = np.asarray(labels).astype(str).copy()
+    out = dict(fin_info)
+    folded = []
+    for name in list(out):
+        if not name.startswith("caudal") or name not in fins:
+            continue
+        members = np.asarray(fins[name]["vertex_indices"], dtype=int)
+        if len(members) == 0:
+            continue
+        foot, tang = rig._axis_frame_at(np.asarray(fins[name]["insertion_centroid"], dtype=float),
+                                        centerline)
+        rel = verts[members] - foot
+        axial = rel @ tang
+        radial = np.linalg.norm(rel - np.outer(axial, tang), axis=1)
+        aspect = float(np.ptp(axial)) / max(float(np.ptp(radial)), 1e-9)
+        if force or aspect >= LOBE_ASPECT:
+            out.pop(name)
+            labels[members] = "body"
+            folded.append((name, aspect))
+    return out, labels, folded
+
+
 def run_pipeline(
     glb,
     out=None,
@@ -331,6 +367,7 @@ def run_pipeline(
     up=(0.0, 0.0, 1.0),
     core_radius_frac=0.17,
     hook_turn_mult=3.0,
+    caudal_lobes="fins",
     sigma=None,
     fin_blend_rings=rig.DEFAULT_FIN_BLEND_RINGS,
     precaudal_fraction=rig.DEFAULT_PRECAUDAL_FRACTION,
@@ -350,6 +387,11 @@ def run_pipeline(
         voxel_pitch: None = ``max(extents)/128``.
         n_stations: chart resolution.
         up: the input mesh's DORSAL direction.  Load-bearing; see the module docstring.
+        caudal_lobes: ``"fins"`` (default) keeps every caudal island as a driven
+            fin, as the synthetic fixture expects; ``"auto"`` folds a caudal
+            island that is a lobe (see ``LOBE_ASPECT``) into the body so it
+            rides the last spine joints -- what a scanned heterocercal tail
+            needs; ``"body"`` folds them all.
         core_radius_frac: thick-core threshold that keeps the medial path out of the
             fins.  Must sit between fin half-thickness and peduncle radius.
         sigma: Gaussian weight falloff width in world units; None = two-joint
@@ -414,11 +456,21 @@ def run_pipeline(
     fin_info = rig.fin_info_from_detection(
         detection.fins, straight_mesh.vertices, centerline=straight_centerline
     )
+    labels = np.asarray(detection.labels).astype(str)
+    if caudal_lobes == "body" or caudal_lobes == "auto":
+        fin_info, labels, folded = fold_caudal_lobes(
+            fin_info, labels, detection.fins, straight_mesh.vertices, straight_centerline,
+            force=(caudal_lobes == "body"))
+        for name, ratio in folded:
+            log("caudal: %s is a lobe (axial/radial extent %.1f); it rides the last spine "
+                "joints as body, no fin joints" % (name, ratio))
+        if folded:
+            detection = detection._replace(labels=labels)
     skeleton = rig.build_skeleton(
         straight_centerline, fin_info, precaudal_fraction=precaudal_fraction
     )
     weights = rig.compute_weights(
-        straight_mesh.vertices, detection.labels, skeleton, sigma=sigma,
+        straight_mesh.vertices, labels, skeleton, sigma=sigma,
         faces=straight_mesh.faces, fin_blend_rings=fin_blend_rings,
     )
     timings["rig"] = time.time() - t0
@@ -839,6 +891,10 @@ def build_parser():
     ap.add_argument("-n", "--n-stations", type=int, default=64)
     ap.add_argument("--up", type=float, nargs=3, default=(0.0, 0.0, 1.0),
                     help="DORSAL direction of the input mesh (default +Z)")
+    ap.add_argument("--caudal-lobes", choices=("fins", "auto", "body"), default="fins",
+                    help="fins (default): every caudal island is a driven fin; auto: a caudal island "
+                         "that is a lobe (axial >= %.0fx radial extent) rides the spine as body instead, "
+                         "a blade keeps its fin joints; body: fold them all" % LOBE_ASPECT)
     ap.add_argument("--hook-turn-mult", type=float, default=3.0,
                     help="trim a terminal hook whose sagittal turn per station exceeds this "
                          "multiple of the body's median (and 5 deg); 0 disables")
@@ -875,6 +931,7 @@ def main(argv=None):
         up=tuple(args.up),
         core_radius_frac=args.core_radius_frac,
         hook_turn_mult=args.hook_turn_mult,
+        caudal_lobes=args.caudal_lobes,
         sigma=args.sigma,
         fin_blend_rings=args.fin_blend_rings,
         precaudal_fraction=args.precaudal_fraction,

@@ -144,7 +144,6 @@
  "fin_parents": {
   "anal": "spine_11_caudal_axis_1",
   "caudal_lower": "spine_12_caudal_axis_2",
-  "caudal_upper": "spine_12_caudal_axis_2",
   "dorsal": "spine_10_precaudal",
   "pectoral_L": "spine_05_trunk_03",
   "pectoral_R": "spine_05_trunk_03",
@@ -163,41 +162,37 @@
    15,
    16
   ],
-  "caudal_upper": [
+  "dorsal": [
    17,
    18
   ],
-  "dorsal": [
+  "pectoral_L": [
    19,
    20
   ],
-  "pectoral_L": [
+  "pectoral_R": [
    21,
    22
   ],
-  "pectoral_R": [
+  "pelvic_L": [
    23,
    24
   ],
-  "pelvic_L": [
+  "pelvic_R": [
    25,
    26
   ],
-  "pelvic_R": [
+  "unassigned_island_0": [
    27,
    28
   ],
-  "unassigned_island_0": [
+  "unassigned_island_1": [
    29,
    30
   ],
-  "unassigned_island_1": [
+  "unassigned_island_2": [
    31,
    32
-  ],
-  "unassigned_island_2": [
-   33,
-   34
   ]
  },
  "fractions": [
@@ -214,8 +209,6 @@
   0.78,
   0.868,
   0.956,
-  NaN,
-  NaN,
   NaN,
   NaN,
   NaN,
@@ -322,16 +315,6 @@
    -0.25571062521300475,
    -0.00014642675664036347,
    -0.030858319553548834
-  ],
-  [
-   -0.32364119157164256,
-   0.017041349923720615,
-   0.023697554785899244
-  ],
-  [
-   -0.41512661135353324,
-   0.0613321718918804,
-   0.010393472146849745
   ],
   [
    -0.15560722079468445,
@@ -447,8 +430,6 @@
   "fin_root",
   "fin_tip",
   "fin_root",
-  "fin_tip",
-  "fin_root",
   "fin_tip"
  ],
  "names": [
@@ -469,8 +450,6 @@
   "anal_fin_tip",
   "caudal_lower_fin_root",
   "caudal_lower_fin_tip",
-  "caudal_upper_fin_root",
-  "caudal_upper_fin_tip",
   "dorsal_fin_root",
   "dorsal_fin_tip",
   "pectoral_L_fin_root",
@@ -488,7 +467,7 @@
   "unassigned_island_2_fin_root",
   "unassigned_island_2_fin_tip"
  ],
- "num_joints": 35,
+ "num_joints": 33,
  "num_spine_joints": 13,
  "parents": [
   -1,
@@ -508,23 +487,21 @@
   13,
   12,
   15,
-  12,
-  17,
   10,
+  17,
+  5,
   19,
   5,
   21,
-  5,
-  23,
   9,
-  25,
+  23,
   10,
+  25,
+  0,
   27,
   0,
   29,
-  0,
-  31,
   11,
-  33
+  31
  ]
 }

@@ -1,16 +1,16 @@
 {
  "influences_histogram": {
-  "1": 124791,
-  "2": 885170,
-  "3": 3853
+  "1": 151341,
+  "2": 858719,
+  "3": 3754
  },
  "max_influences": 3,
- "mean_influences": 1.8807098738032815,
+ "mean_influences": 1.8544239870429882,
  "row_sum_max": 1.0000000000000002,
  "row_sum_min": 0.9999999999999999,
  "shape": [
   1013814,
-  35
+  33
  ],
  "unweighted_joints": [
   "unassigned_island_0_fin_root",
@@ -25,8 +25,6 @@
   "anal_fin_tip": 2501.4311506793724,
   "caudal_lower_fin_root": 1659.5256818155171,
   "caudal_lower_fin_tip": 2108.1409848511526,
-  "caudal_upper_fin_root": 16476.532368516797,
-  "caudal_upper_fin_tip": 13746.800964816639,
   "dorsal_fin_root": 7822.615948528353,
   "dorsal_fin_tip": 3642.7173848050074,
   "pectoral_L_fin_root": 24281.21700347747,
@@ -48,8 +46,8 @@
   "spine_08_trunk_06": 73930.27931681198,
   "spine_09_trunk_07": 73120.87964459923,
   "spine_10_precaudal": 59535.57118847403,
-  "spine_11_caudal_axis_1": 41134.04244823653,
-  "spine_12_caudal_axis_2": 88979.55056538725,
+  "spine_11_caudal_axis_1": 41146.11712960141,
+  "spine_12_caudal_axis_2": 119190.80921735556,
   "unassigned_island_0_fin_root": 0.0,
   "unassigned_island_0_fin_tip": 0.0,
   "unassigned_island_1_fin_root": 0.0,

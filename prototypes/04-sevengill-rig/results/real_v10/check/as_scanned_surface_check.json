@@ -6,13 +6,13 @@
   "n_body_vertices": 876354,
   "as_scanned_spine_joint_error_max_m": 0.0008423357215027048,
   "as_scanned_spine_joint_error_max_BL": 0.0012350892666333929,
-  "as_scanned_surface_rms_m": 0.0051466773611484155,
-  "as_scanned_surface_max_m": 0.019698134062109407,
-  "as_scanned_surface_rms_pct_BL": 0.7546404367417142,
-  "as_scanned_surface_max_pct_BL": 2.888272850332733,
-  "as_scanned_surface_rms_pct_BL_body_only": 0.4576423109359908,
-  "as_scanned_surface_max_pct_BL_body_only": 2.1490623001885925,
-  "as_scanned_surface_rms_px": 1.5137127558214258,
+  "as_scanned_surface_rms_m": 0.005146678860511963,
+  "as_scanned_surface_max_m": 0.019698133866243615,
+  "as_scanned_surface_rms_pct_BL": 0.7546406565884781,
+  "as_scanned_surface_max_pct_BL": 2.8882728216135733,
+  "as_scanned_surface_rms_pct_BL_body_only": 0.45764244180688,
+  "as_scanned_surface_max_pct_BL_body_only": 2.1490622408821025,
+  "as_scanned_surface_rms_px": 1.5137131968060782,
   "rest_extents_m": [
     0.6820039200880954,
     0.23015292080751065,
@@ -35,11 +35,11 @@
     "pelvic_R": 2771
   },
   "timings_s": {
-    "load": 5.363422155380249,
-    "centerline": 0.6772017478942871,
-    "debend": 13.240823030471802,
-    "fins": 4.694892883300781,
-    "rig": 2.5350236892700195,
-    "motion": 0.006064176559448242
+    "load": 5.380793809890747,
+    "centerline": 0.7551860809326172,
+    "debend": 14.832017183303833,
+    "fins": 4.862483978271484,
+    "rig": 2.6561100482940674,
+    "motion": 0.005749940872192383
   }
 }

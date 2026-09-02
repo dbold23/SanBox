@@ -623,3 +623,24 @@ def test_tip_of_a_long_low_fin_is_its_apex():
         fin_info = rig.fin_info_from_detection(
             {"caudal_upper": {"insertion_centroid": ins, "vertex_indices": np.arange(50)}}, caudal)
         assert fin_info["caudal_upper"]["tip"][0] == pytest.approx(-0.30)
+        # the root of a lobe is where it leaves the peduncle (its anterior end,
+        # x ~ -0.20), wherever the detector's innermost-radius quartile put it
+        assert fin_info["caudal_upper"]["insertion"][0] > -0.215
+
+
+def test_fold_caudal_lobes_folds_a_lobe_and_keeps_a_blade():
+    import rig_sevengill
+    cl = np.column_stack([np.linspace(0.3, -0.3, 13), np.zeros(13), np.zeros(13)])
+    lobe = np.column_stack([np.linspace(-0.30, -0.49, 60), np.zeros(60), np.linspace(0.01, 0.05, 60)])
+    blade = np.column_stack([np.full(40, -0.30), np.zeros(40), np.linspace(0.02, 0.09, 40)])
+    verts = np.vstack([lobe, blade])
+    fins = {"caudal_upper": {"insertion_centroid": lobe[0], "vertex_indices": np.arange(60)},
+            "caudal_lower": {"insertion_centroid": blade[0], "vertex_indices": 60 + np.arange(40)}}
+    fin_info = rig.fin_info_from_detection(fins, verts, centerline=cl)
+    labels = np.array(["caudal_upper"] * 60 + ["caudal_lower"] * 40)
+    out, new_labels, folded = rig_sevengill.fold_caudal_lobes(fin_info, labels, fins, verts, cl)
+    assert [n for n, _ in folded] == ["caudal_upper"]
+    assert "caudal_upper" not in out and "caudal_lower" in out
+    assert set(new_labels[:60]) == {"body"} and set(new_labels[60:]) == {"caudal_lower"}
+    out, new_labels, folded = rig_sevengill.fold_caudal_lobes(fin_info, labels, fins, verts, cl, force=True)
+    assert set(n for n, _ in folded) == {"caudal_upper", "caudal_lower"} and not out
