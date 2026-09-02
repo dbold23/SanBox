@@ -26,21 +26,39 @@ dorsal, phi = +90 deg is the animal's left flank, phi = 180 deg is ventral.
 
 Invertibility contract
 ----------------------
-``tube_coords`` returns the *station index* alongside (s, r, phi) precisely so
-that ``tube_to_points`` is an exact inverse.  The foot point is an unclamped
+The chart is not the station polyline: ``tube_coords`` charts on a clamped
+cubic B-spline *approximant* of the stations, resampled to ``DEFAULT_UPSAMPLE``
+dense segments per station segment (``densify_centerline``), which cuts the
+per-corner ``r x turn`` step -- a seam line on the body, a terrace on a fin --
+by the same factor.  It returns the *dense segment index* (``segment``)
+alongside (s, r, phi) precisely so that ``tube_to_points`` is an exact inverse;
+``station`` is derived from ``s`` for the envelope and fin detection.  ``s`` is
+reported in the station chord length, so ``total_length`` and every fraction
+downstream are unchanged by the upsample.  The foot point is an unclamped
 orthogonal projection onto the chosen segment, which lets a point sit beyond
 either end of the chart (a snout tip ahead of s = 0, a caudal lobe behind
 s = S); those overhangs are transported rigidly by the terminal frame, which is
-what preserves a heterocercal tail through a de-bend.  Recovering the segment
-from ``s`` alone would be ambiguous at corners, hence the explicit index.
+what preserves a heterocercal tail through a de-bend.
+
+Fins are carried, not charted
+-----------------------------
+A blade on the inside of a bend spans more arc length than its base, so charted
+through the tube it comes out stretched (2.9x on a 25% sagitta C-curve) and
+the outside one compressed.  ``map_mesh`` -- the transport behind ``debend``,
+``rebend`` and ``synth.bend`` -- therefore carries every island ``detect_fins``
+finds on the source mesh as a rigid body in the frame at its insertion, blended
+into the charted position by a smoothstep of (r - threshold) over half a body
+radius above the root.  The records are kept in ``metadata["rigid_islands"]``
+(with the centerline they belong to) so ``rebend`` inverts the same transport
+exactly for body and fully rigid blade vertices.
 
 Body roll is measured, not corrected
 ------------------------------------
 ``phi`` is seeded once, by ``up``, and the rotation-minimising frames carry that
 seed down the body without twist.  So if the *mesh* is rolled about its own axis
 -- a scan whose dorsal ridge spirals, or a body whose true up varies per station
--- the chart inherits the roll, and because ``debend`` preserves ``(r, phi)`` by
-contract the de-bent rest pose is straight but still rolled.  Both the fin
+-- the chart inherits the roll, and because ``debend`` preserves ``(r, phi)`` for
+body vertices by contract the de-bent rest pose is straight but still rolled.  Both the fin
 priors above and the rig's joint schema assume an unrolled body, so a large roll
 drifts fins across phi sectors and mis-names them.  ``estimate_roll`` measures
 the drift and ``debend`` warns once it exceeds ``_ROLL_WARN_RAD`` over the body;
@@ -84,6 +102,10 @@ __all__ = [
     "tube_coords",
     "tube_to_points",
     "map_points",
+    "map_mesh",
+    "densify_centerline",
+    "DEFAULT_UPSAMPLE",
+    "trim_end_hooks",
     "debend",
     "rebend",
     "detect_fins",
@@ -113,9 +135,9 @@ FIN_LABELS = (
 # ventrolaterally around |phi| ~ 140 deg and must not be mistaken for the anal.
 _PHI_DORSAL = 45.0
 _PHI_VENTRAL = 160.0
-# An island is caudal if it is the posterior-most median island in its sector
-# AND its centroid lies past this fraction of the chart.  The sevengill dorsal
-# sits at s ~ 0.75 and the caudal root at s ~ 0.95, so 0.85 separates them.
+# An island is caudal when it BEGINS (5th percentile of s) past this fraction
+# of the chart, whatever its phi sector -- nothing paired exists behind the
+# peduncle.  Islands that start earlier are dorsal/anal/pectoral/pelvic.
 _CAUDAL_S_MIN = 0.85
 # Pectoral/pelvic split for lateral islands.
 _PECTORAL_S_MAX = 0.50
@@ -355,6 +377,47 @@ def _smooth(path, window):
     )
 
 
+def trim_end_hooks(centerline, up=(0.0, 0.0, 1.0), turn_mult=3.0, window_frac=0.05,
+                   min_deg=5.0, n_stations=None):
+    """Cut a medial path that climbs into a fin on its last stations.
+
+    The medial path of a heterocercal tail can leave the peduncle and run up
+    into the upper caudal lobe for its last few stations.  Straightening that
+    hook removes a pitch the body never had, and the caudal (carried rigidly by
+    the terminal frame) comes out pointing down.  A hook is a *sagittal* turn:
+    the tangent pitches toward the dorsal normal.  A swimming animal's tail
+    flex is lateral (a yaw about the dorsal axis), so only the sagittal
+    component of the turn per station is judged, against the body's own median
+    of that component and an absolute floor of ``min_deg`` per station, within
+    the last ``window_frac`` of stations at either end.  Everything past the
+    first offending station is dropped and the polyline is resampled back to
+    ``n_stations`` (default: the input count).  Returns ``(centerline,
+    n_dropped)``; ``turn_mult <= 0`` disables the trim.
+    """
+    pts = np.asarray(centerline, dtype=float)
+    n = len(pts)
+    if turn_mult <= 0 or n < 8:
+        return pts, 0
+    tang, normals, _ = tube_frames(pts, up=up)
+    seg_t = _unit(np.diff(pts, axis=0))                      # segment tangents, (n-1, 3)
+    d_t = seg_t[1:] - seg_t[:-1]                             # turn vector at interior stations
+    pitch = np.degrees(np.abs(np.arcsin(np.clip(np.sum(d_t * normals[1:-1], axis=1), -1.0, 1.0))))
+    pitch = np.concatenate([[0.0], pitch, [0.0]])            # index = station
+    thresh = max(turn_mult * float(np.median(pitch[1:-1])), float(min_deg))
+    m = max(2, int(round(window_frac * n)))
+    lo, hi = 0, n
+    tail = np.flatnonzero(pitch[n - 1 - m:n - 1] > thresh)
+    if len(tail):
+        hi = n - 1 - m + int(tail[0]) + 1                    # keep the station the hook starts at
+    head = np.flatnonzero(pitch[1:1 + m] > thresh)
+    if len(head):
+        lo = 1 + int(head[-1])
+    if hi - lo < 4 or (lo == 0 and hi == n):
+        return pts, 0
+    out = resample_polyline(pts[lo:hi], n if n_stations is None else int(n_stations))
+    return out, n - (hi - lo)
+
+
 def extract_centerline_3d(
     mesh,
     voxel_pitch=None,
@@ -413,6 +476,8 @@ def extract_centerline_3d(
         n_stations: output stations.
         core_radius_frac, core_pitch_mult: the ``tau`` knobs above.
         end_trim_frac: fraction of the raw medial path discarded at each end.
+            (An end *hook* -- the path climbing into a fin on its last stations
+            -- is a separate, ``up``-aware step: see ``trim_end_hooks``.)
         seed: unused; extraction is deterministic.
 
     Returns:
@@ -578,6 +643,61 @@ class TubeCoords(NamedTuple):
     station: np.ndarray
     total_length: float
     n_stations: int
+    segment: np.ndarray = None      # dense (upsampled) segment index; == station when upsample == 1
+    upsample: int = 1               # dense segments per station segment
+
+
+#: Dense segments per station segment used by ``tube_coords``.  The chart is a
+#: polyline; at every corner the foot point jumps from one segment's frame to
+#: the next, which displaces a vertex at radius ``r`` by about ``r * turn`` and
+#: shows as a step across the surface (a terrace on a fin, a seam line on the
+#: body).  Upsampling the stations through a cubic spline cuts the turn per
+#: segment by the same factor without changing the station count that fin
+#: detection and the envelope are measured on.
+DEFAULT_UPSAMPLE = 8
+
+
+def densify_centerline(centerline, factor=DEFAULT_UPSAMPLE):
+    """Smooth, dense version of a station polyline.
+
+    The stations are the control points of a clamped uniform cubic B-spline
+    (an *approximant*: local, C2, never overshoots, and it damps the voxel-level
+    noise the stations carry from extraction -- measured against ground truth
+    on the synthetic bend it de-bends 30% more accurately than the chord
+    polyline).  The curve is evaluated at 4x oversampling and resampled to
+    ``factor * (n - 1) + 1`` points uniform in its own arc length, so two
+    densified curves with the same station count have proportional segments
+    (what ``map_points`` needs to carry a segment index across).  ``factor <= 1``
+    returns the input unchanged.
+    """
+    cl = np.asarray(centerline, dtype=float)
+    f = max(1, int(factor))
+    if f == 1 or len(cl) < 2:
+        return cl
+    from scipy.interpolate import BSpline
+
+    n = len(cl)
+    k = min(3, n - 1)
+    knots = np.concatenate([np.zeros(k), np.arange(n - k + 1), np.full(k, n - k)])
+    fine = BSpline(knots.astype(float), cl, k, axis=0)(
+        np.linspace(0.0, n - k, 4 * f * (n - 1) + 1)
+    )
+    return resample_polyline(fine, f * (n - 1) + 1)
+
+
+def _dense_chart(centerline, frames, upsample):
+    """``(dense_centerline, dense_frames, factor)`` for the chart of ``centerline``.
+
+    The dense frames are a fresh rotation-minimising field seeded with the
+    coarse field's first normal, so ``phi`` keeps the caller's ``up`` seed.
+    """
+    cl = np.asarray(centerline, dtype=float)
+    f = max(1, int(upsample))
+    if f == 1:
+        return cl, frames, 1
+    dense = densify_centerline(cl, f)
+    seed = np.asarray(frames[1][0], dtype=float)
+    return dense, rotation_minimizing_frames(dense, seed), f
 
 
 def _segments(centerline):
@@ -607,68 +727,130 @@ def _frame_at(d, seg, frames, station, t):
     return tang, nrm, np.cross(tang, nrm)
 
 
-def tube_coords(mesh_or_points, centerline, frames=None):
+_CHUNK = 65536
+
+
+def _nearest_segment(pts, a, d, seg, candidates=None):
+    """Argmin over segments of the clamped point-segment distance (first index
+    wins on ties) and the *unclamped* projection parameter on the winner.
+
+    ``candidates``: optional (k, m) array of segment indices to search per
+    point; ``None`` searches every segment.
+    """
+    if candidates is None:
+        rel = pts[:, None, :] - a[None, :, :]
+        t_all = np.einsum("kmi,mi->km", rel, d) / (seg ** 2)[None, :]
+        proj = a[None] + np.clip(t_all, 0.0, 1.0)[..., None] * d[None]
+        j = np.argmin(np.sum((pts[:, None, :] - proj) ** 2, axis=2), axis=1)
+        return j, t_all[np.arange(len(pts)), j]
+    ac, dc, sc = a[candidates], d[candidates], seg[candidates]
+    rel = pts[:, None, :] - ac
+    t_all = np.einsum("kmi,kmi->km", rel, dc) / (sc ** 2)
+    proj = ac + np.clip(t_all, 0.0, 1.0)[..., None] * dc
+    j = np.argmin(np.sum((pts[:, None, :] - proj) ** 2, axis=2), axis=1)
+    rows = np.arange(len(pts))
+    return candidates[rows, j], t_all[rows, j]
+
+
+def tube_coords(mesh_or_points, centerline, frames=None, upsample=DEFAULT_UPSAMPLE):
     """Project points onto the tube chart.
 
     Args:
         mesh_or_points: a ``trimesh.Trimesh`` or an (k, 3) array.
         centerline: (n, 3) polyline, head first.
         frames: output of ``tube_frames``; computed if omitted.
+        upsample: dense segments per station segment (see ``DEFAULT_UPSAMPLE``);
+            ``1`` charts on the station polyline itself.
 
     Returns:
         ``TubeCoords``.  Deterministic: the foot segment is the argmin of the
         clamped point-segment distance (first index wins on ties), after which
         the projection parameter is *un*clamped so that ``r`` is exactly
-        perpendicular and no material is lost off the ends.
+        perpendicular and no material is lost off the ends.  With ``upsample``
+        > 1 the search is coarse-to-fine: nearest station segment first, then
+        the dense segments within two station segments of it; ``station`` stays
+        the station-segment index and ``segment`` carries the dense one.
     """
     pts = (
         np.asarray(mesh_or_points.vertices, dtype=float)
         if isinstance(mesh_or_points, trimesh.Trimesh)
         else np.asarray(mesh_or_points, dtype=float)
     )
+    cl = np.asarray(centerline, dtype=float)
     if frames is None:
-        frames = tube_frames(centerline)
-    a, d, seg, cum = _segments(centerline)
-
-    rel = pts[:, None, :] - a[None, :, :]
-    t_all = np.einsum("kmi,mi->km", rel, d) / (seg ** 2)[None, :]
-    proj = a[None] + np.clip(t_all, 0.0, 1.0)[..., None] * d[None]
-    station = np.argmin(np.sum((pts[:, None, :] - proj) ** 2, axis=2), axis=1)
-
-    t = t_all[np.arange(len(pts)), station]
-    foot = a[station] + t[:, None] * d[station]
-    _, nrm, bnm = _frame_at(d, seg, frames, station, t)
-
+        frames = tube_frames(cl)
+    dense, dframes, f = _dense_chart(cl, frames, upsample)
+    a, d, seg, cum = _segments(dense)
+    n_dense = len(seg)
+    segment = np.empty(len(pts), dtype=np.int64)
+    t = np.empty(len(pts), dtype=float)
+    if f == 1:
+        for lo in range(0, len(pts), _CHUNK):
+            j, tt = _nearest_segment(pts[lo:lo + _CHUNK], a, d, seg)
+            segment[lo:lo + _CHUNK], t[lo:lo + _CHUNK] = j, tt
+    else:
+        ca, cd, cseg, _ = _segments(cl)
+        offsets = np.arange(-2 * f, 3 * f)
+        for lo in range(0, len(pts), _CHUNK):
+            chunk = pts[lo:lo + _CHUNK]
+            k, _ = _nearest_segment(chunk, ca, cd, cseg)
+            cand = np.clip(k[:, None] * f + offsets[None, :], 0, n_dense - 1)
+            j, tt = _nearest_segment(chunk, a, d, seg, cand)
+            segment[lo:lo + _CHUNK], t[lo:lo + _CHUNK] = j, tt
+    foot = a[segment] + t[:, None] * d[segment]
+    _, nrm, bnm = _frame_at(d, seg, dframes, segment, t)
+    s_dense = cum[segment] + t * seg[segment]
     v = pts - foot
     rn = np.sum(v * nrm, axis=1)
     rb = np.sum(v * bnm, axis=1)
+    # s is reported in the STATION polyline's arc length: the dense curve is a
+    # hair shorter than its control polygon, so its own arc length is rescaled
+    # by chord/dense.  ``total_length`` therefore stays the station chord length
+    # whatever the upsample, and ``map_points`` between two curves of equal
+    # chord length stays an isometry in s.
+    chord = arc_length(cl)
+    scale = float(chord[-1]) / max(float(cum[-1]), 1e-12)
+    s_pt = s_dense * scale
+    if f == 1:
+        station = segment
+    else:
+        station = np.clip(np.searchsorted(chord, s_pt, side="right") - 1, 0, len(cl) - 2)
     return TubeCoords(
-        s=cum[station] + t * seg[station],
+        s=s_pt,
         r=np.hypot(rn, rb),
         phi=np.arctan2(rb, rn),
         station=station.astype(np.int64),
-        total_length=float(cum[-1]),
-        n_stations=len(np.asarray(centerline)),
+        total_length=float(chord[-1]),
+        n_stations=len(cl),
+        segment=segment,
+        upsample=f,
     )
 
 
 def tube_to_points(coords, centerline, frames=None):
     """Inverse of ``tube_coords`` on the same (centerline, frames)."""
+    cl = np.asarray(centerline, dtype=float)
     if frames is None:
-        frames = tube_frames(centerline)
-    a, d, seg, cum = _segments(centerline)
-    st = np.asarray(coords.station, dtype=np.int64)
+        frames = tube_frames(cl)
+    f = int(getattr(coords, "upsample", 1) or 1)
+    dense, dframes, f = _dense_chart(cl, frames, f)
+    a, d, seg, cum = _segments(dense)
+    st = getattr(coords, "segment", None)
+    st = np.asarray(coords.station if st is None else st, dtype=np.int64)
     if st.max(initial=0) >= len(seg):
-        raise ValueError("station index exceeds the centerline's segment count")
-    t = (np.asarray(coords.s, dtype=float) - cum[st]) / seg[st]
+        raise ValueError("segment index exceeds the dense chart's segment count")
+    scale = float(arc_length(cl)[-1]) / max(float(cum[-1]), 1e-12)
+    s_dense = np.asarray(coords.s, dtype=float) / scale
+    t = (s_dense - cum[st]) / seg[st]
     foot = a[st] + t[:, None] * d[st]
-    _, nrm, bnm = _frame_at(d, seg, frames, st, t)
+    _, nrm, bnm = _frame_at(d, seg, dframes, st, t)
     r = np.asarray(coords.r, dtype=float)[:, None]
     phi = np.asarray(coords.phi, dtype=float)[:, None]
     return foot + r * (np.cos(phi) * nrm + np.sin(phi) * bnm)
 
 
-def map_points(points, src_centerline, src_frames, dst_centerline, dst_frames):
+def map_points(points, src_centerline, src_frames, dst_centerline, dst_frames,
+               upsample=DEFAULT_UPSAMPLE):
     """Transport points from one centerline to another through the tube chart.
 
     Both centerlines must have the same station count (station indices are
@@ -684,21 +866,120 @@ def map_points(points, src_centerline, src_frames, dst_centerline, dst_frames):
             "(%d vs %d); resample one first"
             % (len(src_centerline), len(dst_centerline))
         )
-    c = tube_coords(points, src_centerline, src_frames)
+    c = tube_coords(points, src_centerline, src_frames, upsample=upsample)
     ratio = float(arc_length(dst_centerline)[-1]) / max(c.total_length, 1e-12)
     return tube_to_points(c._replace(s=c.s * ratio), dst_centerline, dst_frames)
 
 
-def _remap(mesh, src_cl, src_fr, dst_cl, dst_fr):
+def _remap(mesh, src_cl, src_fr, dst_cl, dst_fr, upsample=DEFAULT_UPSAMPLE):
     """Copy of ``mesh`` with vertices transported; faces/UVs/visual untouched."""
     out = mesh.copy()
     out.vertices = map_points(
-        np.asarray(mesh.vertices, dtype=float), src_cl, src_fr, dst_cl, dst_fr
+        np.asarray(mesh.vertices, dtype=float), src_cl, src_fr, dst_cl, dst_fr,
+        upsample=upsample,
     )
     return out
 
 
-def debend(mesh, centerline, frames=None, up=(0.0, 0.0, 1.0), check_roll=True):
+def _island_frames(insertion, centerline, frames, upsample=DEFAULT_UPSAMPLE):
+    """Foot point and (T, N, B) of the chart at ``insertion``'s foot, plus its
+    chart coordinates -- read through ``tube_coords``/``tube_to_points`` so the
+    terminal-frame extrapolation and the dense chart apply exactly as they do
+    to vertices."""
+    c = tube_coords(np.asarray(insertion, dtype=float)[None, :], centerline, frames,
+                    upsample=upsample)
+    foot = tube_to_points(c._replace(r=np.zeros(1)), centerline, frames)[0]
+    n = tube_to_points(c._replace(r=np.ones(1), phi=np.zeros(1)), centerline, frames)[0] - foot
+    b = tube_to_points(c._replace(r=np.ones(1), phi=np.full(1, 0.5 * np.pi)),
+                       centerline, frames)[0] - foot
+    return c, foot, np.stack([np.cross(n, b), n, b])
+
+
+def _rigid_islands(coords, det, src_cl, src_fr, dst_cl, dst_fr, blend=0.5):
+    """Rigid-transport records for every island of ``det`` (named fins and
+    demoted lumps alike): ``(members, weights, src_foot, src_axes, dst_foot,
+    dst_axes)`` with ``weights`` rising from 0 at the island's innermost radius
+    to 1 half a body radius further out."""
+    out = []
+    env = np.asarray(det.envelope, dtype=float)
+    for name, fin in det.fins.items():
+        members = np.asarray(fin["vertex_indices"], dtype=np.int64)
+        if len(members) == 0:
+            continue
+        insertion = np.asarray(fin["insertion_centroid"], dtype=float)
+        ci, foot_s, axes_s = _island_frames(insertion, src_cl, src_fr, coords.upsample)
+        ratio = float(arc_length(dst_cl)[-1]) / max(float(arc_length(src_cl)[-1]), 1e-12)
+        _, foot_d, axes_d = _island_frames(
+            tube_to_points(ci._replace(s=ci.s * ratio), dst_cl, dst_fr)[0], dst_cl, dst_fr,
+            coords.upsample)
+        st = int(np.clip(ci.station[0], 0, len(env) - 1))
+        body_r = float(env[st]) if np.isfinite(env[st]) and env[st] > 0 else float(coords.r[members].min())
+        # The blend starts at the protrusion threshold the island was cut at,
+        # interpolated continuously along the body: the labels were cut with the
+        # per-station staircase, so w is small but not exactly 0 on the island
+        # boundary (measured 0.01-0.15); the smoothstep keeps the join free of a
+        # visible crease.
+        thr = det.threshold
+        if thr is None:
+            r0 = np.full(len(members), float(coords.r[members].min()))
+        else:
+            n_seg = max(len(thr) - 1, 1)                  # threshold[k] belongs to segment k
+            u = coords.s[members] / max(coords.total_length, 1e-12) * n_seg - 0.5
+            r0 = np.interp(u, np.arange(len(thr)), np.asarray(thr, dtype=float))
+        w = np.clip((coords.r[members] - r0) / max(blend * body_r, 1e-9), 0.0, 1.0)
+        w = w * w * (3.0 - 2.0 * w)                      # smoothstep: no crease at either end of the band
+        out.append((members, w, foot_s, axes_s, foot_d, axes_d))
+    return out
+
+
+def _apply_rigid(vertices, charted, records, inverse=False):
+    """Blend rigidly carried island positions into ``charted`` (a copy is returned)."""
+    src = np.asarray(vertices, dtype=float)
+    out = np.array(charted, dtype=float, copy=True)
+    for members, w, foot_s, axes_s, foot_d, axes_d in records:
+        if inverse:
+            foot_s, axes_s, foot_d, axes_d = foot_d, axes_d, foot_s, axes_s
+        local = (src[members] - foot_s) @ axes_s.T          # coords in (T, N, B) of the source
+        rigid = foot_d + local @ axes_d
+        out[members] = (1.0 - w)[:, None] * out[members] + w[:, None] * rigid
+    return out
+
+
+def map_mesh(mesh, src_centerline, src_frames, dst_centerline, dst_frames,
+             rigid_fins=True, coords=None, det=None, upsample=DEFAULT_UPSAMPLE,
+             records=None):
+    """Transport a mesh from one centerline to another: the tube chart for the
+    body, rigid carry (blended at the root) for every fin island detected on
+    the *source* mesh.  Returns ``(mesh_copy, records)``.
+
+    ``records`` (the list a previous ``map_mesh`` returned for the OPPOSITE
+    direction) inverts that transport exactly for body and fully rigid blade
+    vertices instead of detecting islands afresh; it takes precedence over
+    ``rigid_fins``/``coords``/``det``.  ``coords`` (a chart of the source) may be
+    passed to avoid recomputing it; its ``upsample`` then wins over the keyword
+    so body and fins are charted identically.
+    """
+    if coords is not None:
+        upsample = int(getattr(coords, "upsample", upsample) or upsample)
+    out = _remap(mesh, src_centerline, src_frames, dst_centerline, dst_frames, upsample)
+    if records is not None:
+        if len(records):
+            out.vertices = _apply_rigid(mesh.vertices, out.vertices, records, inverse=True)
+        return out, records
+    records = []
+    if rigid_fins:
+        if coords is None:
+            coords = tube_coords(mesh, src_centerline, src_frames, upsample=upsample)
+        if det is None:
+            det = detect_fins(mesh, coords, check=False)
+        records = _rigid_islands(coords, det, src_centerline, src_frames,
+                                 dst_centerline, dst_frames)
+        out.vertices = _apply_rigid(mesh.vertices, out.vertices, records)
+    return out, records
+
+
+def debend(mesh, centerline, frames=None, up=(0.0, 0.0, 1.0), check_roll=True,
+           rigid_fins=True):
     """Straighten a bent mesh onto the canonical +X axis.
 
     Vertex positions change; ``faces``, ``visual`` (UVs, texture, material) and
@@ -707,7 +988,17 @@ def debend(mesh, centerline, frames=None, up=(0.0, 0.0, 1.0), check_roll=True):
 
     De-bending keeps ``(r, phi)`` and replaces the centerline, so it removes the
     *bend* and nothing else: a body rolled about its own axis comes out straight
-    and still rolled.  With ``check_roll`` (default) ``estimate_roll`` measures
+    and still rolled.
+
+    Fins are not part of the tube.  Charted through it, a blade on the inside
+    of a bend spans more arc length than its base and comes out stretched along
+    the body (2.9x on a 26% sagitta C-curve), the outside one compressed.  With
+    ``rigid_fins`` (default) every island ``detect_fins`` finds on the bent
+    mesh -- named fins and demoted lumps alike -- is instead carried as a rigid
+    body in the frame at its insertion, blended into the charted position over
+    the first half body-radius above its root so the base still follows the
+    body.  The records are kept in ``metadata["rigid_islands"]`` so ``rebend``
+    inverts the same transport.  With ``check_roll`` (default) ``estimate_roll`` measures
     that torsion first and warns past ``_ROLL_WARN_RAD``; pass ``False`` to skip
     the measurement (it costs one extra chart and fin detection).
 
@@ -715,10 +1006,20 @@ def debend(mesh, centerline, frames=None, up=(0.0, 0.0, 1.0), check_roll=True):
     """
     if frames is None:
         frames = tube_frames(centerline, up=up)
+    coords = det = None
+    if check_roll or rigid_fins:
+        coords = tube_coords(mesh, centerline, frames)
+        det = detect_fins(mesh, coords, check=False)
     if check_roll:
-        _warn_if_rolled(mesh, centerline, frames)
+        _warn_if_rolled(mesh, centerline, frames, coords=coords, det=det)
     target = straight_centerline(centerline)
-    out = _remap(mesh, centerline, frames, target, canonical_frames(len(target)))
+    out, records = map_mesh(mesh, centerline, frames, target, canonical_frames(len(target)),
+                            rigid_fins=rigid_fins, coords=coords, det=det)
+    # Always overwrite: ``mesh.copy()`` inherits the SOURCE mesh's records, and
+    # a stale set must never be handed to ``rebend``.
+    out.metadata["rigid_islands"] = records
+    out.metadata["rigid_islands_centerline"] = np.asarray(centerline, dtype=float)
+    out.metadata["rigid_fins"] = bool(rigid_fins)
     out.metadata["centerline"] = target
     out.metadata["bent_centerline"] = np.asarray(centerline, dtype=float)
     return out, target
@@ -726,7 +1027,18 @@ def debend(mesh, centerline, frames=None, up=(0.0, 0.0, 1.0), check_roll=True):
 
 def rebend(straight_mesh, target_centerline, source_centerline=None,
            target_frames=None, up=(0.0, 0.0, 1.0)):
-    """Inverse of ``debend``: re-embed a straight mesh on ``target_centerline``."""
+    """Inverse of ``debend``: re-embed a straight mesh on ``target_centerline``.
+
+    Fin transport: if ``straight_mesh`` came from ``debend`` and
+    ``target_centerline`` is the centerline that de-bend was given (compared
+    with ``np.allclose``), the stored ``metadata["rigid_islands"]`` records are
+    inverted, which is exact for body vertices and fully rigid blade vertices
+    (the root blend band is approximate).  If the straight mesh was made with
+    ``rigid_fins=False`` the fins are charted, matching that de-bend.  Otherwise
+    (another target curve, or a mesh reloaded from disk -- the CLI clears
+    metadata on export) islands are detected afresh on the straight mesh and
+    carried rigidly onto the target, an approximate inverse.
+    """
     target_centerline = np.asarray(target_centerline, dtype=float)
     src = (
         straight_centerline(target_centerline)
@@ -735,10 +1047,21 @@ def rebend(straight_mesh, target_centerline, source_centerline=None,
     )
     if target_frames is None:
         target_frames = tube_frames(target_centerline, up=up)
-    out = _remap(
-        straight_mesh, src, canonical_frames(len(src)),
-        target_centerline, target_frames,
+    meta = straight_mesh.metadata
+    records = meta.get("rigid_islands")
+    rec_cl = meta.get("rigid_islands_centerline")
+    same_curve = (
+        records is not None and rec_cl is not None
+        and np.shape(rec_cl) == np.shape(target_centerline)
+        and np.allclose(rec_cl, target_centerline)
     )
+    if same_curve:
+        out, _ = map_mesh(straight_mesh, src, canonical_frames(len(src)),
+                          target_centerline, target_frames, records=list(records))
+    else:
+        out, _ = map_mesh(straight_mesh, src, canonical_frames(len(src)),
+                          target_centerline, target_frames,
+                          rigid_fins=meta.get("rigid_fins", True))
     out.metadata["centerline"] = target_centerline
     return out
 
@@ -766,6 +1089,7 @@ class FinDetection(NamedTuple):
     labels: np.ndarray
     fins: dict
     envelope: np.ndarray
+    threshold: np.ndarray = None    # per-station protrusion radius the labels were cut at
 
 
 def _radius_envelope(coords, mask, n_stations, percentile, smooth):
@@ -787,6 +1111,75 @@ def _radius_envelope(coords, mask, n_stations, percentile, smooth):
     return ndimage.median_filter(env, size=int(smooth), mode="nearest")
 
 
+def _island_stats(members, coords):
+    """(s, phi) summary of one island: centroid fraction, start fraction (5th
+    percentile of s, so one stray vertex cannot move it), phi."""
+    phis = coords.phi[members]
+    total = max(coords.total_length, 1e-12)
+    return {
+        "members": members,
+        "s_frac": float(np.mean(coords.s[members]) / total),
+        "s_min_frac": float(np.percentile(coords.s[members], 5.0) / total),   # robust start
+        "phi_centroid": float(np.arctan2(np.mean(np.sin(phis)), np.mean(np.cos(phis)))),
+        "station_range": (int(coords.station[members].min()),
+                          int(coords.station[members].max())),
+    }
+
+
+#: In a name collision, a cluster smaller than this fraction of the largest
+#: contender is a sliver and loses regardless of how well it fits the prior.
+_SLIVER_FRAC = 0.05
+
+#: Shells of one fin are joined before naming when their station ranges touch,
+#: they lie in the same anatomical sector (dorsal, ventral, left or right
+#: lateral) and their phi centroids agree to within this many degrees.
+_SHELL_PHI_TOL = 45.0
+
+
+def _sector(phi_rad):
+    """Anatomical sector of a phi centroid: dorsal / ventral / lateral_L / lateral_R."""
+    deg = abs(np.rad2deg(phi_rad))
+    if deg <= _PHI_DORSAL:
+        return "dorsal"
+    if deg >= _PHI_VENTRAL:
+        return "ventral"
+    return "lateral_L" if phi_rad > 0 else "lateral_R"
+
+
+def _merge_shells(islands, coords):
+    """Join connected components that are pieces of one fin.
+
+    A generated or scanned mesh often delivers a fin as several disconnected
+    shells (the Meshy sevengill has 239 bodies; its anal fin and its caudal
+    lobe each arrive in two).  Named one at a time, the pieces straddle the
+    anatomical priors and one of them loses its name.  Components whose
+    inclusive station ranges overlap or touch (``_MERGE_STATION_GAP``) and whose
+    phi centroids lie within ``_SHELL_PHI_TOL`` are therefore merged first;
+    a left and a right fin at the same stations stay apart (their phi differs
+    by > 60 deg), and so do a dorsal and an anal fin (~180 deg).
+    """
+    keys = sorted(islands, key=lambda k: islands[k]["station_range"])
+    merged = []
+    for k in keys:
+        isl = islands[k]
+        lo, hi = isl["station_range"]
+        target = None
+        for m in merged:
+            mlo, mhi = m["station_range"]
+            d = isl["phi_centroid"] - m["phi_centroid"]
+            dphi = abs(np.degrees(np.arctan2(np.sin(d), np.cos(d))))
+            if (lo <= mhi + _MERGE_STATION_GAP and hi + _MERGE_STATION_GAP >= mlo
+                    and dphi <= _SHELL_PHI_TOL
+                    and _sector(isl["phi_centroid"]) == _sector(m["phi_centroid"])):
+                target = m
+                break
+        if target is None:
+            merged.append(dict(isl))
+        else:
+            target.update(_island_stats(np.union1d(target["members"], isl["members"]), coords))
+    return {i: m for i, m in enumerate(merged)}
+
+
 def _classify(islands):
     """Name islands from their (s, phi) centroids against anatomical priors.
 
@@ -800,6 +1193,12 @@ def _classify(islands):
     dorsal_sector, ventral_sector = [], []
     for key, isl in islands.items():
         phi_deg = abs(np.rad2deg(isl["phi_centroid"]))
+        if isl["s_min_frac"] >= _CAUDAL_S_MIN:
+            # Nothing paired exists behind the peduncle: an island that begins
+            # past the caudal threshold is caudal whatever its phi sector (a
+            # lobe carried past the chart's end can sit well off the midline).
+            names[key] = "caudal"
+            continue
         if phi_deg <= _PHI_DORSAL:
             dorsal_sector.append(key)
         elif phi_deg >= _PHI_VENTRAL:
@@ -811,8 +1210,12 @@ def _classify(islands):
     for sector, median_name in ((dorsal_sector, "dorsal"), (ventral_sector, "anal")):
         if not sector:
             continue
-        sector = sorted(sector, key=lambda k: islands[k]["s_frac"])
-        while sector and islands[sector[-1]]["s_frac"] >= _CAUDAL_S_MIN:
+        # An island is caudal when it BEGINS past the caudal threshold: an anal
+        # or dorsal fin that ends at the peduncle has its centroid near the
+        # threshold but starts well before it; a caudal lobe starts at or
+        # beyond the chart's end.
+        sector = sorted(sector, key=lambda k: islands[k]["s_min_frac"])
+        while sector and islands[sector[-1]]["s_min_frac"] >= _CAUDAL_S_MIN:
             names[sector.pop()] = "caudal"  # split by phi, per vertex, below
         for key in sector:
             names[key] = median_name
@@ -919,12 +1322,18 @@ def detect_fins(mesh, coords, percentile=60.0, margin=0.30, floor_frac=0.002,
     ``|phi| = 90 deg``, so a single wrap-around caudal fin and two separate lobes
     both come out right.
 
-    Two islands may only share a name when their station ranges overlap or touch
-    (``_MERGE_STATION_GAP``) -- one fin arriving as several components.  Islands
-    that classify alike but sit at different places along the body are *not* one
-    fin: the one whose (s, phi) centroid best matches the anatomical prior keeps
-    the name, the others are demoted to ``unassigned_island_<k>`` entries in the
-    returned ``fins`` dict, and a ``RuntimeWarning`` names the collision.
+    Shells of one fin (a generated mesh often delivers a fin as several
+    disconnected components) are joined before naming when their station ranges
+    touch and they sit in the same anatomical sector (``_merge_shells``); an
+    island is caudal when it *begins* past ``_CAUDAL_S_MIN`` whatever its
+    sector.  Two islands may only share a name when their station ranges overlap
+    or touch (``_MERGE_STATION_GAP``).  Islands that classify alike but sit at
+    different places along the body are *not* one fin: a cluster under
+    ``_SLIVER_FRAC`` of the largest contender loses outright, otherwise the one
+    whose (s, phi) centroid best matches the anatomical prior keeps the name;
+    the others are demoted to ``unassigned_island_<k>`` entries in the returned
+    ``fins`` dict, and a ``RuntimeWarning`` names the collision.  The per-station
+    protrusion threshold the labels were cut at is returned as ``threshold``.
     Demoted vertices keep the ``body`` label, so a downstream rig that binds
     ``fins`` by name must skip the ``unassigned_island_`` prefix (there are no
     vertices carrying that label to weight).
@@ -945,7 +1354,8 @@ def detect_fins(mesh, coords, percentile=60.0, margin=0.30, floor_frac=0.002,
     env = None
     for _ in range(max(1, int(passes))):
         env = _radius_envelope(coords, keep, n_stations, percentile, envelope_smooth)
-        thresh = (1.0 + margin) * env[coords.station] + floor_frac * coords.total_length
+        thresh_station = (1.0 + margin) * env + floor_frac * coords.total_length
+        thresh = thresh_station[coords.station]
         keep = coords.r <= thresh
     protruding = ~keep
 
@@ -968,14 +1378,8 @@ def detect_fins(mesh, coords, percentile=60.0, margin=0.30, floor_frac=0.002,
             members = idx[comp == c]
             if len(members) < int(min_island):
                 continue
-            phis = coords.phi[members]
-            islands[c] = {
-                "members": members,
-                "s_frac": float(np.mean(coords.s[members]) / coords.total_length),
-                "phi_centroid": float(
-                    np.arctan2(np.mean(np.sin(phis)), np.mean(np.cos(phis)))
-                ),
-            }
+            islands[c] = _island_stats(members, coords)
+        islands = _merge_shells(islands, coords)
 
         verts = np.asarray(mesh.vertices, dtype=float)
         named = _classify(islands)
@@ -999,9 +1403,14 @@ def detect_fins(mesh, coords, percentile=60.0, margin=0.30, floor_frac=0.002,
             clusters = _merge_touching(candidates[gname], coords)
             keep = clusters[0]
             if len(clusters) > 1:
+                # A sliver cannot be the fin when a real island claims the same
+                # name: clusters under ``_SLIVER_FRAC`` of the largest are
+                # demoted before the prior is consulted.
+                biggest = max(len(c) for c in clusters)
                 order = sorted(
                     range(len(clusters)),
-                    key=lambda i: (_prior_mismatch(gname, clusters[i], coords),
+                    key=lambda i: (len(clusters[i]) < _SLIVER_FRAC * biggest,
+                                   _prior_mismatch(gname, clusters[i], coords),
                                    -len(clusters[i]),
                                    int(coords.station[clusters[i]].min())),
                 )
@@ -1032,7 +1441,8 @@ def detect_fins(mesh, coords, percentile=60.0, margin=0.30, floor_frac=0.002,
 
     if check:
         _warn_missing_fins(fins, margin, floor_frac, min_island)
-    detection = FinDetection(labels=labels.astype(str), fins=fins, envelope=env)
+    detection = FinDetection(labels=labels.astype(str), fins=fins, envelope=env,
+                             threshold=thresh_station)
     if check:
         check_anatomy(detection)
     return detection
@@ -1151,10 +1561,12 @@ def estimate_roll(mesh, coords, det):
     return float(slope), r2
 
 
-def _warn_if_rolled(mesh, centerline, frames):
+def _warn_if_rolled(mesh, centerline, frames, coords=None, det=None):
     """Roll check shared by ``debend`` and the CLI.  Returns ``(slope, r2)``."""
-    coords = tube_coords(mesh, centerline, frames)
-    det = detect_fins(mesh, coords, check=False)
+    if coords is None:
+        coords = tube_coords(mesh, centerline, frames)
+    if det is None:
+        det = detect_fins(mesh, coords, check=False)
     slope, r2 = estimate_roll(mesh, coords, det)
     total = slope * coords.total_length
     if abs(total) > _ROLL_WARN_RAD:
@@ -1253,6 +1665,9 @@ def _cli(argv=None):
     ap.add_argument("--core-radius-frac", type=float, default=0.17)
     ap.add_argument("--up", type=float, nargs=3, default=(0.0, 0.0, 1.0),
                     help="dorsal direction of the input mesh (default +Z)")
+    ap.add_argument("--hook-turn-mult", type=float, default=3.0,
+                    help="trim a terminal hook whose sagittal turn per station exceeds "
+                         "this multiple of the body's median (and 5 deg); 0 disables")
     ap.add_argument("--auto-up", action="store_true",
                     help="if the detected anatomy says --up is upside down "
                          "(anal bigger than dorsal, or the lower caudal lobe "
@@ -1268,6 +1683,11 @@ def _cli(argv=None):
           "%.4f/%.4f" % (len(centerline), info["length"], info["pitch"],
                          info["head_width"], info["tail_width"]))
     up = tuple(float(x) for x in args.up)
+    centerline, n_hook = trim_end_hooks(centerline, up=up, turn_mult=args.hook_turn_mult)
+    if n_hook:
+        info["length"] = float(arc_length(centerline)[-1])
+        print("end hook: %d station(s) that pitched into a fin trimmed; chart length now %.4f"
+              % (n_hook, info["length"]))
     frames, coords, det = _chart(mesh, centerline, up, check=not args.auto_up)
     if args.auto_up:
         flags = check_anatomy(det, warn=False)

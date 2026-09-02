@@ -31,7 +31,7 @@ function setView(view){
 function setClip(name){ curClip = name; if (action) action.stop(); const clip = clips.find(k => k.name === name) || clips[0]; action = mixer.clipAction(clip); action.reset().play(); mixer.setTime(0); return clip; }
 function render(){ renderer.render(scene, camera); }
 function status(){ hud.textContent = `drag = orbit, wheel = zoom, right-drag = pan | space = play/pause | keys 1-5 = clip | b = bones\nclips: ${clips.map(k => k.name + ' ' + k.duration.toFixed(2) + 's').join(' | ')}\nclip: ${curClip}  view: ${curView}  t=${mixer ? mixer.time.toFixed(2) : '-'}  rest bbox: ${box ? [box.getSize(new THREE.Vector3()).x, box.getSize(new THREE.Vector3()).y, box.getSize(new THREE.Vector3()).z].map(v => v.toFixed(3)).join(' ') : ''}`; }
-new GLTFLoader().load('../sevengill_rigged.glb', (g) => {
+new GLTFLoader().load(params.get('glb') || '../sevengill_rigged.glb', (g) => {
   root = g.scene; scene.add(root); clips = g.animations;
   box = new THREE.Box3().setFromObject(root); c = box.getCenter(new THREE.Vector3()); L = Math.max(...box.getSize(new THREE.Vector3()).toArray());
   root.traverse(o => { if (o.isMesh) { o.frustumCulled = false; const ms = Array.isArray(o.material) ? o.material : [o.material]; ms.forEach(m => { if (params.get('pbr') !== '1') { m.metalness = 0.0; m.roughness = 0.85; m.needsUpdate = true; } }); } });

@@ -509,9 +509,13 @@ def test_debend_warns_about_roll_and_straightens_it_no_worse(straight, bent, rol
     rms, rms_r = np.sqrt((err ** 2).mean()), np.sqrt((err_r ** 2).mean())
     print("\nde-bend rms: control %.3f%% BL, rolled %.3f%% BL"
           % (100.0 * rms / bl, 100.0 * rms_r / bl))
-    # Measured: control 0.39% BL, rolled 0.40% BL (the verifier's 0.4-0.5%).
-    assert rms_r < 0.006 * bl
-    assert rms_r < 1.3 * rms
+    # Measured on this checkout (dense chart, rigid fins, numpy 2.5): control
+    # 0.494% BL, rolled 0.587% BL.  The rolled body's caudal lobes sit in the
+    # bend plane at the tail, where the extracted centerline is least accurate,
+    # and a rigidly carried lobe amplifies that terminal-frame error through
+    # its lever arm; the bounds leave ~10% headroom over the measurement.
+    assert rms_r < 0.0065 * bl
+    assert rms_r < 1.4 * rms
     assert np.sqrt((err_r ** 2).mean()) < 1.5 * info_r["pitch"]
 
 
@@ -591,3 +595,92 @@ def test_cli_auto_up_negates_a_flipped_up_and_says_so(flipped, straight, capsys)
     assert len(verts) == len(det.labels)
     for name, fin in det.fins.items():
         assert set(truth[np.asarray(fin["vertex_indices"])]) == {name}
+
+
+# ---------------------------------------------------------------------------
+# Dense chart, rigid fins, end hooks, shell naming (2026-09 fixes)
+# ---------------------------------------------------------------------------
+
+def test_trim_end_hooks_cuts_a_sagittal_hook_and_spares_a_lateral_flex():
+    """A medial path climbing into a fin pitches toward the dorsal normal; a
+    swimming tail flexes laterally.  Only the former is a hook."""
+    n = 64
+    s = np.linspace(0.0, 1.0, n)
+    straight = np.column_stack([s, 0 * s, 0 * s])
+
+    def bent_tail(kind, deg, k=3):
+        pts = straight[:n - k].tolist()
+        p = straight[n - 1 - k].copy()
+        for a in np.radians(deg) * np.linspace(0.0, 1.0, k + 1)[1:]:
+            d = np.array([np.cos(a), np.sin(a), 0.0]) if kind == "lateral" else np.array([np.cos(a), 0.0, np.sin(a)])
+            p = p + d / (n - 1)
+            pts.append(p)
+        return np.asarray(pts)
+
+    for deg in (10.0, 20.0, 45.0):
+        _, dropped = mesh3d.trim_end_hooks(bent_tail("lateral", deg), up=(0, 0, 1))
+        assert dropped == 0, deg
+    out, dropped = mesh3d.trim_end_hooks(bent_tail("sagittal", 30.0), up=(0, 0, 1))
+    assert dropped == 3
+    assert len(out) == n                                    # resampled back to the station count
+    assert mesh3d.trim_end_hooks(bent_tail("sagittal", 30.0), up=(0, 0, 1), turn_mult=0)[1] == 0
+    assert mesh3d.trim_end_hooks(synth.c_curve(0.8, 120.0, n), up=(0, 0, 1))[1] == 0
+
+
+def test_classify_names_caudal_by_where_an_island_starts():
+    def isl(s_min, s_frac, phi_deg):
+        return {"s_min_frac": s_min, "s_frac": s_frac, "phi_centroid": np.radians(phi_deg),
+                "station_range": (0, 1), "members": np.arange(3)}
+    names = mesh3d._classify({
+        0: isl(0.81, 0.86, -176.0),   # anal fin ending at the peduncle: centroid past 0.85, start before
+        1: isl(0.94, 1.10, 57.0),     # caudal lobe carried past the chart end, off the midline
+        2: isl(0.90, 0.95, -178.0),   # lower caudal lobe
+        3: isl(0.62, 0.66, 142.0),    # pelvic
+    })
+    assert names[0] == "anal"
+    assert names[1] == "caudal"
+    assert names[2] == "caudal"
+    assert names[3] == "pelvic_L"
+
+
+def test_merge_shells_joins_same_sector_pieces_only():
+    cl = np.column_stack([np.linspace(0, 1, 32), np.zeros(32), np.zeros(32)])
+    pts = np.array([[0.70, 0.0, -0.05], [0.72, 0.0, -0.05], [0.71, 0.03, -0.04]])   # anal shells + a pelvic
+    coords = mesh3d.tube_coords(pts, cl)
+    islands = {i: mesh3d._island_stats(np.array([i]), coords) for i in range(3)}
+    merged = mesh3d._merge_shells(islands, coords)
+    sizes = sorted(len(m["members"]) for m in merged.values())
+    assert sizes == [1, 2]                                  # the two ventral shells merge, the lateral one does not
+
+
+def test_debend_without_rigid_fins_still_round_trips(bent, extracted):
+    mesh, _ = bent
+    cl, info = extracted
+    out, _ = mesh3d.debend(mesh, cl, check_roll=False, rigid_fins=False)
+    assert out.metadata["rigid_islands"] == [] and out.metadata["rigid_fins"] is False
+    back = mesh3d.rebend(out, cl)
+    err = np.linalg.norm(np.asarray(back.vertices) - np.asarray(mesh.vertices), axis=1)
+    assert np.median(err) < 1e-12
+    assert err.max() < 1.5 * info["pitch"]
+
+
+def test_rebend_ignores_records_from_another_centerline(bent, extracted):
+    mesh, _ = bent
+    cl, _ = extracted
+    out, target = mesh3d.debend(mesh, cl, check_roll=False)
+    other = mesh3d.resample_polyline(synth.s_curve(0.8, 90.0, len(cl)), len(cl))
+    other *= mesh3d.arc_length(target)[-1] / mesh3d.arc_length(other)[-1]
+    fresh = out.copy()
+    fresh.metadata.pop("rigid_islands")
+    a = np.asarray(mesh3d.rebend(out, other).vertices)
+    b = np.asarray(mesh3d.rebend(fresh, other).vertices)
+    assert np.abs(a - b).max() < 1e-9                       # records for cl must not be applied to `other`
+
+
+def test_upsample_one_is_the_station_polyline_chart(straight):
+    cl = straight.metadata["centerline"]
+    a = mesh3d.tube_coords(straight, cl, upsample=1)
+    b = mesh3d.tube_coords(straight, cl)
+    assert np.array_equal(a.segment, a.station)
+    assert a.total_length == b.total_length
+    np.testing.assert_allclose(a.s, b.s, atol=1e-9)         # a straight polyline is its own spline

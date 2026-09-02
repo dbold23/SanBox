@@ -57,16 +57,33 @@ straightening map must not invent.
 move; `faces`, `visual.uv`, the texture image and the material are the *same objects* before and
 after. A textured Meshy GLB survives the operation unchanged except for where its vertices sit.
 
-Two details make it exact rather than approximate:
+Three details make it exact rather than approximate:
 
-- `tube_coords` returns the **station index** alongside `(s, r, phi)`. Recovering the segment from `s`
-  alone is ambiguous at a corner of a bent centerline; with the index, `tube_to_points` inverts to
-  `< 1e-12`.
-- Material beyond either end of the chart — the snout tip, both caudal lobes — gets `s < 0` or
-  `s > S` and is **carried, not clipped**: transported rigidly by the terminal frame. This is
-  deliberate. The centerline extractor's thick-core threshold stops the medial path at the
-  **peduncle** so it cannot wander down a fin, and charting *through* the caudal would straighten the
-  heterocercal upsweep and hand the rig an anatomically wrong rest pose.
+- **The chart is not the station polyline.** `tube_coords` charts on a clamped cubic B-spline
+  *approximant* of the stations, resampled to `DEFAULT_UPSAMPLE = 8` dense segments per station
+  segment (`densify_centerline`). At every corner of a polyline chart a vertex at radius `r` jumps by
+  `r × turn` — a seam line across the body at every station, a terrace on a fin — and the upsample
+  cuts that by the same factor. `tube_coords` returns the **dense segment index** (`segment`)
+  alongside `(s, r, phi)`, which is what makes `tube_to_points` an exact inverse (`< 1e-12`);
+  `station` is derived from `s` for the envelope and fin detection, and `s` is reported in the
+  station chord length so `total_length` and every fraction downstream do not change with the
+  upsample.
+- **Fins are not part of the tube either.** Charted through it, a blade on the inside of a bend spans
+  more arc length than its base and comes out stretched (2.9× on the real scan's 25 % sagitta
+  C-curve), the outside one compressed. `map_mesh` — the transport behind `debend`, `rebend` and
+  `synth.bend` — carries every island `detect_fins` finds on the source mesh as a rigid body in the
+  frame at its insertion, blended into the charted position by a smoothstep of
+  `(r − threshold)` over half a body radius above the root. The records are stored in
+  `metadata["rigid_islands"]` so `rebend` inverts the same transport exactly for body and fully
+  rigid blade vertices (the root blend band is approximate).
+- Material beyond either end of the chart — the snout tip, the caudal — gets `s < 0` or `s > S` and
+  is **carried, not clipped**: transported rigidly by the terminal frame (or, where it is a detected
+  island, by the frame at its insertion). This is deliberate. The centerline extractor's thick-core
+  threshold stops the medial path at the **peduncle** so it cannot wander down a fin, and charting
+  *through* the caudal would straighten the heterocercal upsweep and hand the rig an anatomically
+  wrong rest pose. When the path does climb into the upper lobe on its last stations,
+  `trim_end_hooks` cuts the *sagittal* hook (`--hook-turn-mult`, `0` disables): straightening that
+  pitch is what made the real scan's caudal point down.
 
 ## 3. What the rig is
 
@@ -74,7 +91,9 @@ Two details make it exact rather than approximate:
   parent order, placed at arc-length fractions of the *straight* centerline. The schema module is
   imported through a path shim (`$SEVENGILL_SCHEMA_DIR` overrides), never copied.
 - **Fins**: two joints each — `<fin>_fin_root` at the detected insertion centroid, parented to the
-  nearest spine joint, and `<fin>_fin_tip` at the island's distal extremity. The heterocercal caudal
+  nearest spine joint, and `<fin>_fin_tip` at the island's apex — the vertex protruding farthest
+  from the body axis on the insertion's side (a caudal lobe, whose long axis is axial, takes the
+  vertex farthest from the insertion instead). The heterocercal caudal
   gets its own `caudal_upper` and `caudal_lower` pairs.
 - **Weights**: body vertices bind to their two bracketing spine joints by arc length; fin vertices
   bind to their own fin's root and tip by normalised distance along the fin axis, and still follow
@@ -292,8 +311,8 @@ once extraction has trimmed the ends; no rotation is fitted, only the translatio
 
 | | RMS | max |
 |---|---|---|
-| all vertices | **0.494% BL** (0.63 px) | 3.500% BL (4.48 px) |
-| body only | **0.157% BL** (0.20 px) | 0.674% BL (0.86 px) |
+| all vertices | **0.494% BL** (0.63 px) | 3.474% BL (4.44 px) |
+| body only | **0.138% BL** (0.18 px) | 0.483% BL (0.62 px) |
 
 **Extracted centerline vs the exact C-curve**: mean `0.00051 BL` (0.07 px), max `0.00159 BL` (0.20 px).
 
@@ -303,8 +322,8 @@ once extraction has trimmed the ends; no rotation is fitted, only the translatio
 | fin | found | truth | purity | recall | (recall, sheet fins) |
 |---|---|---|---|---|---|
 | anal | 108 | 126 | 100.0% | 85.7% | 85.7% |
-| caudal_lower | 144 | 162 | 100.0% | 88.9% | 92.6% |
-| caudal_upper | 336 | 336 | 100.0% | 100.0% | 100.0% |
+| caudal_lower | 139 | 162 | 100.0% | 85.8% | 92.6% |
+| caudal_upper | 325 | 336 | 100.0% | 96.7% | 100.0% |
 | dorsal | 182 | 216 | 100.0% | 84.3% | 88.0% |
 | pectoral_L | 176 | 220 | 100.0% | 80.0% | 80.0% |
 | pectoral_R | 176 | 220 | 100.0% | 80.0% | 80.0% |
@@ -312,7 +331,9 @@ once extraction has trimmed the ends; no rotation is fitted, only the translatio
 | pelvic_R | 120 | 160 | 100.0% | 75.0% | 77.5% |
 
 Recall is 75–100% because a fin's **root** vertices sit at body radius and stay labelled `body` by
-design — the label marks the protruding blade; `station_range` and `insertion_centroid` are what the
+design (the caudal rows lost a few percent when `station` became a function of `s` on the dense
+chart: vertices near a station boundary can bin one station over, which moves the terminal
+station's envelope) — the label marks the protruding blade; `station_range` and `insertion_centroid` are what the
 rig binds the base with.
 
 Solid fins doubled the vertex count of every blade without moving a single one of them in `r`, so
@@ -347,8 +368,8 @@ by geometry:
 | caudal_upper, caudal_lower | `spine_12_caudal_axis_2` |
 
 **`as_scanned`** (same `BL = 0.8000`, same rigid mean offset removed): spine joints land on the
-scanned centerline to max `0.00117 BL` (0.15 px); skinned surface vs the scan RMS `0.604% BL`, max
-`2.807% BL`.
+scanned centerline to max `0.00117 BL` (0.15 px); skinned surface vs the scan RMS `0.596% BL`, max
+`2.756% BL`.
 
 **Cruise kinematics**: 0.90 Hz, wavelength 0.90 BL, prescribed tail amplitude 0.110 BL, posed
 0.103 BL (0.94×). DCT bending-mode energy **0.976 in 4 modes, 0.996 in 6**. Implied longitudinal skin
@@ -394,20 +415,28 @@ Total demo wall time **3.1 s**. Full prototype test suite: **236 tests, 75 s**.
 
 - **`--core-radius-frac` is a prior, and priors mislead.** Fin naming uses anatomical sectors —
   `|phi| ≤ 45°` dorsal midline, `|phi| ≥ 160°` ventral, laterals split pectoral/pelvic at `s = 0.50`,
-  median islands past `s = 0.85` are caudal. On a sevengill this is right. On a mesh with an unusual
-  fin set, a dorsal fin far forward, or a caudal that survives the core threshold, it will produce
-  confidently wrong names. `fins.json` and the contact strip exist so you can see it happen; fix it by
-  re-running with a different `--core-radius-frac` or by pinning `fin_info[name]["parent"]`.
-- **The chart stops at the peduncle.** The caudal lobes are transported rigidly by the terminal frame.
-  That preserves the heterocercal upsweep through the de-bend, but it also means the tail is not
-  independently charted, and a mesh whose caudal is fleshy enough to survive the core threshold will
-  inflate `info["tail_width"]` and can flip the head-first call. Check the printed head/tail widths.
-- **Nearest-segment ambiguity at corners.** For large `r` near a corner of a bent centerline the
-  nearest-segment rule is genuinely ambiguous: about 4% of vertices (all fin tips) re-land on a
-  neighbouring segment, shifting `s` by up to `r × (turn per segment)`. It scales exactly as
-  `1/n_stations` (6.1e-3 / 3.0e-3 / 1.5e-3 / 7.5e-4 BL at `n = 64/128/256/512`) and is currently an
-  order of magnitude below centerline-extraction error. At a much finer voxel pitch it becomes the
-  next term to attack, with spline upsampling.
+  islands that *begin* past `s = 0.85` are caudal whatever their sector. Disconnected shells of one
+  fin (a generated mesh often ships a fin in pieces) are merged before naming when they touch in
+  stations and share a sector, and in a name collision a cluster under 5 % of the largest contender
+  loses outright before the prior is consulted. On a sevengill this is right. On a mesh with an
+  unusual fin set, a dorsal fin far forward, or a caudal that survives the core threshold, it will
+  produce confidently wrong names. `fins.json` and the contact strip exist so you can see it happen;
+  fix it by re-running with a different `--core-radius-frac` or by pinning
+  `fin_info[name]["parent"]`.
+- **The chart stops at the peduncle.** The caudal is carried rigidly — the overhang by the terminal
+  frame, the detected lobes by the frame at their insertion. That preserves the heterocercal upsweep
+  through the de-bend, but it also means the tail is not independently charted, and a mesh whose
+  caudal is fleshy enough to survive the core threshold will inflate `info["tail_width"]`, can flip
+  the head-first call, and can leave the medial path hooked up into the lobe (see `trim_end_hooks`).
+  Check the printed head/tail widths and the "end hook" line.
+- **Nearest-segment ambiguity at corners.** For large `r` near a corner of the dense chart polyline
+  the nearest-segment rule is genuinely ambiguous: a few percent of body vertices re-land on a
+  neighbouring *dense* segment, shifting `s` by up to `r × (turn per dense segment)` — eight times
+  less than on the station polyline (`~8e-4 BL` on the C-120 fixture) and an order of magnitude
+  below centerline-extraction error. Fin vertices no longer see it at all: they are carried rigidly.
+  The coarse-to-fine search assumes stations uniform in arc length (every producer in this repo
+  resamples them so); a hand-built polyline whose segment lengths vary by more than ~30 % can miss
+  the true nearest dense segment.
 - **No self-contact handling, and the default C-start is capped so it does not need any.** Nothing
   detects or resolves the tail intersecting the head; the clip is kinematic, not simulated. The
   original default (`ESCAPE_PEAK_CURVATURE_UNCAPPED_PER_BL = 6.0 /BL`) turned the midline **276.6°**
@@ -725,12 +754,12 @@ V-axis flip that §8's item 8 warns about (measured: < 1e-6 over the whole atlas
 
 | file | contract |
 |---|---|
-| `mesh3d.py` | the chart: `load_mesh`, `extract_centerline_3d`, `tube_frames`, `tube_coords`/`tube_to_points`, `debend`/`rebend`, `detect_fins`. CLI: `python mesh3d.py IN.glb -o OUT.glb` |
+| `mesh3d.py` | the chart: `load_mesh`, `extract_centerline_3d`, `tube_frames`, `tube_coords`/`tube_to_points`, `debend`/`rebend`, `detect_fins`. CLI: `python mesh3d.py IN.glb -o OUT.glb`; `map_mesh` (chart for the body, rigid carry for fins), `densify_centerline`, `trim_end_hooks` |
 | `synth.py` | the procedural sevengill with ground truth: `make_sevengill` (solid, welded, two-sided fins; `solid_fins=False` for the old sheets), `fin_section_report`, `c_curve`/`s_curve`, `bend`, `export_glb`, `preview_png` |
 | `rig.py` | `build_skeleton`, `fin_info_from_detection`, `compute_weights`, `forward_kinematics`, `lbs`, quaternion helpers. Imports `skeleton_sevengill` from phase1b |
 | `gltf_export.py` | `write_skinned_glb`, `validate_glb` (shells out to the Khronos validator) |
 | `motion.py` | the swimming model: `WaveParams`, `MODE_CONFIG`, `curvature`, `joint_yaw_angles`, `make_clip`, plus diagnostics (`phase_report`, `dct_energy_fraction`, `implied_skin_strain`, `tail_tip_amplitude`). `python motion.py` prints a kinematics report |
-| **`rig_sevengill.py`** | **the CLI**: `run_pipeline`, `solve_as_scanned`, `write_report`, `render_contact_strip` |
+| **`rig_sevengill.py`** | **the CLI**: `run_pipeline`, `solve_as_scanned`, `write_report`, `render_contact_strip`; `--hook-turn-mult` |
 | **`demo.py`** | **the end-to-end synthetic demo**; writes `demo/` and prints every number in §6 |
 | `scripts/measure_lbs_artifact.py` | the numbers in §7's LBS paragraph: worst trunk edge and face ratios at the escape peak and which spine segments they cluster in. `--uncapped` adds the pre-cap 6 /BL contrast |
 | **`texture_identity.py`** | **the scan's own skin → catalogue individual #0** (§9): `chart_coords` (04 → 05 convention bridge), `straighten`, `delight_texture`, `fit_individual`, `resight_series`, `random_individuals`, `bake_individual`, `write_textured_glb`, `render_side`, `contact_sheet`. CLI: `python texture_identity.py --glb IN.glb --out DIR`. Imports prototype 05 read-only through a `sys.path` shim (`$SEVENGILL_P05_DIR` overrides) |

@@ -365,18 +365,41 @@ def build_skeleton(
     return Skeleton(names, parents, np.asarray(joints, dtype=float), kinds, fractions, fins)
 
 
-def fin_info_from_detection(fins, vertices):
+def _axis_frame_at(point, centerline):
+    """Closest point on ``centerline`` (a straight or gently curved polyline) to
+    ``point`` and the unit tangent there, pointing snout -> tail (``T = -X`` in
+    the canonical straight pose).  With ``centerline=None`` the body axis is
+    the X line through the origin, which is where ``mesh3d.debend`` puts the
+    straight rest pose."""
+    if centerline is None:
+        return np.array([float(point[0]), 0.0, 0.0]), np.array([-1.0, 0.0, 0.0])   # T = -X
+    cl = np.asarray(centerline, dtype=float)
+    seg, t = _project_on_polyline(np.asarray(point, dtype=float)[None, :], cl)
+    a, b = cl[seg[0]], cl[seg[0] + 1]
+    foot = a + t[0] * (b - a)
+    tang = b - a
+    return foot, tang / max(np.linalg.norm(tang), 1e-12)
+
+
+def fin_info_from_detection(fins, vertices, centerline=None):
     """Adapt module A's ``detect_fins(...).fins`` dict to the ``fin_info`` contract.
 
     Module A reports, per fin, an ``insertion_centroid`` and the ``vertex_indices`` of
     the island, but no tip -- the tip is not a landmark it needs. Here the tip is the
-    labelled vertex FARTHEST from the insertion centroid, which is what a fin's distal
-    extremity is on a protruding island, and the axis root->tip is what
-    ``compute_weights`` grades the fin along.
+    island's APEX: the labelled vertex that protrudes farthest from the body axis in
+    the direction the insertion sits (dorsal for a dorsal fin, outboard for a
+    pectoral).  The axis root->tip is what ``compute_weights`` grades the fin along,
+    so it has to leave the body: the earlier rule, "farthest from the insertion
+    centroid", picks a base corner on any island that is longer along the body than
+    it is tall (a sevengill's low dorsal, anal and pelvic fins), which turns the fin
+    drive into a fore-aft hinge and folds the blade over.
 
     Args:
         fins: ``{name: {"insertion_centroid": (3,), "vertex_indices": (k,) int}}``.
         vertices: (N, 3) rest-pose vertices of the straight mesh.
+        centerline: optional (M, 3) straight centerline the rest pose was built on;
+            the body axis near each fin is read from it.  Default: the +X axis
+            through the origin (``mesh3d.straight_centerline``'s convention).
 
     Returns:
         ``{name: {"insertion": (3,), "tip": (3,)}}`` in the same order.
@@ -395,7 +418,25 @@ def fin_info_from_detection(fins, vertices):
             members = verts[np.asarray(entry["vertex_indices"], dtype=int)]
             if len(members) == 0:
                 raise ValueError("fin %r has no vertices" % name)
-            tip = members[int(np.argmax(np.linalg.norm(members - insertion, axis=1)))]
+            foot, tang = _axis_frame_at(insertion, centerline)
+            radial = insertion - foot
+            radial = radial - (radial @ tang) * tang
+            norm = np.linalg.norm(radial)
+            if name.startswith("caudal"):
+                # A caudal lobe's long axis is AXIAL: its tip is the most
+                # posterior vertex along the tail-ward tangent.  (Not "farthest
+                # from the insertion": on a tapering lobe the innermost-radius
+                # quartile that defines the insertion can sit mid-lobe, and the
+                # farthest vertex from there is the base, pointing the bone
+                # forward.)
+                tip = members[int(np.argmax((members - foot) @ tang))]
+            elif norm > 1e-9:
+                u = radial / norm
+                rel = members - foot
+                rel = rel - (rel @ tang)[:, None] * tang
+                tip = members[int(np.argmax(rel @ u))]
+            else:  # insertion on the axis: no side to prefer, fall back to reach
+                tip = members[int(np.argmax(np.linalg.norm(members - insertion, axis=1)))]
         out[name] = {"insertion": insertion, "tip": tip}
         if "parent" in entry:
             out[name]["parent"] = entry["parent"]

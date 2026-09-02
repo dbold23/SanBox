@@ -330,6 +330,7 @@ def run_pipeline(
     n_stations=64,
     up=(0.0, 0.0, 1.0),
     core_radius_frac=0.17,
+    hook_turn_mult=3.0,
     sigma=None,
     fin_blend_rings=rig.DEFAULT_FIN_BLEND_RINGS,
     precaudal_fraction=rig.DEFAULT_PRECAUDAL_FRACTION,
@@ -385,6 +386,12 @@ def run_pipeline(
            info["head_width"], info["tail_width"]))
 
     t0 = time.time()
+    centerline, n_hook = mesh3d.trim_end_hooks(centerline, up=tuple(up), turn_mult=hook_turn_mult)
+    if n_hook:
+        info["length"] = float(mesh3d.arc_length(centerline)[-1])
+        info["n_hook_stations"] = int(n_hook)
+        log("end hook: %d station(s) that pitched into a fin trimmed; chart length now %.4f"
+            % (n_hook, info["length"]))
     frames = mesh3d.tube_frames(centerline, up=tuple(up))
     coords = mesh3d.tube_coords(mesh, centerline, frames)
     straight_mesh, straight_centerline = mesh3d.debend(mesh, centerline, frames)
@@ -404,7 +411,9 @@ def run_pipeline(
     log("fins: %d islands -- %s" % (len(detection.fins), ", ".join(sorted(detection.fins))))
 
     t0 = time.time()
-    fin_info = rig.fin_info_from_detection(detection.fins, straight_mesh.vertices)
+    fin_info = rig.fin_info_from_detection(
+        detection.fins, straight_mesh.vertices, centerline=straight_centerline
+    )
     skeleton = rig.build_skeleton(
         straight_centerline, fin_info, precaudal_fraction=precaudal_fraction
     )
@@ -830,6 +839,9 @@ def build_parser():
     ap.add_argument("-n", "--n-stations", type=int, default=64)
     ap.add_argument("--up", type=float, nargs=3, default=(0.0, 0.0, 1.0),
                     help="DORSAL direction of the input mesh (default +Z)")
+    ap.add_argument("--hook-turn-mult", type=float, default=3.0,
+                    help="trim a terminal hook whose sagittal turn per station exceeds this "
+                         "multiple of the body's median (and 5 deg); 0 disables")
     ap.add_argument("--core-radius-frac", type=float, default=0.17,
                     help="thick-core threshold keeping the medial path out of the fins")
     ap.add_argument("--sigma", type=float, default=None,
@@ -862,6 +874,7 @@ def main(argv=None):
         n_stations=args.n_stations,
         up=tuple(args.up),
         core_radius_frac=args.core_radius_frac,
+        hook_turn_mult=args.hook_turn_mult,
         sigma=args.sigma,
         fin_blend_rings=args.fin_blend_rings,
         precaudal_fraction=args.precaudal_fraction,

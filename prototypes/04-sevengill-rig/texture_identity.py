@@ -305,6 +305,12 @@ def straighten(source, n_stations=64, tex_size=DEFAULT_TEX_SIZE, seed=0,
     ``synth.make_sevengill(textured=True, seed=seed)``).  The centerline is
     always re-extracted from the geometry -- never taken from ``metadata`` --
     so the synthetic and the real GLB go down exactly the same path.
+    
+    Note: ``mesh3d.debend`` carries fin islands rigidly (``rigid_fins=True``).
+    Body vertices are unaffected to machine precision, but the observed ``s``
+    extent that ``chart_coords(normalize="extent")`` rescales by is set by the
+    rigidly carried caudal tip and snout, and demoted islands keep the ``body``
+    label, so their texels enter the chart at their carried ``(s, phi)``.
     """
     t0 = time.time()
     if source is None:

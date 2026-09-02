@@ -217,20 +217,37 @@ def test_bend_preserves_topology_and_girth(straight, bent):
     assert len(mesh.vertices) == len(straight.vertices)
     assert not np.allclose(mesh.vertices, straight.vertices)
     # A tube-coordinate bend is an isometry in s and preserves r exactly -- for
-    # every vertex whose foot lands on the same segment before and after.  It
-    # re-lands on a different segment for ~4% of vertices, all of them at large
-    # r near a corner of the bent polyline, where the nearest-segment rule is
-    # genuinely ambiguous; there the recovered s shifts by up to r * (turn per
-    # segment) = 0.20 * 120 deg / 63 ~ 6e-3 BL.  That bound, not exactness, is
-    # what the chart guarantees on a bent centerline.
+    # every vertex whose foot lands on the same dense segment before and after.
+    # It re-lands on a neighbouring dense segment for a few percent of vertices,
+    # all of them at large r near a corner of the dense polyline, where the
+    # nearest-segment rule is genuinely ambiguous; there the recovered s shifts
+    # by up to r * (turn per dense segment) = 0.20 * 120 deg / (63 * 8) ~ 8e-4
+    # BL.  That bound, not exactness, is what the chart guarantees on a bent
+    # centerline -- eight times tighter than the station polyline's.
+    # Fins are not charted: each island rides its insertion frame as a rigid
+    # plate (``mesh3d.map_mesh``), so the chart contract is checked on the body
+    # and rigidity on the blades.
     a = mesh3d.tube_coords(straight, info["source_centerline"], info["source_frames"])
     b = mesh3d.tube_coords(mesh, info["centerline"], info["frames"])
-    same = a.station == b.station
-    assert same.mean() > 0.95
+    w = np.zeros(len(a.s))
+    for members, weights, *_ in mesh.metadata["rigid_islands"]:
+        w[members] = weights
+    body = w == 0
+    same = (a.segment == b.segment) & body
+    assert same.sum() > 0.95 * body.sum()
     assert np.allclose(a.r[same], b.r[same], atol=1e-9)
     assert np.allclose(a.s[same], b.s[same], atol=1e-9)
-    assert np.abs(a.r - b.r).max() < 1e-3
-    assert np.abs(a.s - b.s).max() < 7e-3
+    assert np.abs(a.r[body] - b.r[body]).max() < 1e-3
+    assert np.abs(a.s[body] - b.s[body]).max() < 1e-3
+    sv, bv = np.asarray(straight.vertices), np.asarray(mesh.vertices)
+    for members, weights, *_ in mesh.metadata["rigid_islands"]:
+        blade = members[weights >= 1.0]
+        if len(blade) < 2:
+            continue
+        ref = blade[0]
+        d0 = np.linalg.norm(sv[blade] - sv[ref], axis=1)
+        d1 = np.linalg.norm(bv[blade] - bv[ref], axis=1)
+        assert np.allclose(d0, d1, atol=1e-9)          # the blade is a rigid body
 
 
 def test_bend_is_invertible_on_ground_truth(straight, bent):
@@ -239,13 +256,22 @@ def test_bend_is_invertible_on_ground_truth(straight, bent):
     segment); at 64 stations over a 120 deg arc that is ~6e-3 BL worst case on a
     fin tip and ~5e-4 BL rms."""
     mesh, info = bent
-    back = mesh3d.map_points(
-        np.asarray(mesh.vertices), info["centerline"], info["frames"],
+    back, _ = mesh3d.map_mesh(
+        mesh, info["centerline"], info["frames"],
         info["source_centerline"], info["source_frames"],
+        records=mesh.metadata["rigid_islands"],
     )
-    err = np.linalg.norm(back - np.asarray(straight.vertices), axis=1)
+    err = np.linalg.norm(np.asarray(back.vertices) - np.asarray(straight.vertices), axis=1)
     assert np.sqrt((err ** 2).mean()) < 1e-3
     assert err.max() < 1e-2
+    # body vertices and fully rigid blade vertices invert exactly; only the
+    # root blend band (a position mix of the two transports) is approximate
+    w = np.zeros(len(err))
+    for members, weights, *_ in mesh.metadata["rigid_islands"]:
+        w[members] = weights
+    exact = (w == 0) | (w >= 1)
+    assert np.median(err[exact]) < 1e-12
+    assert err[exact].max() < 1e-3        # nearest-segment re-landing at corners, r * turn per dense segment
 
 
 def test_export_glb_round_trip(straight):

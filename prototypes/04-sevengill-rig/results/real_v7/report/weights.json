@@ -1,0 +1,60 @@
+{
+ "influences_histogram": {
+  "1": 124791,
+  "2": 885170,
+  "3": 3853
+ },
+ "max_influences": 3,
+ "mean_influences": 1.8807098738032815,
+ "row_sum_max": 1.0000000000000002,
+ "row_sum_min": 0.9999999999999999,
+ "shape": [
+  1013814,
+  35
+ ],
+ "unweighted_joints": [
+  "unassigned_island_0_fin_root",
+  "unassigned_island_0_fin_tip",
+  "unassigned_island_1_fin_root",
+  "unassigned_island_1_fin_tip",
+  "unassigned_island_2_fin_root",
+  "unassigned_island_2_fin_tip"
+ ],
+ "vertex_mass_by_joint": {
+  "anal_fin_root": 3194.235515987298,
+  "anal_fin_tip": 2501.4311506793724,
+  "caudal_lower_fin_root": 1659.5256818155171,
+  "caudal_lower_fin_tip": 2108.1409848511526,
+  "caudal_upper_fin_root": 16476.532368516797,
+  "caudal_upper_fin_tip": 13746.800964816639,
+  "dorsal_fin_root": 7822.615948528353,
+  "dorsal_fin_tip": 3642.7173848050074,
+  "pectoral_L_fin_root": 24281.21700347747,
+  "pectoral_L_fin_tip": 12774.78299652218,
+  "pectoral_R_fin_root": 29115.050853948553,
+  "pectoral_R_fin_tip": 16788.615812717926,
+  "pelvic_L_fin_root": 2255.176338588235,
+  "pelvic_L_fin_tip": 951.8236614117632,
+  "pelvic_R_fin_root": 1788.3110359407267,
+  "pelvic_R_fin_tip": 1174.0222973926054,
+  "spine_00_cranium": 45059.676402858626,
+  "spine_01_branchial_1": 25981.420961042797,
+  "spine_02_branchial_7": 20917.506120794424,
+  "spine_03_trunk_01": 50853.08311821976,
+  "spine_04_trunk_02": 100109.86314721277,
+  "spine_05_trunk_03": 113307.01657245668,
+  "spine_06_trunk_04": 97052.0965165026,
+  "spine_07_trunk_05": 83552.01399740533,
+  "spine_08_trunk_06": 73930.27931681198,
+  "spine_09_trunk_07": 73120.87964459923,
+  "spine_10_precaudal": 59535.57118847403,
+  "spine_11_caudal_axis_1": 41134.04244823653,
+  "spine_12_caudal_axis_2": 88979.55056538725,
+  "unassigned_island_0_fin_root": 0.0,
+  "unassigned_island_0_fin_tip": 0.0,
+  "unassigned_island_1_fin_root": 0.0,
+  "unassigned_island_1_fin_tip": 0.0,
+  "unassigned_island_2_fin_root": 0.0,
+  "unassigned_island_2_fin_tip": 0.0
+ }
+}

@@ -26,7 +26,7 @@ Contracts
 
 ``bend(mesh, curve=None, ...) -> (bent_mesh, info)``
     Forward tube-coordinate transport of a *straight* mesh onto ``curve``.  Uses
-    exactly the machinery ``mesh3d.debend`` inverts -- ``mesh3d.map_points`` --
+    exactly the machinery ``mesh3d.debend`` inverts -- ``mesh3d.map_mesh`` --
     so a round trip through the ground-truth centerline is exact to float
     precision and any residual measures centerline-extraction error alone.
 
@@ -727,7 +727,10 @@ def bend(mesh, curve=None, source_centerline=None, up=(0.0, 0.0, 1.0)):
             with a straight ground-truth centerline).
         curve: (m, 3) target centerline, or None for the default ~120 degree
             lateral C-curve.  Resampled to the source station count and rescaled
-            to the source arc length, so the map is an isometry in ``s``.
+            to the source arc length, so the map is an isometry in ``s`` for body
+            vertices; fin islands ride their insertion frame as rigid plates
+            (``mesh3d.map_mesh``), and the records are stored in
+            ``metadata["rigid_islands"]``.
         source_centerline: (n, 3) straight centerline; defaults to
             ``mesh.metadata['centerline']``.
         up: seed normal for the target rotation-minimising frames (dorsal).
@@ -754,11 +757,11 @@ def bend(mesh, curve=None, source_centerline=None, up=(0.0, 0.0, 1.0)):
     src_frames = mesh3d.tube_frames(src, up=up)
     dst_frames = mesh3d.tube_frames(dst, up=up)
 
-    out = mesh.copy()
-    out.vertices = mesh3d.map_points(
-        np.asarray(mesh.vertices, dtype=float), src, src_frames, dst, dst_frames
-    )
+    # Body through the chart, fins as rigid plates hinged at their base -- the
+    # same transport ``mesh3d.debend`` applies in the other direction.
+    out, records = mesh3d.map_mesh(mesh, src, src_frames, dst, dst_frames)
     out.metadata["centerline"] = dst
+    out.metadata["rigid_islands"] = records
     out.metadata["straight_centerline"] = src
     return out, {
         "centerline": dst,

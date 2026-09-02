@@ -152,8 +152,9 @@ def test_module_a_fin_detection_dict_is_accepted(capsule):
         np.testing.assert_allclose(
             sk.joints[root], capsule["fin_info"][name]["insertion"], atol=1e-12
         )
-        # the derived tip is the fin vertex farthest from the insertion, so it sits
-        # at least as far out as the analytic tip's distance minus the box half-chord
+        # the derived tip is the island's apex (farthest radial protrusion on the
+        # insertion's side; caudal: farthest from the insertion), so it sits at
+        # least as far out as the analytic tip's distance minus the box half-chord
         reach = np.linalg.norm(sk.joints[tip] - sk.joints[root])
         analytic = np.linalg.norm(
             capsule["fin_info"][name]["tip"] - capsule["fin_info"][name]["insertion"]
@@ -599,3 +600,26 @@ def test_quaternion_roundtrip():
 
 def test_identity_rotation_is_the_identity_quaternion():
     np.testing.assert_allclose(rig.rotmat_to_quat(np.eye(3)), [0.0, 0.0, 0.0, 1.0], atol=1e-12)
+
+
+def test_tip_of_a_long_low_fin_is_its_apex():
+    """A fin longer along the body than it is tall: the old rule (farthest from
+    the insertion) picked a base corner, so the fin drive hinged it fore-aft."""
+    n_along, n_up = 40, 8
+    xs = np.linspace(-0.05, 0.05, n_along)          # 100 mm along the body
+    zs = np.linspace(0.02, 0.04, n_up)              # 20 mm tall, root at body radius 0.02
+    X, Z = np.meshgrid(xs, zs)
+    verts = np.column_stack([X.ravel(), np.zeros(X.size), Z.ravel()])
+    insertion = np.array([0.0, 0.0, 0.02])
+    fin_info = rig.fin_info_from_detection(
+        {"dorsal": {"insertion_centroid": insertion, "vertex_indices": np.arange(len(verts))}}, verts)
+    tip = fin_info["dorsal"]["tip"]
+    assert tip[2] == pytest.approx(0.04)             # on the apex row, not the z = 0.02 base row
+    # a caudal lobe's axis is axial: its tip is the most posterior vertex, even
+    # when the detected insertion sits mid-lobe (a tapering lobe's innermost
+    # radii are at its far end)
+    caudal = np.column_stack([np.linspace(-0.30, -0.20, 50), np.zeros(50), np.linspace(0.01, 0.03, 50)])
+    for ins in (caudal[-1], caudal[25], caudal[0]):
+        fin_info = rig.fin_info_from_detection(
+            {"caudal_upper": {"insertion_centroid": ins, "vertex_indices": np.arange(50)}}, caudal)
+        assert fin_info["caudal_upper"]["tip"][0] == pytest.approx(-0.30)
