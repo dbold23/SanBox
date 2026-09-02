@@ -18,6 +18,9 @@ from scipy.spatial import cKDTree
 
 rest_path, asset_path, out_asset, out_dir = sys.argv[1:5]
 radius = float(sys.argv[sys.argv.index("--radius-mm") + 1]) / 1000.0 if "--radius-mm" in sys.argv else 0.014
+source = sys.argv[sys.argv.index("--source") + 1] if "--source" in sys.argv else "left"   # flank with the GOOD eye
+SGN = 1.0 if source == "left" else -1.0          # +Y is the animal's left in the rest pose
+feather = 0.35                                   # outer fraction of the disc that fades into the existing skin
 os.makedirs(out_dir, exist_ok=True)
 rest = trimesh.load(rest_path, force="mesh")
 V = np.asarray(rest.vertices, float); F = np.asarray(rest.faces); UV = np.asarray(rest.visual.uv, float)
@@ -38,37 +41,40 @@ lum = sample(UV).mean(1)
 head = V[:, 0] > V[:, 0].max() - 0.22 * BL              # anterior 22% of the body
 # The eye sits on the flank ABOVE the mouth line and behind the snout tip; the
 # mouth corner (dark, ventral) is excluded by the z > 0 constraint.
-right = head & (V[:, 1] < -0.004) & (V[:, 2] > 0.0) & (V[:, 0] < V[:, 0].max() - 0.03)
-# a pupil is a small dark blob inside a bright ring: score = darkness of the
-# 4 mm neighbourhood minus darkness of the 4-9 mm annulus
+right = head & (SGN * V[:, 1] > 0.004) & (V[:, 2] > 0.0) & (V[:, 0] < V[:, 0].max() - 0.01)   # SOURCE flank (the eye can sit within ~15 mm of the snout tip)
+# a pupil is a small dark blob inside a bright ring: score = 90th percentile
+# of luminance in the 2.5-6 mm annulus minus the mean of the 2.5 mm core
+# (the black-pupil / white-ring eye of this model scores ~210, the amber one
+# ~110, a skin spot < 60)
 cand = np.flatnonzero(right); tree = cKDTree(V[cand])
-thr = np.percentile(lum[cand], 3.0); dark = cand[lum[cand] <= thr]
+thr = np.percentile(lum[cand], 1.0); dark = cand[lum[cand] <= thr]
 best, best_score = None, -1e9
 for p in V[dark]:
-    inner = tree.query_ball_point(p, 0.004); outer = tree.query_ball_point(p, 0.009)
-    if len(inner) < 20 or len(outer) <= len(inner): continue
+    inner = tree.query_ball_point(p, 0.0025); outer = tree.query_ball_point(p, 0.006)
+    if len(inner) < 8 or len(outer) <= len(inner) + 20: continue
     ring = np.setdiff1d(outer, inner)
-    score = lum[cand[ring]].mean() - lum[cand[inner]].mean()
+    score = np.percentile(lum[cand[ring]], 90) - lum[cand[inner]].mean()
     if score > best_score: best_score, best = score, p
 seed = best
-disc = dark[np.linalg.norm(V[dark] - seed, axis=1) < 0.006]
+disc = dark[np.linalg.norm(V[dark] - seed, axis=1) < 0.003]
 eye_R = V[disc].mean(0)
-print("pupil/ring contrast score %.1f" % best_score)
+print("pupil/ring contrast score %.1f (a pupil inside a bright ring scores > 60; lower means the detector may have locked onto a skin spot)" % best_score)
+assert best_score > 60, "no convincing pupil-in-ring on the source flank; refusing to patch"
 eye_L_mirror = eye_R * np.array([1.0, -1.0, 1.0])
 # The head is not exactly mirror-symmetric (mirrored left points sit ~3.7 mm off
 # the right surface, about one iris width).  Register the mirrored LEFT head
 # onto the RIGHT head with ICP; the sampling map is then p -> T(mirror(p)) and
 # the true left eye is mirror(T^-1(eye_R)).
 MIR = np.array([1.0, -1.0, 1.0])
-selL = head & (V[:, 1] > 0.004) & (np.linalg.norm(V - eye_L_mirror, axis=1) < 0.06)
-selR = head & (V[:, 1] < -0.004) & (np.linalg.norm(V - eye_R, axis=1) < 0.06)
+selL = head & (SGN * V[:, 1] < -0.004) & (np.linalg.norm(V - eye_L_mirror, axis=1) < 0.06)   # TARGET flank
+selR = head & (SGN * V[:, 1] > 0.004) & (np.linalg.norm(V - eye_R, axis=1) < 0.06)             # SOURCE flank
 rng = np.random.default_rng(0)
 srcL = V[rng.choice(np.flatnonzero(selL), min(6000, selL.sum()), replace=False)] * MIR
 tgtR = V[rng.choice(np.flatnonzero(selR), min(20000, selR.sum()), replace=False)]
 T_icp, _, cost = trimesh.registration.icp(srcL, tgtR, scale=False, max_iterations=50)
 eye_L = (np.linalg.inv(T_icp) @ np.append(eye_R, 1.0))[:3] * MIR
-print("ICP mirrored-left -> right: residual %.5f m; left eye moved %.4f m from the pure mirror" % (cost, np.linalg.norm(eye_L - eye_L_mirror)))
-print("right eye centre (rest frame) %s, %d dark verts; left eye centre %s" % (np.round(eye_R, 4), len(disc), np.round(eye_L, 4)))
+print("source flank: %s.  ICP mirrored-target -> source: residual %.5f m; target eye moved %.4f m from the pure mirror" % (source, cost, np.linalg.norm(eye_L - eye_L_mirror)))
+print("SOURCE eye centre (rest frame) %s, %d dark verts; TARGET eye centre %s" % (np.round(eye_R, 4), len(disc), np.round(eye_L, 4)))
 
 # faces whose vertices lie in the left-eye disc / right-eye disc
 inL = np.linalg.norm(V - eye_L, axis=1) < radius
@@ -79,6 +85,14 @@ rightmesh = trimesh.Trimesh(V, F[facesR], process=False)
 
 # rasterise the left-eye faces in atlas space: for each texel, barycentric -> 3D -> mirror -> right surface -> UV -> colour
 patched = img.copy(); n_tex = 0; dists = []
+# Tone match: the two flanks of the atlas were lit differently, so a raw copy
+# shows as a disc.  Per-channel gain = mean target skin / mean source skin over
+# the annulus 6 mm .. radius around each eye (vertex colours, pupil excluded).
+def annulus_mean(centre):
+    d = np.linalg.norm(V - centre, axis=1); sel = (d > 0.006) & (d < radius)
+    return sample(UV[sel]).reshape(-1, 3).mean(0)
+gain = annulus_mean(eye_L) / np.maximum(annulus_mean(eye_R), 1.0)
+print("tone gain target/source per channel:", np.round(gain, 3))
 for fi in facesL:
     tri_uv = uv_to_px(UV[F[fi]]); x0, y0 = np.floor(tri_uv.min(0)).astype(int); x1, y1 = np.ceil(tri_uv.max(0)).astype(int)
     if x1 - x0 > 400 or y1 - y0 > 400:      # a degenerate/huge UV triangle: skip
@@ -107,9 +121,12 @@ for fi in facesL:
     den = np.maximum(d00 * d11 - d01 * d01, 1e-18)
     b1 = (d11 * d20 - d01 * d21) / den; b2 = (d00 * d21 - d01 * d20) / den; b0 = 1 - b1 - b2
     uv_r = b0[:, None] * UV[fr[:, 0]] + b1[:, None] * UV[fr[:, 1]] + b2[:, None] * UV[fr[:, 2]]
-    col = sample(uv_r)
+    col = sample(uv_r) * gain[None, :]
     xi = np.clip(np.round(Pw[:, 0]).astype(int), 0, W_ - 1); yi = np.clip(np.round(Pw[:, 1]).astype(int), 0, H_ - 1)
-    patched[yi, xi] = col; n_tex += len(xi)
+    dd = np.linalg.norm(pos3 - eye_L, axis=1) / radius            # 0 at the centre .. 1 at the disc edge
+    alpha = np.clip((1.0 - dd) / feather, 0.0, 1.0)              # 1 inside, fading over the outer band
+    alpha = alpha * alpha * (3.0 - 2.0 * alpha)
+    patched[yi, xi] = alpha[:, None] * col + (1.0 - alpha[:, None]) * patched[yi, xi]; n_tex += len(xi)
 print("patched %d texels; mapped points to right surface: mean %.4f m, p95 %.4f m" % (n_tex, np.concatenate(dists).mean(), np.percentile(np.concatenate(dists), 95)))
 out_img = Image.fromarray(np.clip(patched, 0, 255).astype(np.uint8))
 geom.visual.material.baseColorTexture = out_img
@@ -132,8 +149,8 @@ def render_side(colors, sign, path, mark=None):
         d.ellipse([mx - rr, im.size[1] - my - rr, mx + rr, im.size[1] - my + rr], outline=(255, 40, 40), width=3)
     im.save(path)
 vcol_before = sample(UV); img = patched; vcol_after = sample(UV)
-render_side(vcol_before, -1, os.path.join(out_dir, "eye_right_flank_before.png"), mark=eye_R)
-render_side(vcol_before, +1, os.path.join(out_dir, "eye_left_flank_before.png"), mark=eye_L)
-render_side(vcol_after, +1, os.path.join(out_dir, "eye_left_flank_after.png"), mark=eye_L)
-json.dump({"eye_R_rest": eye_R.tolist(), "eye_L_rest": eye_L.tolist(), "radius_m": radius, "texels": n_tex, "faces_left": int(len(facesL))}, open(os.path.join(out_dir, "eye_patch.json"), "w"), indent=2)
+render_side(vcol_before, int(SGN), os.path.join(out_dir, "eye_source_flank_before.png"), mark=eye_R)
+render_side(vcol_before, -int(SGN), os.path.join(out_dir, "eye_target_flank_before.png"), mark=eye_L)
+render_side(vcol_after, -int(SGN), os.path.join(out_dir, "eye_target_flank_after.png"), mark=eye_L)
+json.dump({"source_flank": source, "source_eye_rest": eye_R.tolist(), "target_eye_rest": eye_L.tolist(), "radius_m": radius, "feather": feather, "tone_gain": gain.tolist(), "texels": n_tex, "faces_target": int(len(facesL))}, open(os.path.join(out_dir, "eye_patch.json"), "w"), indent=2)
 print("renders written to", out_dir)

@@ -23,6 +23,6 @@ clip turn       134 frames, 4.44 s, loop=True
 clip escape     16 frames, 0.49 s, loop=False
 clip rest       101 frames, 3.33 s, loop=True
 clip as_scanned 46 frames, 1.50 s, spine joint error max 0.00084
-wrote results/real_v7/sevengill_rigged.glb (171155.8 kB)
+wrote results/real_v8/sevengill_rigged.glb (171500.5 kB)
 validator: 0 errors, 0 warnings
-report: results/real_v7/report
+report: results/real_v8/report

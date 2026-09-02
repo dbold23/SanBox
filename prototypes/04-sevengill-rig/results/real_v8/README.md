@@ -1,7 +1,7 @@
-# Prototype 04 on the real Meshy GLB, after the fixes (final run v7, 2026-09-02)
+# Prototype 04 on the real Meshy GLB, after the fixes (final run v8, 2026-09-02)
 
 Same input mesh as `results/real/` (`assets/sevengill.glb`), except that the base-colour atlas has the
-right eye mirrored onto the left eye (`assets/sevengill_eyefix.glb`, made by
+left eye mirrored onto the right eye (`assets/sevengill_eyefix.glb`, made by
 `results/real/check/scripts/mirror_eye_texture.py`; geometry, UVs and the other two textures are
 identical).  Same command as before, `--up 0 1 0`.  Neither GLB is committed (123 MB / 153 MB in,
 171 MB out).
@@ -15,7 +15,7 @@ identical).  Same command as before, `--up 0 1 0`.  Neither GLB is committed (12
 | dorsal tip folded back, overhang at its base; pelvic and anal fins "sliced in half"; a swaying triangle on the peduncle | the fin tip joint was the island vertex farthest from the insertion, which on a long low fin is the front base corner, so the fin drive hinged the blade fore-aft | tip = vertex protruding farthest from the body axis on the insertion's side (`rig.fin_info_from_detection`) |
 | tail tip pointing down | the medial path climbed into the upper caudal lobe on its last 3 stations (terminal tangent 46 deg up); straightening removed that pitch and the rigidly carried lobe rotated down with it.  The rotation-minimising frame itself stays within 3 deg of world-up, so the "-108 deg roll" warning was not the cause | end hooks are trimmed in `extract_centerline_3d` (turn > 3x median within the last 5 % of stations) |
 | caudal lobe unnamed, anal fin split, "up vector flipped" warning | the Meshy mesh delivers fins as several disconnected shells; each was named alone, and a 10-vertex sliver at the right phi beat the 29,540-vertex lobe in the prior tie-break | touching same-sector shells are merged before naming; an island that *starts* past 0.85 of the chart is caudal whatever its sector; slivers under 5 % of the largest contender lose collisions |
-| left eye textured in the wrong place | Meshy atlas | right-eye texels copied onto a 22 mm disc around the true left eye: the mirrored left head is registered onto the right head by ICP (the head is not mirror-symmetric, pure mirroring landed 3.7 mm off, one iris width), every atlas texel of the left disc is sampled at its registered position on the right flank (texture only) |
+| right eye textured differently from the left (the left one is the reference) | Meshy atlas | left-eye texels copied onto a 32 mm disc around the mirrored eye position on the right flank: the mirrored right head is ICP-registered onto the left head (the head is not mirror-symmetric; a pure mirror lands 1.6-3.7 mm off), each atlas texel of the disc is sampled at its registered position on the left flank, tone-matched per channel to the surrounding right-flank skin and feathered over the outer 35 % of the disc so no edge shows; the old amber eye 15 mm behind lies inside the disc and is overwritten (texture only) |
 
 Not fixed, because they are in the mesh, not the pipeline: the right pectoral has 36 % more blade area
 than the left (measured on the untouched scan), and the pelvic fins are staggered by 29 mm of arc
@@ -23,7 +23,7 @@ length on the scan itself.
 
 ## Numbers
 
-| quantity | before (`results/real`) | after (`results/real_v7`) |
+| quantity | before (`results/real`) | after (`results/real_v8`) |
 |---|---|---|
 | chart length | 0.5044 m | 0.4803 m (hook of 3 stations trimmed) |
 | rest extents | 0.668 x 0.231 x 0.130 m | 0.682 x 0.230 x 0.108 m |
@@ -46,6 +46,6 @@ one `detect_fins` demotion (the 10-vertex sliver).
 
 `report/` (pipeline report), `check/` (label overlays, surface check, zooms), `frames/` (three.js viewer
 frames incl. both eyes, tail, dorsal), `eye/` (eye-patch before/after renders and the detected centres),
-`rig_run.log`, `check.log`.  The viewer at `results/real/viewer/index.html` takes `?glb=../v7/sevengill_rigged.glb`.
+`rig_run.log`, `check.log`.  The viewer at `results/real/viewer/index.html` takes `?glb=../v8/sevengill_rigged.glb`.
 
 Review: an independent three-lens review of the diff (invertibility, regression/test adequacy, design/docs) found three bugs that were fixed before this run -- `rebend` reusing fin records built for another centerline or inherited from the input mesh, `_merge_shells` able to fuse a pelvic fin with the anal fin, and the end-hook trim cutting a genuine lateral tail flex (it now judges the sagittal turn only) -- plus the caudal tip rule, the blend threshold index and the upsample threading in `map_mesh`.  Seven tests were added for the new behaviour.

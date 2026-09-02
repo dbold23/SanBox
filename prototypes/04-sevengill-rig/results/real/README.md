@@ -1,6 +1,6 @@
 # Prototype 04 on the real Meshy GLB (run 2026-09-01, BEFORE the fixes)
 
-> Superseded by `results/real_v7/README.md` (2026-09-02): the pipeline fixes for the terraced fins, seam lines, folded dorsal tip, dropped tail and mis-named caudal are described and measured there.  This directory is kept as the before state.
+> Superseded by `results/real_v8/README.md` (2026-09-02): the pipeline fixes for the terraced fins, seam lines, folded dorsal tip, dropped tail and mis-named caudal are described and measured there.  This directory is kept as the before state.
 
 Input: `Meshy_AI_Frilled_Shark_0901203940_texture.glb` (123,112,964 bytes, md5 0bf748b16c457186a7385afcf35c12eb),
 copied to `assets/sevengill.glb`. Not committed (over 100 MB). The rigged output `sevengill_rigged.glb`

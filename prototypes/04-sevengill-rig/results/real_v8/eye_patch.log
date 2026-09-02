@@ -1,0 +1,8 @@
+pupil/ring contrast score 225.9 (a pupil inside a bright ring scores > 60; lower means the detector may have locked onto a skin spot)
+source flank: left.  ICP mirrored-target -> source: residual 0.00000 m; target eye moved 0.0016 m from the pure mirror
+SOURCE eye centre (rest frame) [0.2503 0.0145 0.0015], 109 dark verts; TARGET eye centre [ 0.2512 -0.0159  0.0015]
+left-eye faces 58932, right-eye faces 129313
+tone gain target/source per channel: [0.985 0.981 0.982]
+patched 2010454 texels; mapped points to right surface: mean 0.0011 m, p95 0.0023 m
+wrote assets/sevengill_eyefix.glb 153 MB
+renders written to results/real_v8/eye
