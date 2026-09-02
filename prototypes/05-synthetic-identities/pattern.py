@@ -821,8 +821,15 @@ def copy_from_chart(pattern_image, mask=None, params=None, threshold=None,
                     identity="copied", date="2020-01-01", length_cm=250.0,
                     regions=(), min_area_px=4, seed=-1, radius_gain=1.0,
                     confidence=None, min_confidence=0.25,
-                    chart_semantics="auto", axis_order="auto"):
+                    chart_semantics="auto", axis_order="auto",
+                    max_area_frac=0.02):
     """COPY: fit an :class:`Individual` to an existing chart darkness image.
+
+    ``max_area_frac``: a connected component covering more than this fraction
+    of the whole chart is not a spot (a sevengill speckle is well under 0.1%
+    of the skin) - it is an unobserved or shadowed region that survived
+    thresholding. Such components are dropped with a warning and counted in
+    ``provenance["oversized_dropped"]``; ``None`` disables the guard.
 
     This is the hook for replaying a REAL animal on the synthetic body. The
     photo -> chart extraction (detect the animal, rectify to (s, phi), read
@@ -939,9 +946,14 @@ def copy_from_chart(pattern_image, mask=None, params=None, threshold=None,
 
     rows_cols = _label_periodic(binary)
     recs = []
+    max_area_px = None if max_area_frac is None else float(max_area_frac) * h * w
+    oversized = []
     for rr, cc in rows_cols:
         area_px = int(rr.size)
         if area_px < min_area_px:
+            continue
+        if max_area_px is not None and area_px > max_area_px:
+            oversized.append(area_px)
             continue
         vals = work[rr % h, cc]
         if conf is not None:
@@ -972,6 +984,14 @@ def copy_from_chart(pattern_image, mask=None, params=None, threshold=None,
 
     recs.sort(key=lambda r: (r[0], r[1]))
     spots = empty_spots(len(recs))
+    if oversized:
+        warnings.warn(
+            "copy_from_chart dropped %d oversized component(s) (largest %d px = "
+            "%.1f%% of the chart; limit %.1f%%) - unobserved or shadowed regions "
+            "are not spots" % (len(oversized), max(oversized),
+                               100.0 * max(oversized) / float(h * w),
+                               100.0 * float(max_area_frac)),
+            RuntimeWarning, stacklevel=2)
     for i, (s_c, phi_c, radius, ecc, angle, darkness) in enumerate(recs):
         spots[i] = (i, s_c, phi_c, radius, ecc, angle, darkness, as_date(date))
     return Individual(
@@ -983,6 +1003,8 @@ def copy_from_chart(pattern_image, mask=None, params=None, threshold=None,
             "components_found": int(len(rows_cols)),
             "spots_kept": int(len(recs)),
             "min_area_px": int(min_area_px),
+            "max_area_frac": (None if max_area_frac is None else float(max_area_frac)),
+            "oversized_dropped": int(len(oversized)),
             "radius_gain": float(radius_gain),
             "axis_order": resolved_order,
             "semantics": resolved_semantics,

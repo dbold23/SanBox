@@ -11,3 +11,6 @@ emb_cache/
 # make_dataset.py commands quoted in prototypes/05-synthetic-identities/README.md
 05-synthetic-identities/demo/
 05-synthetic-identities/demo_*/
+# texture_identity variant GLBs: regenerated in ~13 s by the README command; keep the charts/sheet/json
+04-sevengill-rig/results/texture_identity/*.glb
+04-sevengill-rig/results/texture_identity/textures/

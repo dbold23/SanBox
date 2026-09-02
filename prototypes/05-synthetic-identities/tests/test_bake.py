@@ -424,3 +424,25 @@ def test_baking_a_darkness_chart_as_a_multiplier_is_warned_about():
         bake.bake_chart_to_texture(
             tube.mesh, tube.vertex_s, tube.vertex_phi, chart, 64,
             chart_semantics="darkness")
+
+
+def test_uncovered_texels_never_come_out_black_or_nan():
+    """Gutter texels take the nearest covered colour even when the base albedo is NaN there."""
+    import numpy as np
+    import bake
+    import fixtures
+
+    mesh, vs, vphi = fixtures.make_uv_tube(24, 16, 1.0, seed=0)[:3]
+    tex_size = (64, 64)
+    base = np.full(tex_size + (3,), 0.6)
+    base[:, :3, :] = np.nan                       # an off-atlas strip with undefined albedo
+    chart = np.zeros((32, 64))                    # darkness 0 = no marks
+    tex = bake.bake_chart_to_texture(mesh, vs, vphi, chart, tex_size,
+                                     base_albedo=base, delight=False,
+                                     chart_semantics="darkness")
+    tex = np.asarray(tex)
+    rgb, alpha = tex[..., :3], tex[..., 3]
+    assert np.isfinite(rgb).all()
+    gutters = alpha == 0
+    if gutters.any():
+        assert rgb[gutters].min() > 0.3, "gutter texels must inherit skin colour, not black"

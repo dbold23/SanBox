@@ -392,7 +392,11 @@ def test_fit_individual_pins_the_ambiguous_conventions(run_synth):
         "auto semantics would guess 'darkness' here")
     ind = ti.fit_individual(chart, context=run_synth["context"])
     assert ind.provenance["semantics"] == "albedo"
-    assert len(ind) == len(run_synth["individual0"])
+    # individual0 is fitted from the UNFILLED read (unobserved cells NaN); this
+    # refit uses the hole-filled display chart, so the two spot counts agree
+    # only to within the boundary cells the fill adds or removes.
+    n0 = len(run_synth["individual0"])
+    assert abs(len(ind) - n0) <= max(3, int(0.15 * n0)), (len(ind), n0)
 
 
 # ---------------------------------------------------------------------------

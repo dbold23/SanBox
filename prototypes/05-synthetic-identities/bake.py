@@ -823,7 +823,15 @@ def bake_chart_to_texture(
     mult[cov] = sampled if sampled.shape[1] == 3 else np.repeat(sampled[:, :1], 3, axis=1)
 
     rgb = np.clip(albedo * mult, 0.0, 1.0)
-    rgb[~cov] = 0.0
+    # Every uncovered atlas texel takes the nearest COVERED texel's colour (the
+    # alpha channel below still marks it as a gutter). Writing black there put
+    # dark slivers on every sub-texel face - the fin-root slits and the atlas
+    # seam rendered as stripes - and a base albedo can itself be NaN off-atlas
+    # (de-lighting leaves it undefined there), so copying the base is not safe.
+    if cov.any() and not cov.all():
+        _, (iy_all, ix_all) = ndimage.distance_transform_edt(~cov, return_indices=True)
+        rgb[~cov] = rgb[iy_all[~cov], ix_all[~cov]]
+    rgb = np.nan_to_num(rgb, nan=0.0)
     tex = np.zeros(shape + (4,), dtype=np.float32)
     tex[..., :3] = rgb
     tex[..., 3] = cov.astype(np.float32)

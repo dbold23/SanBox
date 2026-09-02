@@ -670,10 +670,10 @@ number below. The tests assert on ratios, not on these absolutes.
 | chart spot-scale contrast, de-lit → flattened `skin` base | 0.0363 → 0.0009 (2 % left) |
 | gain clamp bound on | 0 % of texels |
 | chart cells actually measured (fin texels dropped) | 85 % — the rest are `NaN`, i.e. *unobserved* |
-| individual #0 | **55 spots** from 61 connected components, Otsu threshold 0.595 |
+| individual #0 | **58 spots** (fitted on the UNFILLED chart read; 2 oversized components dropped by the `max_area_frac` guard, the largest 3.1 % of the chart) |
 | render → re-fit round trip | 36 spots, `recoverable_spot_count` = 36 (exact) |
-| `drift.similarity` to resights at 9 / 18 / 27 / 36 months | 0.973 / 0.913 / 0.841 / 0.770 |
-| `drift.similarity` to 3 random individuals | −0.009 / 0.007 / 0.028 |
+| `drift.similarity` to resights at 9 / 18 / 27 / 36 months | 0.933 / 0.855 / 0.770 / 0.687 |
+| `drift.similarity` to 3 random individuals | 0.035 / 0.012 / 0.007 |
 | same pipeline on a C-120 bend of the same mesh | same identity recovered (similarity > 0.6, spot count within 20 %) |
 | same pipeline on `demo/sevengill_synthetic_bent.glb`, unmodified | runs, all GLBs validate |
 | whole run (1 + 4 + 3 GLBs, all validated) | 13.5 s |

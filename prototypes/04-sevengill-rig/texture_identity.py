@@ -439,7 +439,7 @@ def body_texel_alpha(mesh, fins, raster):
 
 
 def read_chart(mesh, texture, vertex_s, vertex_phi, chart_shape=None,
-               alpha=None, return_coverage=False):
+               alpha=None, return_coverage=False, fill_holes=True):
     """Read a UV texture off the surface into a chart, in BAKE layout.
 
     Thin wrapper over ``bake.mesh_texture_to_chart`` that fixes the default
@@ -453,7 +453,7 @@ def read_chart(mesh, texture, vertex_s, vertex_phi, chart_shape=None,
         tex = np.dstack([tex[..., :3], np.asarray(alpha, dtype=float)])
     return bake.mesh_texture_to_chart(
         mesh, tex, vertex_s, vertex_phi, chart_shape=shape,
-        return_coverage=return_coverage,
+        return_coverage=return_coverage, fill_holes=fill_holes,
     )
 
 
@@ -1023,7 +1023,13 @@ def run(glb=None, out_dir=DEFAULT_OUT, n_resights=4, years=3.0, n_random=3,
     chart_skin = read_chart(mesh, delit.skin, vs, vphi, chart_shape=shape,
                             alpha=alpha)
 
-    ind0 = fit_individual(chart_delighted, context=ctx, identity="individual0",
+    # Fit on the UNFILLED read: hole-filling diffuses neighbours into cells no
+    # texel reached (the caudal overhang, dropped fin texels), and that grey
+    # smear thresholded as one giant "spot". NaN there means unobserved, and
+    # copy_from_chart treats it so. The filled chart stays for display/bake.
+    chart_fit = read_chart(mesh, delit.albedo, vs, vphi, chart_shape=shape,
+                           alpha=alpha, fill_holes=False)
+    ind0 = fit_individual(chart_fit, context=ctx, identity="individual0",
                           date=start_date, length_cm=length_cm)
     if report:
         print("de-light: low-frequency swing %.3f -> %.3f, dorsoventral "

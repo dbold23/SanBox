@@ -1,0 +1,201 @@
+{
+  "chart_finite_frac": 0.8498046875,
+  "chart_shape_bake": [
+    240,
+    128
+  ],
+  "delight": {
+    "coverage_frac": 0.994354248046875,
+    "dorsoventral_contrast_after": 0.9448364598315718,
+    "dorsoventral_contrast_before": 0.5229978645589308,
+    "gain_clipped_frac": 0.0,
+    "highfreq_chart_delighted": 0.043846689979495666,
+    "highfreq_chart_real": 0.045471111609291584,
+    "highfreq_chart_skin": 0.0018518542968955227,
+    "lowfreq_swing_after": 0.005918973494082129,
+    "lowfreq_swing_before": 1.002167738176545
+  },
+  "exclude_fins": true,
+  "individual0": {
+    "components_found": 67,
+    "n_spots": 58,
+    "round_trip": {
+      "area_fraction": 0.012076822916666667,
+      "n_spots": 58,
+      "recoverable": 29,
+      "refit": 27,
+      "threshold": 0.5687137743982401
+    },
+    "threshold": 0.5687137743982401
+  },
+  "input": null,
+  "out_dir": "results/texture_identity",
+  "paths": {
+    "chart_delighted": "results/texture_identity/chart_delighted.png",
+    "chart_real": "results/texture_identity/chart_real.png",
+    "chart_skin": "results/texture_identity/chart_skin.png",
+    "contact_sheet": "results/texture_identity/contact_sheet.png",
+    "individual0_glb": "results/texture_identity/individual0.glb",
+    "individual0_json": "results/texture_identity/individual0.json",
+    "random_01_glb": "results/texture_identity/random_01.glb",
+    "random_02_glb": "results/texture_identity/random_02.glb",
+    "random_03_glb": "results/texture_identity/random_03.glb",
+    "resight_01_glb": "results/texture_identity/resight_01.glb",
+    "resight_02_glb": "results/texture_identity/resight_02.glb",
+    "resight_03_glb": "results/texture_identity/resight_03.glb",
+    "resight_04_glb": "results/texture_identity/resight_04.glb",
+    "texture_delighted": "results/texture_identity/textures/delighted.png",
+    "texture_real": "results/texture_identity/textures/real.png",
+    "texture_skin": "results/texture_identity/textures/skin.png"
+  },
+  "randoms": [
+    {
+      "n_spots": 58,
+      "name": "random_01",
+      "similarity_to_individual0": 0.03512585568389346
+    },
+    {
+      "n_spots": 58,
+      "name": "random_02",
+      "similarity_to_individual0": 0.012334080232889516
+    },
+    {
+      "n_spots": 58,
+      "name": "random_03",
+      "similarity_to_individual0": 0.006901131728739051
+    }
+  ],
+  "resights": [
+    {
+      "date": "2020-10-01",
+      "length_cm": 251.7604933314293,
+      "n_spots": 58,
+      "name": "resight_01",
+      "similarity_to_individual0": 0.9333448362683402
+    },
+    {
+      "date": "2021-07-02",
+      "length_cm": 253.4435032436084,
+      "n_spots": 58,
+      "name": "resight_02",
+      "similarity_to_individual0": 0.8550513344345475
+    },
+    {
+      "date": "2022-04-02",
+      "length_cm": 255.0524399626095,
+      "n_spots": 58,
+      "name": "resight_03",
+      "similarity_to_individual0": 0.7704903684734234
+    },
+    {
+      "date": "2023-01-01",
+      "length_cm": 256.5905636224983,
+      "n_spots": 58,
+      "name": "resight_04",
+      "similarity_to_individual0": 0.6874481733960167
+    }
+  ],
+  "seconds": 12.91,
+  "seed": 0,
+  "straighten": {
+    "chart_length_m": 0.7312989917502363,
+    "fins_found": [
+      "anal",
+      "caudal_lower",
+      "caudal_upper",
+      "dorsal",
+      "pectoral_L",
+      "pectoral_R",
+      "pelvic_L",
+      "pelvic_R"
+    ],
+    "head_width": 0.044811290183333054,
+    "length": 0.7312989917502363,
+    "n_core_voxels": 12792,
+    "n_faces": 14120,
+    "n_vertices": 7150,
+    "pitch": 0.007977642173423425,
+    "radius": [
+      0.03488634891930524,
+      0.03948786091243856,
+      0.04285700264703407,
+      0.047357195786741246,
+      0.050198669312376445,
+      0.05408066352210279,
+      0.056660990473625286,
+      0.058460612066549025,
+      0.06218417038254515,
+      0.0638211373873874,
+      0.06470901293270358,
+      0.06613311402229335,
+      0.06810086704426371,
+      0.07113767147816653,
+      0.07179877956081082,
+      0.07179877956081082,
+      0.07179877956081082,
+      0.07243910946669004,
+      0.07346930103426054,
+      0.07370642474841535,
+      0.07502699403338173,
+      0.07568255887750204,
+      0.07568255887750204,
+      0.07568255887750204,
+      0.07568255887750204,
+      0.07568255887750204,
+      0.07545172195349636,
+      0.07398051450657549,
+      0.07315191324401933,
+      0.07227898150013104,
+      0.07179877956081082,
+      0.07179877956081082,
+      0.07167526550496642,
+      0.07135420079977578,
+      0.0711003604758364,
+      0.0691179624595747,
+      0.06750553757909941,
+      0.06497363144394151,
+      0.0638211373873874,
+      0.06382113738738739,
+      0.06289816001891431,
+      0.06108273214736032,
+      0.05898941077614096,
+      0.05681265924464873,
+      0.055991752309900784,
+      0.055507381512512055,
+      0.053335596751586604,
+      0.050255062330911926,
+      0.04815720231816821,
+      0.04785662392889841,
+      0.046554849957845326,
+      0.043179111687028475,
+      0.04037880033599698,
+      0.039888210867117115,
+      0.03965524894258851,
+      0.03720401719096653,
+      0.03512249083317347,
+      0.03225013859039799,
+      0.031910568693693686,
+      0.031910568693693686,
+      0.029828530106156326,
+      0.027619255302444412,
+      0.025283093164264105,
+      0.0234333047781667
+    ],
+    "s_normalize": "extent",
+    "s_raw_range": [
+      -0.03797118727282866,
+      0.9773066846242378
+    ],
+    "straighten_seconds": 1.027,
+    "tail_width": 0.028330886789736488,
+    "tau": 0.012866035009175348,
+    "texture_shape": [
+      256,
+      256
+    ]
+  },
+  "texture_size": [
+    256,
+    256
+  ]
+}

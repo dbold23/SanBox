@@ -430,3 +430,26 @@ def test_exclusion_mask_adapter_records_the_gill_slit_disagreement():
     without = P.chart_exclusion_mask((384, 192), include_gill_slits=False)
     assert with_gills.mean() > without.mean()
     assert np.all(with_gills[without])
+
+
+def test_copy_from_chart_drops_oversized_components_with_a_warning():
+    """A region covering 3% of the chart is unobserved skin or shadow, not a spot."""
+    import warnings as _w
+    import numpy as np
+    import pattern
+
+    h, w = 64, 128
+    img = np.ones((h, w))                      # albedo: 1 = bare skin
+    img[10:14, 20:24] = 0.2                    # a real spot, 16 px
+    img[30:50, 60:110] = 0.2                   # 1000 px = 12% of the chart, same darkness: dropped for SIZE alone
+    with _w.catch_warnings(record=True) as rec:
+        _w.simplefilter("always")
+        ind = pattern.copy_from_chart(img, chart_semantics="albedo", axis_order="phi_major",
+                                      min_area_px=4)
+    assert ind.provenance["oversized_dropped"] == 1
+    assert len(ind) == 1
+    assert any("oversized" in str(r.message) for r in rec)
+    # guard off: the blob comes back as a (nonsense) spot
+    ind2 = pattern.copy_from_chart(img, chart_semantics="albedo", axis_order="phi_major",
+                                   min_area_px=4, max_area_frac=None)
+    assert len(ind2) == 2
