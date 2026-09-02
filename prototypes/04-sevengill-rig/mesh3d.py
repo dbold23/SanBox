@@ -163,6 +163,15 @@ _ROLL_MIN_RADIUS_FRAC = 0.5
 # margin of 0.30), so without this ceiling the fattest "body" vertex of a finned
 # station is a fin root and the fit tracks the fins, not the ridge.
 _ROLL_BAND_FRAC = 0.20
+# ...and stations within this many stations of a *detected* fin are dropped
+# whole.  ``station_range`` reports the detected blade; the fin's root rows sit
+# under the detection margin, keep the ``body`` label by design and run a
+# station or two further at each end, and there they are the fattest
+# body-labelled vertex of their station.  Without the pad those end stations
+# leak into the fit, one per fin, each free to pick the left or the right blade
+# of a bilaterally symmetric animal -- a coin flip that ``np.unwrap`` then
+# turns into a pi offset over the whole tail of the fit.
+_ROLL_FIN_STATION_PAD = 2
 
 
 # ---------------------------------------------------------------------------
@@ -1064,9 +1073,12 @@ def estimate_roll(mesh, coords, det):
     fin-labelled vertices: a fin's root row keeps the ``body`` label by design
     (it sits under the detection margin), and it is the fattest thing at its
     station, so leaving those stations in makes the fit track the fins instead
-    of the ridge.  Stations whose fattest candidate is too near the axis (the
-    end caps) are dropped too, as are both terminal stations, which collect all
-    the material overhanging the chart.
+    of the ridge.  The block is padded by ``_ROLL_FIN_STATION_PAD`` stations
+    each side for the same reason: the *detected* blade is narrower than the
+    fin, and the stations just outside it hold nothing but undetected root.
+    Stations whose fattest candidate is too near the axis (the end caps) are
+    dropped too, as are both terminal stations, which collect all the material
+    overhanging the chart.
 
     Args:
         mesh: the mesh ``coords`` was charted from (used only to check length).
@@ -1093,7 +1105,8 @@ def estimate_roll(mesh, coords, det):
     blocked = np.zeros(n_stations, dtype=bool)
     for fin in det.fins.values():
         lo, hi = fin["station_range"]
-        blocked[max(0, int(lo)):min(n_stations, int(hi) + 1)] = True
+        blocked[max(0, int(lo) - _ROLL_FIN_STATION_PAD):
+                min(n_stations, int(hi) + 1 + _ROLL_FIN_STATION_PAD)] = True
     blocked[0] = blocked[-1] = True
 
     st = coords.station[body]

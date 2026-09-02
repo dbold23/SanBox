@@ -304,9 +304,14 @@ def test_fin_base_seam_edges_stay_continuous_under_the_cruise_clip(demo_run):
 
     A fin island was 100% fin root while the body vertices one ring outside it were
     100% spine, so under a clip the mesh edges crossing that boundary changed length
-    by up to 2.13% BL -- a visible tear at every fin base.  The fin-root weight now
+    by up to 1.94% BL -- a visible tear at every fin base.  The fin-root weight now
     ramps out over ``rig.DEFAULT_FIN_BLEND_RINGS`` rings and the same edges move by
-    0.34% BL.  The gate is 1.0% BL.
+    0.45% BL.  The gate is 1.0% BL.
+
+    (Both numbers moved when the stand-in's fins became solid: the seam is now
+    the boundary of a two-sided blade, so it is 346 edges rather than 174 and
+    they sit slightly deeper in the body.  The control -- weights with the
+    blend off -- reads 1.94% BL instead of 2.13%, so its gate is 1.5%.)
     """
     result = demo_run["result"]
     clip = result.clips["cruise"]
@@ -318,7 +323,7 @@ def test_fin_base_seam_edges_stay_continuous_under_the_cruise_clip(demo_run):
         result.straight_mesh.vertices, result.detection.labels, result.skeleton,
     )
     hard_pct, _ = _max_seam_change_bl(result, hard, clip)
-    assert hard_pct > 2.0, "the un-blended seam must still be the bad case (%.4f %%BL)" % hard_pct
+    assert hard_pct > 1.5, "the un-blended seam must still be the bad case (%.4f %%BL)" % hard_pct
     assert blended < 0.5 * hard_pct
 
 

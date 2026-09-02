@@ -10,12 +10,16 @@ Contracts
 ---------
 ``make_sevengill(...) -> trimesh.Trimesh``
     A single connected surface: a body of revolution (blunt head, tapered
-    peduncle, mild dorsoventral ellipticity) with eight fin sheets **welded** to
-    it -- their root row *is* a row of body-grid vertices, so the mesh graph is
-    connected exactly as a scanned/photogrammetric mesh would be.  Fins are
-    zero-thickness sheets; the real Meshy fins are thin solids, and both are
-    handled identically downstream because fin detection thresholds *radius*,
-    not thickness.  Carries UVs and a procedural texture.
+    peduncle, mild dorsoventral ellipticity) with eight **solid** fins welded
+    into it.  Each fin is a closed, two-sided loft of a NACA-00xx section --
+    round nose, thin trailing edge, maximum thickness ``FIN_THICKNESS_RATIO`` of
+    the local chord at the root -- whose root loop is a *slit* opened in the
+    body grid itself: the root column is split into two lips pushed apart by the
+    local section half-thickness, its neighbours are slid aside to make room,
+    and a single triangle closes the notch at each end of the slit.  Nothing is
+    duplicated and nothing is orphaned; the mesh graph is connected exactly as a
+    scanned/photogrammetric mesh would be, and the fin shells add no boundary
+    and no non-manifold edge.  Carries UVs and a procedural texture.
     ``mesh.metadata`` holds the ground truth: ``centerline`` (N,3),
     ``vertex_labels`` (V,) of str, ``fins`` (per-fin construction parameters),
     ``total_length``, ``tube_length``, ``gill_u``.
@@ -45,6 +49,7 @@ __all__ = [
     "s_curve",
     "export_glb",
     "preview_png",
+    "fin_section_report",
     "FIN_SPECS",
     "LABELS",
 ]
@@ -135,12 +140,137 @@ def _radial_dir(u, phi, r_max, ellipticity):
     return v / np.linalg.norm(v, axis=-1, keepdims=True)
 
 
+# ---------------------------------------------------------------------------
+# Fin cross-section
+# ---------------------------------------------------------------------------
+# Every fin is a closed two-sided loft of a symmetric section.  These constants
+# are the whole of its shape; the numbers they produce on the default stand-in
+# are printed by ``fin_section_report``.
+
+#: Maximum section thickness as a fraction of the local chord, at the root.
+#: 10-14% is the range measured on the Meshy sevengill's pectoral and dorsal.
+FIN_THICKNESS_RATIO = 0.12
+#: Tip thickness as a fraction of the root's, *before* the chord taper is
+#: applied on top of it, so the blade thins faster than it narrows.
+FIN_TIP_THICKNESS_SCALE = 0.35
+#: Nose closure, as a fraction of the section's maximum half-thickness.  The
+#: leading edge is a rounded ``sqrt(x)`` nose truncated by this facet: two
+#: coincident vertices would be a duplicate and a zero-area triangle.
+FIN_LE_FRACTION = 0.20
+#: Trailing-edge closure, same units.  Thin, but deliberately not zero.
+FIN_TE_FRACTION = 0.03
+#: Floor on the half-thickness in units of ``total_length``, so the thinnest
+#: sliver of the thinnest fin tip is still well clear of float32 export noise.
+FIN_MIN_HALF_THICKNESS = 1.5e-4
+#: A root section may not be thicker than this fraction of the first span step,
+#: or the blade would be born inside the body.  Inactive on the default fins;
+#: it is what keeps a 0.3x-span sliver fin from turning inside out.
+FIN_ROOT_CLEARANCE = 0.75
+#: Body columns each side of the root slit that are slid aside to make room for
+#: it.  The slit needs ``ceil(half-thickness / column)`` columns of clearance;
+#: this many more keeps the displaced quads from collapsing.
+FIN_WARP_MARGIN = 2
+
+
+def _section_shape(xc):
+    """Symmetric thickness law across the chord, normalised to a maximum of 1.
+
+    NACA-00xx ``y_t`` -- a ``sqrt(x)`` nose, so the leading edge is *round*
+    rather than a wedge -- plus two closures, ``FIN_LE_FRACTION`` at the nose
+    and ``FIN_TE_FRACTION`` at the tail, which stop the two sides of the
+    section from collapsing onto each other at the ends.  ``xc`` is 0 at the
+    leading edge (anterior, +X) and 1 at the trailing edge.
+    """
+    x = np.clip(np.asarray(xc, dtype=float), 0.0, 1.0)
+    naca = 10.0 * (
+        0.2969 * np.sqrt(x) - 0.1260 * x - 0.3516 * x ** 2
+        + 0.2843 * x ** 3 - 0.1015 * x ** 4
+    )
+    f = naca + FIN_LE_FRACTION * (1.0 - x) ** 3 + FIN_TE_FRACTION * x ** 3
+    return f / _SECTION_SHAPE_MAX
+
+
+# Normaliser for the law above, found by sampling it with the normaliser at 1:
+# the closures move the maximum off the NACA peak, so it is not 1 by algebra.
+_SECTION_SHAPE_MAX = 1.0
+_SECTION_SHAPE_MAX = float(np.max(_section_shape(np.linspace(0.0, 1.0, 4001))))
+
+
+def _seam_columns(j, n_theta):
+    """Grid columns holding the signed body column ``j``.
+
+    The body grid carries one duplicated column so the UV wrap needs no
+    degenerate parameterisation, so the column at ``phi = 0`` lives at two
+    indices and both must move together.
+    """
+    j = int(j) % int(n_theta)
+    return (0, int(n_theta)) if j == 0 else (j,)
+
+
+def _fin_plan(spec, n_stations, n_theta, u_stations, total_length, tube_length,
+              r_max, ellipticity):
+    """Resolve one ``FIN_SPECS`` entry into everything the builder needs.
+
+    Returns a dict with the station range and root column (unchanged from the
+    zero-thickness construction, so the ``fins`` metadata contract is
+    untouched), the per-station half-opening of the root slit in *column*
+    units, the number of neighbouring columns to slide aside, and the section
+    thickness law sampled at the chord stations.
+    """
+    u0, u1, phi_deg, span, sweep, taper, n_span = spec
+    i0 = int(np.round(u0 * (n_stations - 1)))
+    i1 = int(np.round(u1 * (n_stations - 1)))
+    if i1 - i0 < 2:
+        i1 = i0 + 2
+    i1 = min(i1, int(n_stations) - 1)
+    i0 = max(0, min(i0, i1 - 2))
+    j_root = int(np.round((phi_deg % 360.0) / 360.0 * n_theta)) % int(n_theta)
+    phi_root = 2.0 * np.pi * j_root / n_theta
+
+    g_root = u_stations[i0:i1 + 1]
+    n_chord = i1 - i0
+    chord = float(g_root[-1] - g_root[0]) * tube_length
+    u_mid = 0.5 * float(g_root[0] + g_root[-1])
+    r_mid = r_max * float(_body_radius(u_mid))
+    # Arc length swept on the body surface per radian of phi, at the root.
+    arc_per_rad = max(
+        r_mid * float(np.hypot(np.cos(phi_root), ellipticity * np.sin(phi_root))),
+        1e-12,
+    )
+
+    half_max = 0.5 * FIN_THICKNESS_RATIO * chord
+    half_max = min(half_max, FIN_ROOT_CLEARANCE * span * total_length / float(n_span))
+    d_cols = (half_max / arc_per_rad) / (2.0 * np.pi / n_theta)
+    n_warp = int(np.ceil(d_cols)) + int(FIN_WARP_MARGIN)
+
+    xc = (g_root - g_root[0]) / max(float(g_root[-1] - g_root[0]), 1e-12)
+    shape = _section_shape(xc)
+
+    cells = set()
+    for i in range(i0, i1 + 1):
+        for k in range(-n_warp + 1, n_warp):
+            for jc in _seam_columns(j_root + k, n_theta):
+                cells.add((i, jc))
+
+    return {
+        "i0": i0, "i1": i1, "n_chord": n_chord, "j_root": j_root,
+        "phi_root": phi_root, "g_root": g_root, "chord": chord,
+        "half_max": half_max, "d_cols": d_cols * shape, "n_warp": n_warp,
+        "shape": shape, "span": span, "sweep": sweep, "taper": taper,
+        "n_span": int(n_span), "cells": cells,
+    }
+
+
 def _procedural_texture(size=256, seed=0):
     """Countershaded, spotted skin.  ``v`` is phi/2pi, so v=0 is dorsal."""
     from PIL import Image
 
     rng = np.random.default_rng(seed)
-    vv, uu = np.meshgrid(
+    # meshgrid(..., indexing="xy") returns (column-varying, row-varying); the
+    # image column is u and the row is v, so u comes first. (The earlier
+    # ``vv, uu`` order put the countershading on the u axis - no dorsoventral
+    # gradient on the mesh at all.)
+    uu, vv = np.meshgrid(
         np.linspace(0.0, 1.0, size), np.linspace(0.0, 1.0, size), indexing="xy"
     )
     # Countershading: dark at v ~ 0 or 1 (dorsal), pale at v ~ 0.5 (ventral).
@@ -177,6 +307,7 @@ def make_sevengill(
     with_fins=True,
     textured=True,
     seed=0,
+    solid_fins=True,
 ):
     """Build the canonical straight sevengill.
 
@@ -195,6 +326,10 @@ def make_sevengill(
             the path" test.
         textured: attach the procedural texture and UVs.
         seed: texture RNG seed.
+        solid_fins: build the fins as closed two-sided lofts welded into a slit
+            in the body grid (the default).  ``False`` reverts to the
+            pre-volumetric zero-thickness sheets, which is what the A/B numbers
+            in the README are measured against.
 
     Returns:
         ``trimesh.Trimesh`` in the canonical pose, with ground truth in
@@ -208,25 +343,109 @@ def make_sevengill(
     r_max = radius_fraction * L
 
     u_stations = np.linspace(0.0, 1.0, int(n_stations))
-    phi_cols = 2.0 * np.pi * np.arange(n_theta + 1) / n_theta  # +1 = UV seam copy
+    n_theta = int(n_theta)
+    n_stations = int(n_stations)
+    dphi_col = 2.0 * np.pi / n_theta
+    phi_cols = dphi_col * np.arange(n_theta + 1)      # +1 = UV seam copy
 
-    # ---- body grid -------------------------------------------------------
-    uu, pp = np.meshgrid(u_stations, phi_cols, indexing="ij")
-    body = _surface_point(uu, pp, L, S, r_max, ellipticity)
-    grid = np.arange(int(n_stations) * (n_theta + 1)).reshape(int(n_stations), n_theta + 1)
+    # ---- fin plans, resolved first: the root slits are cut into the body ---
+    plans = {}
+    claimed = set()
+    for name, spec in (FIN_SPECS.items() if with_fins else ()):
+        plan = _fin_plan(spec, n_stations, n_theta, u_stations, L, S, r_max,
+                         ellipticity)
+        # Two fins cannot open the same strip of skin.  Only a hand-built spec
+        # can ask for it -- the fin-merge regression fixture puts a second
+        # caudal lobe on top of the first -- and the later fin then falls back
+        # to the old zero-thickness sheet, flagged ``volumetric: False``.
+        # A slit needs room: its own columns, plus the neighbours it slides
+        # aside, must fit inside the ring without meeting round the back.
+        fits = 2 * plan["n_warp"] < n_theta
+        plan["volumetric"] = (bool(solid_fins) and fits
+                              and not (plan["cells"] & claimed))
+        if plan["volumetric"]:
+            claimed |= plan["cells"]
+        plans[name] = plan
+
+    # ---- body grid, with the root slits opened -----------------------------
+    # Each volumetric fin splits its root column into two lips separated by the
+    # local section thickness, and slides its neighbours outward so the quads
+    # between them stay well shaped.  ``v_grid`` follows the same displacement,
+    # so the texture stays glued to the surface instead of shearing.
+    uu = np.repeat(u_stations[:, None], n_theta + 1, axis=1)
+    phi_grid = np.tile(phi_cols, (n_stations, 1))
+    v_grid = np.tile(np.arange(n_theta + 1) / float(n_theta), (n_stations, 1))
+
+    for plan in plans.values():
+        if not plan["volumetric"]:
+            continue
+        j_root, n_warp = plan["j_root"], plan["n_warp"]
+        for m, i in enumerate(range(plan["i0"], plan["i1"] + 1)):
+            d = float(plan["d_cols"][m])
+            for k in range(1, n_warp):
+                # Linear re-spacing of the ring: the column that sat k out now
+                # sits at d + k * (n_warp - d) / n_warp, so every gap out to
+                # n_warp has the same width and nothing folds over.
+                delta = d + k * (n_warp - d) / n_warp - k
+                for jc in _seam_columns(j_root + k, n_theta):
+                    phi_grid[i, jc] += delta * dphi_col
+                    v_grid[i, jc] += delta / n_theta
+                for jc in _seam_columns(j_root - k, n_theta):
+                    phi_grid[i, jc] -= delta * dphi_col
+                    v_grid[i, jc] -= delta / n_theta
+            if j_root == 0:
+                # The duplicated seam column already supplies two vertices per
+                # station; the slit just pulls them apart.
+                phi_grid[i, n_theta] = 2.0 * np.pi - d * dphi_col
+                v_grid[i, n_theta] = 1.0 - d / n_theta
+                phi_grid[i, 0] = d * dphi_col
+                v_grid[i, 0] = d / n_theta
+            else:
+                phi_grid[i, j_root] = plan["phi_root"] - d * dphi_col
+                v_grid[i, j_root] = (j_root - d) / float(n_theta)
+
+    body = _surface_point(uu, phi_grid, L, S, r_max, ellipticity)
+    grid = np.arange(n_stations * (n_theta + 1)).reshape(n_stations, n_theta + 1)
 
     verts = [body.reshape(-1, 3)]
-    uvs = [np.stack([uu.ravel(), (pp / (2.0 * np.pi)).ravel()], axis=-1)]
-    labels = [np.full(body.shape[0] * body.shape[1], "body", dtype=object)]
+    uvs = [np.stack([uu.ravel(), v_grid.ravel()], axis=-1)]
+    labels = [np.full(grid.size, "body", dtype=object)]
     faces = []
+    n_used = grid.size
 
-    for i in range(int(n_stations) - 1):
+    # Which vertex a body quad sees on each side of a column.  The two differ
+    # only along a root slit: the left lip keeps the original id, the right lip
+    # is a new vertex -- except at phi = 0, where the seam copy is already there.
+    id_left_of = grid.copy()      # column j as the RIGHT edge of quad j-1
+    id_right_of = grid.copy()     # column j as the LEFT edge of quad j
+
+    for plan in plans.values():
+        if not plan["volumetric"]:
+            continue
+        i0, i1, j_root = plan["i0"], plan["i1"], plan["j_root"]
+        if j_root == 0:
+            plan["left_ids"] = grid[i0:i1 + 1, n_theta]
+            plan["right_ids"] = grid[i0:i1 + 1, 0]
+            continue
+        pts = _surface_point(u_stations[i0:i1 + 1],
+                             plan["phi_root"] + plan["d_cols"] * dphi_col,
+                             L, S, r_max, ellipticity)
+        ids = np.arange(n_used, n_used + len(pts))
+        n_used += len(pts)
+        verts.append(pts)
+        uvs.append(np.stack([u_stations[i0:i1 + 1],
+                             (j_root + plan["d_cols"]) / float(n_theta)], axis=-1))
+        labels.append(np.full(len(pts), "body", dtype=object))
+        plan["left_ids"] = grid[i0:i1 + 1, j_root]
+        plan["right_ids"] = ids
+        id_right_of[i0:i1 + 1, j_root] = ids
+
+    for i in range(n_stations - 1):
         for j in range(n_theta):
-            a, b, c, d = grid[i, j], grid[i, j + 1], grid[i + 1, j + 1], grid[i + 1, j]
+            a, b = id_right_of[i, j], id_left_of[i, j + 1]
+            c, d = id_left_of[i + 1, j + 1], id_right_of[i + 1, j]
             faces.append((a, b, c))
             faces.append((a, c, d))
-
-    n_used = grid.size
 
     # ---- snout and peduncle caps (fans to a single apex, no degenerate faces)
     cap = 0.35 * r_max * _body_radius(0.0)
@@ -236,7 +455,7 @@ def make_sevengill(
     labels.append(np.array(["body"], dtype=object))
     n_used += 1
     for j in range(n_theta):
-        faces.append((snout_apex, grid[0, j + 1], grid[0, j]))
+        faces.append((snout_apex, id_left_of[0, j + 1], id_right_of[0, j]))
 
     tail_apex = n_used
     verts.append(np.array([[_axis_x(1.0, L, S) - cap, 0.0, 0.0]]))
@@ -244,52 +463,97 @@ def make_sevengill(
     labels.append(np.array(["body"], dtype=object))
     n_used += 1
     for j in range(n_theta):
-        faces.append((tail_apex, grid[-1, j], grid[-1, j + 1]))
+        faces.append((tail_apex, id_right_of[-1, j], id_left_of[-1, j + 1]))
 
-    # ---- fins: welded sheets whose root row is a column of body vertices ---
+    # ---- fins: closed two-sided lofts rising out of the root slits ---------
     fin_meta = {}
-    for name, (u0, u1, phi_deg, span, sweep, taper, n_span) in (
-        FIN_SPECS.items() if with_fins else ()
-    ):
-        i0 = int(np.round(u0 * (n_stations - 1)))
-        i1 = int(np.round(u1 * (n_stations - 1)))
-        if i1 - i0 < 2:
-            i1 = i0 + 2
-        j_root = int(np.round((phi_deg % 360.0) / 360.0 * n_theta)) % n_theta
-        phi_root = 2.0 * np.pi * j_root / n_theta
+    for name, plan in plans.items():
+        i0, i1, n_chord = plan["i0"], plan["i1"], plan["n_chord"]
+        j_root, phi_root, g_root = plan["j_root"], plan["phi_root"], plan["g_root"]
+        span, sweep, taper = plan["span"], plan["sweep"], plan["taper"]
+        n_span = plan["n_span"]
+        centre = 0.5 * (g_root[0] + g_root[-1])
 
-        n_chord = i1 - i0
-        root_ids = grid[i0:i1 + 1, j_root]
-        # Continuous chord parameter of the root row, in tube fraction.
-        g_root = u_stations[i0:i1 + 1]
+        if plan["volumetric"]:
+            # Thickness runs along the body tangent at the root, so the blade
+            # stands proud of the surface rather than shearing along it.
+            e_hat = np.array([0.0, np.cos(phi_root),
+                              -ellipticity * np.sin(phi_root)])
+            e_hat = e_hat / np.linalg.norm(e_hat)
+            rows = [(plan["right_ids"], plan["left_ids"])]
+            for k in range(1, n_span + 1):
+                t = k / float(n_span)
+                # Chord tapers toward the tip and sweeps posteriorly.
+                g = centre + (g_root - centre) * (1.0 - taper * t) + sweep * t
+                base = _surface_point(g, phi_root, L, S, r_max, ellipticity)
+                rad = _radial_dir(np.minimum(g, 1.0), phi_root, r_max, ellipticity)
+                mid = base + (span * L * t) * rad
+                h = (plan["half_max"] * plan["shape"] * (1.0 - taper * t)
+                     * (1.0 - (1.0 - FIN_TIP_THICKNESS_SCALE) * t))
+                h = np.maximum(h, FIN_MIN_HALF_THICKNESS * L)
+                pair = []
+                for sign in (1.0, -1.0):
+                    ids = np.arange(n_used, n_used + n_chord + 1)
+                    n_used += n_chord + 1
+                    verts.append(mid + (sign * h)[:, None] * e_hat)
+                    uvs.append(np.stack([
+                        np.clip(g, 0.0, 1.0),
+                        (j_root / float(n_theta)
+                         + sign * (0.12 * t + plan["d_cols"] / n_theta)) % 1.0,
+                    ], axis=-1))
+                    labels.append(np.full(n_chord + 1, name, dtype=object))
+                    pair.append(ids)
+                rows.append((pair[0], pair[1]))
 
-        rows = [root_ids]
-        for k in range(1, n_span + 1):
-            t = k / float(n_span)
-            # Chord tapers toward the tip and sweeps posteriorly (u increasing).
-            centre = 0.5 * (g_root[0] + g_root[-1])
-            g = centre + (g_root - centre) * (1.0 - taper * t) + sweep * t
-            base = _surface_point(g, phi_root, L, S, r_max, ellipticity)
-            d = _radial_dir(np.minimum(g, 1.0), phi_root, r_max, ellipticity)
-            pts = base + (span * L * t) * d
-            ids = np.arange(n_used, n_used + n_chord + 1)
-            n_used += n_chord + 1
-            verts.append(pts)
-            uvs.append(
-                np.stack(
+            # One triangle closes the notch the slit leaves at each end of the
+            # root; at the ends of the body that apex is the cap apex.
+            head_col = j_root if j_root else n_theta
+            a = snout_apex if i0 == 0 else int(id_left_of[i0 - 1, head_col])
+            faces.append((a, int(rows[0][0][0]), int(rows[0][1][0])))
+            b = (tail_apex if i1 == n_stations - 1
+                 else int(id_left_of[i1 + 1, head_col]))
+            faces.append((b, int(rows[0][1][-1]), int(rows[0][0][-1])))
+
+            # Shell: quads between consecutive closed sections, walked as
+            # right side leading edge -> trailing edge, then left side back.
+            for k in range(n_span):
+                (ra, la), (rb, lb) = rows[k], rows[k + 1]
+                loop_in = np.concatenate([ra, la[::-1]])
+                loop_out = np.concatenate([rb, lb[::-1]])
+                n_loop = len(loop_in)
+                for q in range(n_loop):
+                    q2 = (q + 1) % n_loop
+                    faces.append((loop_in[q], loop_in[q2], loop_out[q2]))
+                    faces.append((loop_in[q], loop_out[q2], loop_out[q]))
+            # Tip lid across the outermost section: no extra vertices, and it
+            # uses every edge of that section exactly once.
+            rt, lt = rows[-1]
+            for m in range(n_chord):
+                faces.append((rt[m], rt[m + 1], lt[m + 1]))
+                faces.append((rt[m], lt[m + 1], lt[m]))
+        else:
+            # Fallback: the pre-volumetric zero-thickness sheet.
+            root_ids = id_left_of[i0:i1 + 1, j_root if j_root else n_theta]
+            sheet = [root_ids]
+            for k in range(1, n_span + 1):
+                t = k / float(n_span)
+                g = centre + (g_root - centre) * (1.0 - taper * t) + sweep * t
+                base = _surface_point(g, phi_root, L, S, r_max, ellipticity)
+                rad = _radial_dir(np.minimum(g, 1.0), phi_root, r_max, ellipticity)
+                ids = np.arange(n_used, n_used + n_chord + 1)
+                n_used += n_chord + 1
+                verts.append(base + (span * L * t) * rad)
+                uvs.append(np.stack(
                     [np.clip(g, 0.0, 1.0),
                      np.full(n_chord + 1, (j_root / n_theta + 0.12 * t) % 1.0)],
-                    axis=-1,
-                )
-            )
-            labels.append(np.full(n_chord + 1, name, dtype=object))
-            rows.append(ids)
-
-        for k in range(n_span):
-            ra, rb = rows[k], rows[k + 1]
-            for m in range(n_chord):
-                faces.append((ra[m], ra[m + 1], rb[m + 1]))
-                faces.append((ra[m], rb[m + 1], rb[m]))
+                    axis=-1))
+                labels.append(np.full(n_chord + 1, name, dtype=object))
+                sheet.append(ids)
+            for k in range(n_span):
+                ra, rb = sheet[k], sheet[k + 1]
+                for m in range(n_chord):
+                    faces.append((ra[m], ra[m + 1], rb[m + 1]))
+                    faces.append((ra[m], rb[m + 1], rb[m]))
 
         fin_meta[name] = {
             "u0": float(g_root[0]),
@@ -302,6 +566,20 @@ def make_sevengill(
                                r_max, ellipticity),
                 dtype=float,
             ),
+            # Added by the volumetric build; nothing downstream reads them.
+            "volumetric": bool(plan["volumetric"]),
+            "root_chord": float(plan["chord"]),
+            "root_thickness": float(2.0 * plan["half_max"]),
+            "root_thickness_ratio": float(
+                2.0 * plan["half_max"] / max(plan["chord"], 1e-12)),
+            # (span row, chord station, 2) -- each vertex of the blade paired
+            # with its twin on the other side of the section, root row first.
+            # This is the ground truth ``fin_section_report`` measures against;
+            # it is absent on a fin that fell back to a sheet.
+            "section_pairs": (
+                np.stack([np.stack([np.asarray(ra), np.asarray(la)], axis=-1)
+                          for ra, la in rows], axis=0)
+                if plan["volumetric"] else None),
         }
 
     vertices = np.concatenate(verts, axis=0)
@@ -340,10 +618,57 @@ def make_sevengill(
             "gill_u": _GILL_U.copy(),
             "gill_x": _axis_x(_GILL_U, L, S),
             "with_fins": bool(with_fins),
+            "solid_fins": bool(solid_fins),
             "seed": int(seed),
         }
     )
     return mesh
+
+
+def fin_section_report(mesh):
+    """Measure every solid fin's cross-section, on the mesh as it was built.
+
+    Reads ``metadata['fins'][name]['section_pairs']`` -- the (span row, chord
+    station) grid pairing each vertex on one side of a blade with its twin on
+    the other -- and measures the vertices themselves, so what comes back is
+    what was built rather than what was asked for.  Fins that fell back to a
+    zero-thickness sheet are absent from the result.
+
+    Returns ``{name: {...}}`` in world units except where noted:
+
+    ``root_chord``
+        Chord of the root section (its leading to trailing edge along the body).
+    ``root_thickness``, ``root_ratio``
+        Widest point of the root section, and that over the chord -- the
+        ``FIN_THICKNESS_RATIO`` the builder was asked for, as delivered.
+    ``le_closure``, ``te_closure``
+        Nose and tail facets of the root section, as fractions of the chord:
+        how blunt the rounded leading edge is, and how thin the trailing edge.
+    ``tip_thickness``
+        Widest point of the outermost section (the tip lid).
+    ``min_thickness``
+        Thinnest place anywhere on the fin.  Nonzero by construction
+        (``FIN_MIN_HALF_THICKNESS``); this is the number that says so.
+    """
+    v = np.asarray(mesh.vertices, dtype=float)
+    out = {}
+    for name, fin in mesh.metadata.get("fins", {}).items():
+        pairs = fin.get("section_pairs")
+        if pairs is None:
+            continue
+        p = np.asarray(pairs, dtype=np.int64)
+        t = np.linalg.norm(v[p[..., 0]] - v[p[..., 1]], axis=-1)
+        chord = float(fin["root_chord"])
+        out[name] = {
+            "root_chord": chord,
+            "root_thickness": float(t[0].max()),
+            "root_ratio": float(t[0].max() / chord),
+            "le_closure": float(t[0, 0] / chord),
+            "te_closure": float(t[0, -1] / chord),
+            "tip_thickness": float(t[-1].max()),
+            "min_thickness": float(t.min()),
+        }
+    return out
 
 
 # ---------------------------------------------------------------------------

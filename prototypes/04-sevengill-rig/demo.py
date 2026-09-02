@@ -159,14 +159,20 @@ def run(out_dir=DEFAULT_OUT, seconds=4.0, fps=30.0, n_stations=64, seed=SEED,
     same_faces = np.array_equal(np.asarray(bent.faces), np.asarray(result.straight_mesh.faces))
     uv_in = getattr(bent.visual, "uv", None)
     uv_out = getattr(result.straight_mesh.visual, "uv", None)
-    uv_same = uv_in is not None and uv_out is not None and np.allclose(uv_in, uv_out)
+    # ``uv_out`` has been through the GLB, where UVs are float32 and stored
+    # v-flipped, so a v near 0 comes back with ~6e-8 of absolute error and a
+    # *relative* error far above np.allclose's default rtol.  Compare on an
+    # absolute tolerance a float32 can actually meet.
+    uv_same = (uv_in is not None and uv_out is not None
+               and np.allclose(uv_in, uv_out, rtol=0.0, atol=1e-6))
     reloaded = mesh3d.load_mesh(rigged_path, report=False)
     uv_rt = getattr(reloaded.visual, "uv", None)
     uv_err = (float(np.abs(np.asarray(uv_rt) - np.asarray(uv_out)).max())
               if uv_rt is not None and len(uv_rt) == len(uv_out) else float("nan"))
     print("\n[5] texture / topology through the de-bend and the GLB round trip")
-    print("    faces identical: %s | UVs identical after de-bend: %s | "
-          "UV error after GLB write+reload: %.2e" % (same_faces, uv_same, uv_err))
+    print("    faces identical: %s | UVs identical after de-bend (to float32): %s"
+          " | UV error after GLB write+reload: %.2e"
+          % (same_faces, uv_same, uv_err))
 
     # -- 6. the rig ---------------------------------------------------------
     sk = result.skeleton
