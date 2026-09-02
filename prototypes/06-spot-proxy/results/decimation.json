@@ -1,0 +1,152 @@
+[
+  {
+    "cache": "/Volumes/External Dive 2TB/projects/marine-cv/7Gill/.claude/worktrees/melops-ablation-vast-gpu-6d469d/prototypes/06-spot-proxy/assets/real_body_1.5mm.npz",
+    "cell_mm": 1.5,
+    "cluster_drift_mm": {
+      "max": 0.12150319472991387,
+      "mean": 0.002370810370195272,
+      "p95": 0.0069087074595182
+    },
+    "face_ratio": 0.07771490145146788,
+    "glb": "/Volumes/External Dive 2TB/projects/marine-cv/7Gill/.claude/worktrees/melops-ablation-vast-gpu-6d469d/prototypes/04-sevengill-rig/results/real_v11/sevengill_rigged.glb",
+    "n_dropped_degenerate": 1804176,
+    "n_dropped_duplicate": 5233,
+    "n_faces": 152467,
+    "n_faces_source": 1961876,
+    "n_fin_vertices": 10813,
+    "n_vertices": 75731,
+    "n_vertices_source": 1013814,
+    "s_raw_range": [
+      -0.026727148480138446,
+      0.6552767966320902
+    ],
+    "seconds": {
+      "chart": null,
+      "decimate": 0.6631507873535156,
+      "load": null,
+      "total": 0.6716458797454834
+    },
+    "total_length_m": 0.4803003498178298,
+    "vertex_ratio": 0.0746991065422257
+  },
+  {
+    "cache": "/Volumes/External Dive 2TB/projects/marine-cv/7Gill/.claude/worktrees/melops-ablation-vast-gpu-6d469d/prototypes/06-spot-proxy/assets/real_body_2mm.npz",
+    "cell_mm": 2.0,
+    "cluster_drift_mm": {
+      "max": 0.16654116310562658,
+      "mean": 0.0042224405359243865,
+      "p95": 0.012270447012925024
+    },
+    "face_ratio": 0.04453186643804195,
+    "glb": "/Volumes/External Dive 2TB/projects/marine-cv/7Gill/.claude/worktrees/melops-ablation-vast-gpu-6d469d/prototypes/04-sevengill-rig/results/real_v11/sevengill_rigged.glb",
+    "n_dropped_degenerate": 1870916,
+    "n_dropped_duplicate": 3594,
+    "n_faces": 87366,
+    "n_faces_source": 1961876,
+    "n_fin_vertices": 6270,
+    "n_vertices": 43304,
+    "n_vertices_source": 1013814,
+    "s_raw_range": [
+      -0.026727148480138446,
+      0.6552767966320902
+    ],
+    "seconds": {
+      "chart": null,
+      "decimate": 0.638206958770752,
+      "load": null,
+      "total": 0.6434879302978516
+    },
+    "total_length_m": 0.4803003498178298,
+    "vertex_ratio": 0.0427139495015851
+  },
+  {
+    "cache": "/Volumes/External Dive 2TB/projects/marine-cv/7Gill/.claude/worktrees/melops-ablation-vast-gpu-6d469d/prototypes/06-spot-proxy/assets/real_body_2.5mm.npz",
+    "cell_mm": 2.5,
+    "cluster_drift_mm": {
+      "max": 0.1973282715248663,
+      "mean": 0.006570367807327887,
+      "p95": 0.01901130478659482
+    },
+    "face_ratio": 0.02882496141448287,
+    "glb": "/Volumes/External Dive 2TB/projects/marine-cv/7Gill/.claude/worktrees/melops-ablation-vast-gpu-6d469d/prototypes/04-sevengill-rig/results/real_v11/sevengill_rigged.glb",
+    "n_dropped_degenerate": 1902688,
+    "n_dropped_duplicate": 2637,
+    "n_faces": 56551,
+    "n_faces_source": 1961876,
+    "n_fin_vertices": 4082,
+    "n_vertices": 28007,
+    "n_vertices_source": 1013814,
+    "s_raw_range": [
+      -0.026727148480138446,
+      0.6552767966320902
+    ],
+    "seconds": {
+      "chart": null,
+      "decimate": 0.6724748611450195,
+      "load": null,
+      "total": 0.6758780479431152
+    },
+    "total_length_m": 0.4803003498178298,
+    "vertex_ratio": 0.027625382959793415
+  },
+  {
+    "cache": "/Volumes/External Dive 2TB/projects/marine-cv/7Gill/.claude/worktrees/melops-ablation-vast-gpu-6d469d/prototypes/06-spot-proxy/assets/real_body_4mm.npz",
+    "cell_mm": 4.0,
+    "cluster_drift_mm": {
+      "max": 0.3287867670464724,
+      "mean": 0.01703695815974875,
+      "p95": 0.04901815035313125
+    },
+    "face_ratio": 0.011321816465464688,
+    "glb": "/Volumes/External Dive 2TB/projects/marine-cv/7Gill/.claude/worktrees/melops-ablation-vast-gpu-6d469d/prototypes/04-sevengill-rig/results/real_v11/sevengill_rigged.glb",
+    "n_dropped_degenerate": 1938368,
+    "n_dropped_duplicate": 1296,
+    "n_faces": 22212,
+    "n_faces_source": 1961876,
+    "n_fin_vertices": 1650,
+    "n_vertices": 10933,
+    "n_vertices_source": 1013814,
+    "s_raw_range": [
+      -0.026727148480138446,
+      0.6552767966320902
+    ],
+    "seconds": {
+      "chart": null,
+      "decimate": 0.6060550212860107,
+      "load": null,
+      "total": 0.6078920364379883
+    },
+    "total_length_m": 0.4803003498178298,
+    "vertex_ratio": 0.01078402941762493
+  },
+  {
+    "cache": "/Volumes/External Dive 2TB/projects/marine-cv/7Gill/.claude/worktrees/melops-ablation-vast-gpu-6d469d/prototypes/06-spot-proxy/assets/real_body_6mm.npz",
+    "cell_mm": 6.0,
+    "cluster_drift_mm": {
+      "max": 0.6368892067959454,
+      "mean": 0.03742214677771601,
+      "p95": 0.10880752246868905
+    },
+    "face_ratio": 0.005079831752873271,
+    "glb": "/Volumes/External Dive 2TB/projects/marine-cv/7Gill/.claude/worktrees/melops-ablation-vast-gpu-6d469d/prototypes/04-sevengill-rig/results/real_v11/sevengill_rigged.glb",
+    "n_dropped_degenerate": 1951242,
+    "n_dropped_duplicate": 668,
+    "n_faces": 9966,
+    "n_faces_source": 1961876,
+    "n_fin_vertices": 761,
+    "n_vertices": 4875,
+    "n_vertices_source": 1013814,
+    "s_raw_range": [
+      -0.026727148480138446,
+      0.6552767966320902
+    ],
+    "seconds": {
+      "chart": null,
+      "decimate": 0.5776870250701904,
+      "load": null,
+      "total": 0.578732967376709
+    },
+    "total_length_m": 0.4803003498178298,
+    "vertex_ratio": 0.004808574353875563
+  }
+]

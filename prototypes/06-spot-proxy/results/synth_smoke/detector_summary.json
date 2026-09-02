@@ -1,0 +1,611 @@
+{
+  "conf_hist": {
+    "bin_edges": [
+      0.25,
+      0.275,
+      0.3,
+      0.325,
+      0.35,
+      0.375,
+      0.4,
+      0.42500000000000004,
+      0.45,
+      0.475,
+      0.5,
+      0.525,
+      0.55,
+      0.575,
+      0.6000000000000001,
+      0.625,
+      0.65,
+      0.675,
+      0.7,
+      0.7250000000000001,
+      0.75,
+      0.775,
+      0.8,
+      0.8250000000000001,
+      0.8500000000000001,
+      0.875,
+      0.9,
+      0.925,
+      0.9500000000000001,
+      0.9750000000000001,
+      1.0
+    ],
+    "fp_counts": [
+      0,
+      0,
+      1,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "fp_quantiles": {
+      "mean": 0.3265,
+      "q05": 0.30535,
+      "q25": 0.31475,
+      "q50": 0.3265,
+      "q75": 0.33825,
+      "q95": 0.34764999999999996
+    },
+    "n_fp": 2,
+    "n_tp": 80,
+    "tp_counts": [
+      7,
+      10,
+      7,
+      3,
+      8,
+      5,
+      4,
+      7,
+      4,
+      4,
+      6,
+      5,
+      3,
+      2,
+      1,
+      0,
+      0,
+      2,
+      0,
+      0,
+      0,
+      2,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    "tp_quantiles": {
+      "mean": 0.418,
+      "q05": 0.27290000000000003,
+      "q25": 0.316,
+      "q50": 0.395,
+      "q75": 0.50375,
+      "q95": 0.6138999999999998
+    }
+  },
+  "dropped": [],
+  "match_rule": "detection centre within max(gt radius_px, 6 px) of a visible GT centre; one-to-one, greedy by descending detector confidence",
+  "per_image": [
+    {
+      "D_minor": 1554.0894688472713,
+      "area_norm": 0.7263409750951719,
+      "aspect": 1.3920289563029071,
+      "bbox_width_frac": 1.0,
+      "body_conf": 0.480038046836853,
+      "body_ok": true,
+      "by_threshold": {
+        "0.25": {
+          "fn": 82,
+          "fp": 0,
+          "n_det": 9,
+          "precision": 1.0,
+          "recall": 0.0989010989010989,
+          "tp": 9
+        },
+        "0.40": {
+          "fn": 88,
+          "fp": 0,
+          "n_det": 3,
+          "precision": 1.0,
+          "recall": 0.03296703296703297,
+          "tp": 3
+        },
+        "0.50": {
+          "fn": 90,
+          "fp": 0,
+          "n_det": 1,
+          "precision": 1.0,
+          "recall": 0.01098901098901099,
+          "tp": 1
+        },
+        "0.60": {
+          "fn": 91,
+          "fp": 0,
+          "n_det": 0,
+          "precision": null,
+          "recall": 0.0,
+          "tp": 0
+        }
+      },
+      "conf_q50": 0.348,
+      "density": 12.390874683643913,
+      "fn": 82,
+      "fp": 0,
+      "fp_conf": {
+        "q05": null,
+        "q25": null,
+        "q50": null,
+        "q75": null,
+        "q95": null
+      },
+      "identity": "syn0000",
+      "image_id": "syn0000_00",
+      "match_dist_px_median": 1.0770329614268923,
+      "n_det": 9,
+      "n_gt_rendered": 880,
+      "n_gt_visible": 91,
+      "nn_median": 0.03892210188539027,
+      "precision": 1.0,
+      "recall": 0.0989010989010989,
+      "sighting": 0,
+      "size_q50": 0.016023406414179743,
+      "tp": 9,
+      "tp_conf": {
+        "mean": 0.3673333333333333,
+        "q05": 0.28300000000000003,
+        "q25": 0.286,
+        "q50": 0.348,
+        "q75": 0.437,
+        "q95": 0.494
+      }
+    },
+    {
+      "D_minor": 1094.4604277863536,
+      "area_norm": 0.9467703984623824,
+      "aspect": 1.8569903040891336,
+      "bbox_width_frac": 1.0,
+      "body_conf": 0.5565096139907837,
+      "body_ok": true,
+      "by_threshold": {
+        "0.25": {
+          "fn": 68,
+          "fp": 1,
+          "n_det": 35,
+          "precision": 0.9714285714285714,
+          "recall": 0.3333333333333333,
+          "tp": 34
+        },
+        "0.40": {
+          "fn": 81,
+          "fp": 0,
+          "n_det": 21,
+          "precision": 1.0,
+          "recall": 0.20588235294117646,
+          "tp": 21
+        },
+        "0.50": {
+          "fn": 90,
+          "fp": 0,
+          "n_det": 12,
+          "precision": 1.0,
+          "recall": 0.11764705882352941,
+          "tp": 12
+        },
+        "0.60": {
+          "fn": 98,
+          "fp": 0,
+          "n_det": 4,
+          "precision": 1.0,
+          "recall": 0.0392156862745098,
+          "tp": 4
+        }
+      },
+      "conf_q50": 0.439,
+      "density": 36.96778021032587,
+      "fn": 68,
+      "fp": 1,
+      "fp_conf": {
+        "mean": 0.35,
+        "q05": 0.35,
+        "q25": 0.35,
+        "q50": 0.35,
+        "q75": 0.35,
+        "q95": 0.35
+      },
+      "identity": "syn0000",
+      "image_id": "syn0000_01",
+      "match_dist_px_median": 0.9741928376588564,
+      "n_det": 35,
+      "n_gt_rendered": 880,
+      "n_gt_visible": 102,
+      "nn_median": 0.04478415702365622,
+      "precision": 0.9714285714285714,
+      "recall": 0.3333333333333333,
+      "sighting": 1,
+      "size_q50": 0.023597329318270608,
+      "tp": 34,
+      "tp_conf": {
+        "mean": 0.4582352941176471,
+        "q05": 0.28635,
+        "q25": 0.36875,
+        "q50": 0.441,
+        "q75": 0.51825,
+        "q95": 0.7253999999999997
+      }
+    },
+    {
+      "D_minor": 1005.3833700785299,
+      "area_norm": 1.9435723482778589,
+      "aspect": 2.007971913691233,
+      "bbox_width_frac": 1.0,
+      "body_conf": 0.5149108171463013,
+      "body_ok": true,
+      "by_threshold": {
+        "0.25": {
+          "fn": 47,
+          "fp": 0,
+          "n_det": 9,
+          "precision": 1.0,
+          "recall": 0.16071428571428573,
+          "tp": 9
+        },
+        "0.40": {
+          "fn": 52,
+          "fp": 0,
+          "n_det": 4,
+          "precision": 1.0,
+          "recall": 0.07142857142857142,
+          "tp": 4
+        },
+        "0.50": {
+          "fn": 56,
+          "fp": 0,
+          "n_det": 0,
+          "precision": null,
+          "recall": 0.0,
+          "tp": 0
+        },
+        "0.60": {
+          "fn": 56,
+          "fp": 0,
+          "n_det": 0,
+          "precision": null,
+          "recall": 0.0,
+          "tp": 0
+        }
+      },
+      "conf_q50": 0.37,
+      "density": 4.630648304898261,
+      "fn": 47,
+      "fp": 0,
+      "fp_conf": {
+        "q05": null,
+        "q25": null,
+        "q50": null,
+        "q75": null,
+        "q95": null
+      },
+      "identity": "syn0001",
+      "image_id": "syn0001_00",
+      "match_dist_px_median": 0.565685424949226,
+      "n_det": 9,
+      "n_gt_rendered": 880,
+      "n_gt_visible": 56,
+      "nn_median": 0.08740692767663105,
+      "precision": 1.0,
+      "recall": 0.16071428571428573,
+      "sighting": 0,
+      "size_q50": 0.029659787124950005,
+      "tp": 9,
+      "tp_conf": {
+        "mean": 0.36933333333333335,
+        "q05": 0.261,
+        "q25": 0.323,
+        "q50": 0.37,
+        "q75": 0.438,
+        "q95": 0.4568
+      }
+    },
+    {
+      "D_minor": 1633.8977764834317,
+      "area_norm": 0.48215299662940597,
+      "aspect": 1.3927878171012669,
+      "bbox_width_frac": 1.0,
+      "body_conf": 0.5846571922302246,
+      "body_ok": true,
+      "by_threshold": {
+        "0.25": {
+          "fn": 78,
+          "fp": 1,
+          "n_det": 24,
+          "precision": 0.9583333333333334,
+          "recall": 0.22772277227722773,
+          "tp": 23
+        },
+        "0.40": {
+          "fn": 90,
+          "fp": 0,
+          "n_det": 11,
+          "precision": 1.0,
+          "recall": 0.10891089108910891,
+          "tp": 11
+        },
+        "0.50": {
+          "fn": 94,
+          "fp": 0,
+          "n_det": 7,
+          "precision": 1.0,
+          "recall": 0.06930693069306931,
+          "tp": 7
+        },
+        "0.60": {
+          "fn": 100,
+          "fp": 0,
+          "n_det": 1,
+          "precision": 1.0,
+          "recall": 0.009900990099009901,
+          "tp": 1
+        }
+      },
+      "conf_q50": 0.3705,
+      "density": 49.776730970827,
+      "fn": 78,
+      "fp": 1,
+      "fp_conf": {
+        "mean": 0.303,
+        "q05": 0.303,
+        "q25": 0.303,
+        "q50": 0.303,
+        "q75": 0.303,
+        "q95": 0.303
+      },
+      "identity": "syn0001",
+      "image_id": "syn0001_01",
+      "match_dist_px_median": 1.0630145812734608,
+      "n_det": 24,
+      "n_gt_rendered": 880,
+      "n_gt_visible": 101,
+      "nn_median": 0.021999940228987207,
+      "precision": 0.9583333333333334,
+      "recall": 0.22772277227722773,
+      "sighting": 1,
+      "size_q50": 0.012652518165382907,
+      "tp": 23,
+      "tp_conf": {
+        "mean": 0.4095652173913044,
+        "q05": 0.2741,
+        "q25": 0.2995,
+        "q50": 0.386,
+        "q75": 0.5235000000000001,
+        "q95": 0.5636999999999999
+      }
+    },
+    {
+      "D_minor": 1936.160017501183,
+      "area_norm": 0.3068106319154481,
+      "aspect": 1.0546110284801387,
+      "bbox_width_frac": 0.9717261904761905,
+      "body_conf": 0.5847292542457581,
+      "body_ok": true,
+      "by_threshold": {
+        "0.25": {
+          "fn": 79,
+          "fp": 0,
+          "n_det": 5,
+          "precision": 1.0,
+          "recall": 0.05952380952380952,
+          "tp": 5
+        },
+        "0.40": {
+          "fn": 83,
+          "fp": 0,
+          "n_det": 1,
+          "precision": 1.0,
+          "recall": 0.011904761904761904,
+          "tp": 1
+        },
+        "0.50": {
+          "fn": 83,
+          "fp": 0,
+          "n_det": 1,
+          "precision": 1.0,
+          "recall": 0.011904761904761904,
+          "tp": 1
+        },
+        "0.60": {
+          "fn": 84,
+          "fp": 0,
+          "n_det": 0,
+          "precision": null,
+          "recall": 0.0,
+          "tp": 0
+        }
+      },
+      "conf_q50": 0.33,
+      "density": 16.2966973106001,
+      "fn": 79,
+      "fp": 0,
+      "fp_conf": {
+        "q05": null,
+        "q25": null,
+        "q50": null,
+        "q75": null,
+        "q95": null
+      },
+      "identity": "syn0002",
+      "image_id": "syn0002_00",
+      "match_dist_px_median": 0.848528137423869,
+      "n_det": 5,
+      "n_gt_rendered": 880,
+      "n_gt_visible": 84,
+      "nn_median": 0.03831931089939278,
+      "precision": 1.0,
+      "recall": 0.05952380952380952,
+      "sighting": 0,
+      "size_q50": 0.016580414879656852,
+      "tp": 5,
+      "tp_conf": {
+        "mean": 0.362,
+        "q05": 0.27240000000000003,
+        "q25": 0.318,
+        "q50": 0.33,
+        "q75": 0.369,
+        "q95": 0.4994
+      }
+    },
+    {
+      "D_minor": null,
+      "area_norm": null,
+      "aspect": null,
+      "bbox_width_frac": null,
+      "body_conf": null,
+      "body_ok": false,
+      "by_threshold": {
+        "0.25": {
+          "fn": 103,
+          "fp": 0,
+          "n_det": 0,
+          "precision": null,
+          "recall": 0.0,
+          "tp": 0
+        },
+        "0.40": {
+          "fn": 103,
+          "fp": 0,
+          "n_det": 0,
+          "precision": null,
+          "recall": 0.0,
+          "tp": 0
+        },
+        "0.50": {
+          "fn": 103,
+          "fp": 0,
+          "n_det": 0,
+          "precision": null,
+          "recall": 0.0,
+          "tp": 0
+        },
+        "0.60": {
+          "fn": 103,
+          "fp": 0,
+          "n_det": 0,
+          "precision": null,
+          "recall": 0.0,
+          "tp": 0
+        }
+      },
+      "conf_q50": null,
+      "density": null,
+      "fn": 103,
+      "fp": 0,
+      "fp_conf": {
+        "q05": null,
+        "q25": null,
+        "q50": null,
+        "q75": null,
+        "q95": null
+      },
+      "identity": "syn0002",
+      "image_id": "syn0002_01",
+      "match_dist_px_median": null,
+      "n_det": 0,
+      "n_gt_rendered": 880,
+      "n_gt_visible": 103,
+      "nn_median": null,
+      "precision": null,
+      "recall": 0.0,
+      "sighting": 1,
+      "size_q50": null,
+      "tp": 0,
+      "tp_conf": {
+        "q05": null,
+        "q25": null,
+        "q50": null,
+        "q75": null,
+        "q95": null
+      }
+    }
+  ],
+  "pooled": {
+    "0.25": {
+      "fn": 457,
+      "fp": 2,
+      "n_det": 82,
+      "n_gt": 537,
+      "precision": 0.975609756097561,
+      "recall": 0.148975791433892,
+      "tp": 80
+    },
+    "0.40": {
+      "fn": 497,
+      "fp": 0,
+      "n_det": 40,
+      "n_gt": 537,
+      "precision": 1.0,
+      "recall": 0.074487895716946,
+      "tp": 40
+    },
+    "0.50": {
+      "fn": 516,
+      "fp": 0,
+      "n_det": 21,
+      "n_gt": 537,
+      "precision": 1.0,
+      "recall": 0.03910614525139665,
+      "tp": 21
+    },
+    "0.60": {
+      "fn": 532,
+      "fp": 0,
+      "n_det": 5,
+      "n_gt": 537,
+      "precision": 1.0,
+      "recall": 0.00931098696461825,
+      "tp": 5
+    }
+  },
+  "run": {
+    "corpus": "/Volumes/External Dive 2TB/projects/marine-cv/7Gill/.claude/worktrees/melops-ablation-vast-gpu-6d469d/prototypes/06-spot-proxy/results/synth_smoke",
+    "detect_seconds": 1.57,
+    "device": "cpu",
+    "min_tol_px": 6.0,
+    "n_dropped": 0,
+    "n_images": 6,
+    "n_truth_rows": 6,
+    "seconds": 1.8,
+    "seconds_per_image": 0.301
+  }
+}

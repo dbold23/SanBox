@@ -1,0 +1,283 @@
+{
+  "mode": "frames",
+  "path": "results/real/detections.jsonl",
+  "n_records_read": 1091,
+  "n_rectified": 1030,
+  "n_dropped": 61,
+  "frames": {
+    "pca": 895,
+    "chart": 135
+  },
+  "pca_fallback_frac": 0.8689320388349514,
+  "images_with_drop_reason": {
+    "obstruction_refilled": 298,
+    "chart_frame_rejected": 895,
+    "spot_centre_outside_mask": 73,
+    "r_clipped_to_unit": 11
+  },
+  "chart_rejection_reasons": {
+    "centerline_warning": 864,
+    "spots_outside_body": 519,
+    "spot_far_outside_body": 684,
+    "centerline_too_short": 219
+  },
+  "max_abs_r_raw": {
+    "min": 0.04562933012817929,
+    "median": 0.9317863626925429,
+    "max": 1.661314400309817,
+    "n_over_1": 11
+  },
+  "spots_per_image_mean": 124.03786407766991,
+  "dropped": [
+    {
+      "line": 1,
+      "image_id": 6,
+      "reason": "no body polygon or too few spots"
+    },
+    {
+      "line": 41,
+      "image_id": 48,
+      "reason": "no body polygon or too few spots"
+    },
+    {
+      "line": 74,
+      "image_id": 81,
+      "reason": "no body polygon or too few spots"
+    },
+    {
+      "line": 84,
+      "image_id": 91,
+      "reason": "no body polygon or too few spots"
+    },
+    {
+      "line": 88,
+      "image_id": 95,
+      "reason": "no body polygon or too few spots"
+    },
+    {
+      "line": 91,
+      "image_id": 98,
+      "reason": "no body polygon or too few spots"
+    },
+    {
+      "line": 97,
+      "image_id": 104,
+      "reason": "no body polygon or too few spots"
+    },
+    {
+      "line": 98,
+      "image_id": 105,
+      "reason": "no body polygon or too few spots"
+    },
+    {
+      "line": 113,
+      "image_id": 120,
+      "reason": "no body polygon or too few spots"
+    },
+    {
+      "line": 128,
+      "image_id": 135,
+      "reason": "no body polygon or too few spots"
+    },
+    {
+      "line": 196,
+      "image_id": 205,
+      "reason": "no body polygon or too few spots"
+    },
+    {
+      "line": 223,
+      "image_id": 232,
+      "reason": "no body polygon or too few spots"
+    },
+    {
+      "line": 267,
+      "image_id": 276,
+      "reason": "no body polygon or too few spots"
+    },
+    {
+      "line": 278,
+      "image_id": 287,
+      "reason": "no body polygon or too few spots"
+    },
+    {
+      "line": 419,
+      "image_id": 428,
+      "reason": "no body polygon or too few spots"
+    },
+    {
+      "line": 429,
+      "image_id": 438,
+      "reason": "no body polygon or too few spots"
+    },
+    {
+      "line": 441,
+      "image_id": 450,
+      "reason": "no body polygon or too few spots"
+    },
+    {
+      "line": 444,
+      "image_id": 453,
+      "reason": "no body polygon or too few spots"
+    },
+    {
+      "line": 446,
+      "image_id": 455,
+      "reason": "no body polygon or too few spots"
+    },
+    {
+      "line": 457,
+      "image_id": 466,
+      "reason": "no body polygon or too few spots"
+    },
+    {
+      "line": 464,
+      "image_id": 473,
+      "reason": "no body polygon or too few spots"
+    },
+    {
+      "line": 477,
+      "image_id": 486,
+      "reason": "no body polygon or too few spots"
+    },
+    {
+      "line": 528,
+      "image_id": 537,
+      "reason": "no body polygon or too few spots"
+    },
+    {
+      "line": 532,
+      "image_id": 541,
+      "reason": "no body polygon or too few spots"
+    },
+    {
+      "line": 551,
+      "image_id": 560,
+      "reason": "no body polygon or too few spots"
+    },
+    {
+      "line": 578,
+      "image_id": 587,
+      "reason": "no body polygon or too few spots"
+    },
+    {
+      "line": 591,
+      "image_id": 600,
+      "reason": "no body polygon or too few spots"
+    },
+    {
+      "line": 595,
+      "image_id": 604,
+      "reason": "no body polygon or too few spots"
+    },
+    {
+      "line": 616,
+      "image_id": 625,
+      "reason": "no body polygon or too few spots"
+    },
+    {
+      "line": 638,
+      "image_id": 647,
+      "reason": "no body polygon or too few spots"
+    },
+    {
+      "line": 659,
+      "image_id": 668,
+      "reason": "no body polygon or too few spots"
+    },
+    {
+      "line": 687,
+      "image_id": 696,
+      "reason": "no body polygon or too few spots"
+    },
+    {
+      "line": 694,
+      "image_id": 703,
+      "reason": "no body polygon or too few spots"
+    },
+    {
+      "line": 713,
+      "image_id": 722,
+      "reason": "no body polygon or too few spots"
+    },
+    {
+      "line": 722,
+      "image_id": 731,
+      "reason": "no body polygon or too few spots"
+    },
+    {
+      "line": 740,
+      "image_id": 749,
+      "reason": "no body polygon or too few spots"
+    },
+    {
+      "line": 747,
+      "image_id": 756,
+      "reason": "no body polygon or too few spots"
+    },
+    {
+      "line": 749,
+      "image_id": 758,
+      "reason": "no body polygon or too few spots"
+    },
+    {
+      "line": 760,
+      "image_id": 769,
+      "reason": "no body polygon or too few spots"
+    },
+    {
+      "line": 774,
+      "image_id": 783,
+      "reason": "no body polygon or too few spots"
+    },
+    {
+      "line": 799,
+      "image_id": 808,
+      "reason": "no body polygon or too few spots"
+    },
+    {
+      "line": 844,
+      "image_id": 853,
+      "reason": "no body polygon or too few spots"
+    },
+    {
+      "line": 847,
+      "image_id": 856,
+      "reason": "no body polygon or too few spots"
+    },
+    {
+      "line": 864,
+      "image_id": 873,
+      "reason": "no body polygon or too few spots"
+    },
+    {
+      "line": 883,
+      "image_id": 892,
+      "reason": "no body polygon or too few spots"
+    },
+    {
+      "line": 922,
+      "image_id": 931,
+      "reason": "no body polygon or too few spots"
+    },
+    {
+      "line": 923,
+      "image_id": 932,
+      "reason": "no body polygon or too few spots"
+    },
+    {
+      "line": 941,
+      "image_id": 950,
+      "reason": "no body polygon or too few spots"
+    },
+    {
+      "line": 955,
+      "image_id": 964,
+      "reason": "no body polygon or too few spots"
+    },
+    {
+      "line": 975,
+      "image_id": 984,
+      "reason": "no body polygon or too few spots"
+    }
+  ]
+}

@@ -1,0 +1,71 @@
+{
+  "mode": "frames",
+  "path": "results/synth_calib/detections.jsonl",
+  "n_records_read": 160,
+  "n_rectified": 152,
+  "n_dropped": 8,
+  "frames": {
+    "pca": 123,
+    "chart": 29
+  },
+  "pca_fallback_frac": 0.8092105263157895,
+  "images_with_drop_reason": {
+    "chart_frame_rejected": 123,
+    "obstruction_refilled": 26
+  },
+  "chart_rejection_reasons": {
+    "centerline_warning": 119,
+    "spot_far_outside_body": 83,
+    "spots_outside_body": 72,
+    "centerline_too_short": 16
+  },
+  "max_abs_r_raw": {
+    "min": 0.9005717479137202,
+    "median": 0.9584388149200622,
+    "max": 0.9931333416181568,
+    "n_over_1": 0
+  },
+  "spots_per_image_mean": 126.92105263157895,
+  "dropped": [
+    {
+      "line": 3,
+      "image_id": "syn0000_03",
+      "reason": "no body polygon or too few spots"
+    },
+    {
+      "line": 7,
+      "image_id": "syn0001_03",
+      "reason": "no body polygon or too few spots"
+    },
+    {
+      "line": 38,
+      "image_id": "syn0009_02",
+      "reason": "no body polygon or too few spots"
+    },
+    {
+      "line": 51,
+      "image_id": "syn0012_03",
+      "reason": "no body polygon or too few spots"
+    },
+    {
+      "line": 52,
+      "image_id": "syn0013_00",
+      "reason": "no body polygon or too few spots"
+    },
+    {
+      "line": 89,
+      "image_id": "syn0022_01",
+      "reason": "no body polygon or too few spots"
+    },
+    {
+      "line": 117,
+      "image_id": "syn0029_01",
+      "reason": "no body polygon or too few spots"
+    },
+    {
+      "line": 119,
+      "image_id": "syn0029_03",
+      "reason": "no body polygon or too few spots"
+    }
+  ]
+}

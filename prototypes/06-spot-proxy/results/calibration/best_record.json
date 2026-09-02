@@ -1,0 +1,208 @@
+{
+  "body": {
+    "body_conf_median": 0.7892619669437408,
+    "body_conf_q": [
+      0.5744392424821854,
+      0.7461221367120743,
+      0.7892619669437408,
+      0.8420965820550919,
+      0.8606103658676147
+    ],
+    "n_no_body": 2,
+    "n_records": 38,
+    "n_with_body": 36
+  },
+  "corpus": "/Volumes/External Dive 2TB/projects/marine-cv/7Gill/.claude/worktrees/melops-ablation-vast-gpu-6d469d/prototypes/06-spot-proxy/results/calibration/corpora/b3_r37_elev",
+  "detector": {
+    "0.25": {
+      "fp": 94,
+      "n_det": 4611,
+      "n_gt": 9722,
+      "precision": 0.9796139666016048,
+      "recall": 0.4646163340876363,
+      "tp": 4517
+    },
+    "0.40": {
+      "fp": 12,
+      "n_det": 2445,
+      "n_gt": 9722,
+      "precision": 0.9950920245398773,
+      "recall": 0.25025714873482824,
+      "tp": 2433
+    },
+    "0.50": {
+      "fp": 6,
+      "n_det": 1400,
+      "n_gt": 9722,
+      "precision": 0.9957142857142857,
+      "recall": 0.14338613454021806,
+      "tp": 1394
+    },
+    "0.60": {
+      "fp": 1,
+      "n_det": 657,
+      "n_gt": 9722,
+      "precision": 0.9984779299847792,
+      "recall": 0.06747582801892614,
+      "tp": 656
+    }
+  },
+  "geometry_detail": {
+    "definition": "mean KS D over per-image {aspect,area_norm,bbox_width_frac}",
+    "per_image_D": {
+      "area_norm": 0.2971413160733549,
+      "aspect": 0.15075512405609492,
+      "bbox_width_frac": 0.19320388349514564
+    },
+    "threshold": "0.25",
+    "value": 0.21370010787486515
+  },
+  "geometry_objective": 0.21370010787486515,
+  "ks": {
+    "0.25": {
+      "n_synth_per_image": {
+        "area_norm": 36,
+        "aspect": 36,
+        "bbox_width_frac": 36,
+        "body_conf": 36,
+        "conf_q50": 36,
+        "density": 36,
+        "n_spots": 36,
+        "nn_median": 36,
+        "size_q50": 36
+      },
+      "per_image": {
+        "area_norm": 0.2971413160733549,
+        "aspect": 0.15075512405609492,
+        "bbox_width_frac": 0.19320388349514564,
+        "body_conf": 0.2192017259978425,
+        "conf_q50": 0.31839266450916937,
+        "density": 0.2215749730312837,
+        "n_spots": 0.2861380798274002,
+        "nn_median": 0.0935374149659864,
+        "size_q50": 0.13144552319309602
+      },
+      "pooled": {
+        "conf": 0.017302135651522943,
+        "nn": 0.10475887785534269,
+        "size": 0.09182907811740287,
+        "u": 0.08669481823019237,
+        "v": 0.05134717343136597
+      }
+    },
+    "0.40": {
+      "n_synth_per_image": {
+        "area_norm": 36,
+        "aspect": 36,
+        "bbox_width_frac": 36,
+        "body_conf": 36,
+        "conf_q50": 36,
+        "density": 36,
+        "n_spots": 36,
+        "nn_median": 36,
+        "size_q50": 36
+      },
+      "per_image": {
+        "area_norm": 0.2971413160733549,
+        "aspect": 0.15075512405609492,
+        "bbox_width_frac": 0.19320388349514564,
+        "body_conf": 0.2192017259978425,
+        "conf_q50": 0.15575010808473844,
+        "density": 0.20663430420711973,
+        "n_spots": 0.24266450916936355,
+        "nn_median": 0.148400345871163,
+        "size_q50": 0.1605058365758755
+      },
+      "pooled": {
+        "conf": 0.023984191587815062,
+        "nn": 0.052512183921905264,
+        "size": 0.044991463577519486,
+        "u": 0.10367314243293885,
+        "v": 0.07574031403439818
+      }
+    },
+    "0.50": {
+      "n_synth_per_image": {
+        "area_norm": 36,
+        "aspect": 36,
+        "bbox_width_frac": 36,
+        "body_conf": 36,
+        "conf_q50": 36,
+        "density": 36,
+        "n_spots": 36,
+        "nn_median": 36,
+        "size_q50": 36
+      },
+      "per_image": {
+        "area_norm": 0.2971413160733549,
+        "aspect": 0.15075512405609492,
+        "bbox_width_frac": 0.19320388349514564,
+        "body_conf": 0.2192017259978425,
+        "conf_q50": 0.10635538261997406,
+        "density": 0.21769147788565266,
+        "n_spots": 0.2558252427184466,
+        "nn_median": 0.15818428184281844,
+        "size_q50": 0.22892347600518806
+      },
+      "pooled": {
+        "conf": 0.01616293982360484,
+        "nn": 0.058576354679803044,
+        "size": 0.11188188259907006,
+        "u": 0.10385318077278557,
+        "v": 0.11814885400471437
+      }
+    }
+  },
+  "n_frames": 38,
+  "name": "b3_r37_elev",
+  "objective": 0.13126717056648668,
+  "objective_040": 0.10415929752356871,
+  "objective_detail": {
+    "definition": "0.5 * mean KS D over per-image {density,size_q50,nn_median,conf_q50} + 0.5 * mean KS D over pooled {size,nn,conf}, both at spot conf >= 0.25",
+    "per_image_D": {
+      "conf_q50": 0.31839266450916937,
+      "density": 0.2215749730312837,
+      "nn_median": 0.0935374149659864,
+      "size_q50": 0.13144552319309602
+    },
+    "per_image_mean_D": 0.19123764392488385,
+    "pooled_D": {
+      "conf": 0.017302135651522943,
+      "nn": 0.10475887785534269,
+      "size": 0.09182907811740287
+    },
+    "pooled_mean_D": 0.0712966972080895,
+    "threshold": "0.25",
+    "value": 0.13126717056648668
+  },
+  "overrides": {
+    "camera": {
+      "elevation_deg": [
+        0.0,
+        32.0
+      ]
+    },
+    "pattern": {
+      "min_sep": 0.008,
+      "n_spots": 1300,
+      "radius_median": 0.0037
+    }
+  },
+  "seconds": {
+    "compare": 0.2,
+    "detect": 15.5,
+    "render": 303.6,
+    "total": 319.3
+  },
+  "seed": 0,
+  "spot_radius_px": {
+    "median": 10.524820207108489,
+    "p5": 2.7057581899030048,
+    "p95": 25.74707852562643
+  },
+  "visible_spots": {
+    "max": 420,
+    "median": 245.0,
+    "min": 171
+  }
+}

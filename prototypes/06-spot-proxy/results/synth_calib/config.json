@@ -1,0 +1,203 @@
+{
+  "background": {
+    "gradient": 0.28,
+    "noise": 0.035,
+    "palette": [
+      [
+        0.86,
+        0.73,
+        0.69
+      ],
+      [
+        0.6,
+        0.75,
+        0.71
+      ],
+      [
+        0.55,
+        0.67,
+        0.78
+      ],
+      [
+        0.72,
+        0.73,
+        0.72
+      ],
+      [
+        0.38,
+        0.42,
+        0.42
+      ]
+    ]
+  },
+  "body": {
+    "cell_mm": 1.5
+  },
+  "camera": {
+    "azimuth_deg": [
+      -25.0,
+      25.0
+    ],
+    "elevation_deg": [
+      0.0,
+      32.0
+    ],
+    "fov_y_deg": 44.0,
+    "resolution": [
+      1512,
+      2016
+    ],
+    "roll_deg": [
+      -30.0,
+      30.0
+    ],
+    "s_frame_max": [
+      0.3,
+      0.44
+    ],
+    "s_target": [
+      0.14,
+      0.22
+    ],
+    "width_frac": [
+      0.74,
+      0.92
+    ]
+  },
+  "chart_resolution": [
+    512,
+    2048
+  ],
+  "corpus": {
+    "min_same_side": 2,
+    "start_date": "2019-03-01",
+    "years": 3.0
+  },
+  "degrade": {
+    "blur_sigma": [
+      0.0,
+      1.5
+    ],
+    "jpeg_quality": [
+      75,
+      95
+    ]
+  },
+  "light": {
+    "ambient": 0.35,
+    "azimuth_offset_deg": [
+      -60.0,
+      60.0
+    ],
+    "elevation_deg": [
+      30.0,
+      70.0
+    ],
+    "intensity": 0.85
+  },
+  "occluders": {
+    "cast_shadow_prob": 0.6,
+    "colors": [
+      [
+        0.62,
+        0.46,
+        0.36
+      ],
+      [
+        0.48,
+        0.34,
+        0.27
+      ],
+      [
+        0.72,
+        0.56,
+        0.46
+      ]
+    ],
+    "count_probs": [
+      0.35,
+      0.45,
+      0.2
+    ],
+    "depth_frac": [
+      0.45,
+      0.8
+    ],
+    "edge_offset": [
+      0.55,
+      1.0
+    ],
+    "scale_frac": [
+      0.22,
+      0.42
+    ]
+  },
+  "pattern": {
+    "amplitude": 0.92,
+    "common_darkness": 0.22,
+    "cs_floor": 0.05,
+    "cs_phi_full": 3.05,
+    "cs_phi_onset": 2.3,
+    "darkness_max": 1.0,
+    "darkness_mean": 0.86,
+    "darkness_min": 0.15,
+    "darkness_sigma": 0.12,
+    "dorsal_exponent": 0.3,
+    "drop_regions": [
+      "gill_slits"
+    ],
+    "ecc_max": 2.4,
+    "ecc_sigma": 0.28,
+    "edge_softness": 0.25,
+    "min_sep": 0.008,
+    "n_common": 110,
+    "n_spots": 1300,
+    "radius_log_sigma": 0.38,
+    "radius_median": 0.0037
+  },
+  "pose": {
+    "amp": [
+      0.0,
+      0.35
+    ],
+    "wave": [
+      0.5,
+      0.75,
+      1.0
+    ],
+    "yaw_deg": [
+      -14.0,
+      14.0
+    ]
+  },
+  "skin": {
+    "eye_darkness": 0.26,
+    "eye_radius_m": 0.009,
+    "fill_luminance": 0.86,
+    "fin_tone_from_normal": true,
+    "mottle": 0.045,
+    "mottle_px": 3.0,
+    "mottle_seed": 20260902,
+    "phi_full": 2.95,
+    "phi_onset": 1.75,
+    "png": null,
+    "smooth_px": 2.0,
+    "tint": [
+      1.1,
+      0.96,
+      1.0
+    ],
+    "tone_dorsal": 0.4,
+    "tone_ventral": 0.95
+  },
+  "specular": {
+    "shininess": [
+      18.0,
+      55.0
+    ],
+    "strength": [
+      0.25,
+      0.6
+    ]
+  }
+}

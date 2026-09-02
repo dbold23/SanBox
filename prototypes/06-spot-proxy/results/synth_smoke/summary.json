@@ -1,0 +1,57 @@
+{
+  "body": {
+    "cell_mm": 1.5,
+    "cluster_drift_mm": {
+      "max": 0.12150319472991387,
+      "mean": 0.002370810370195272,
+      "p95": 0.0069087074595182
+    },
+    "face_ratio": 0.07771490145146788,
+    "glb": "/Volumes/External Dive 2TB/projects/marine-cv/7Gill/.claude/worktrees/melops-ablation-vast-gpu-6d469d/prototypes/04-sevengill-rig/results/real_v11/sevengill_rigged.glb",
+    "n_dropped_degenerate": 1804176,
+    "n_dropped_duplicate": 5233,
+    "n_faces": 152467,
+    "n_faces_source": 1961876,
+    "n_fin_vertices": 10813,
+    "n_vertices": 75731,
+    "n_vertices_source": 1013814,
+    "s_raw_range": [
+      -0.026727148480138446,
+      0.6552767966320902
+    ],
+    "seconds": {
+      "chart": null,
+      "decimate": 0.6631507873535156,
+      "load": null,
+      "total": 0.6716458797454834
+    },
+    "total_length_m": 0.4803003498178298,
+    "vertex_ratio": 0.0746991065422257
+  },
+  "coverage_frac_median": 0.43013875110229277,
+  "n_frames": 6,
+  "n_individuals": 3,
+  "out_dir": "results/synth_smoke",
+  "schema": "/Volumes/External Dive 2TB/projects/marine-cv/7Gill/.claude/worktrees/melops-ablation-vast-gpu-6d469d/phase1b/p0-sevengill-schema/keypoints_sevengill_v1.yaml",
+  "seconds": 48.79,
+  "seconds_per_frame": 8.13,
+  "seed": 0,
+  "skin": {
+    "median_rgb": [
+      0.6817639754262904,
+      0.6558446473570818,
+      0.6164447159444684
+    ],
+    "unobserved_frac": 0.02080535888671875
+  },
+  "spot_radius_px": {
+    "median": 7.247146419131151,
+    "p5": 1.3578945305102896,
+    "p95": 27.37336172049508
+  },
+  "visible_spots": {
+    "max": 103,
+    "median": 96.0,
+    "min": 56
+  }
+}

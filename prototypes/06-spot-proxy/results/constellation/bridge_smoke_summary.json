@@ -1,0 +1,75 @@
+{
+  "mode": "synth",
+  "model": "axis",
+  "n_images_used": 5,
+  "n_individuals": 3,
+  "n_same_pairs": 2,
+  "n_diff_pairs": 8,
+  "same_encounter_same_individual_pairs": 0,
+  "leakage_note": "0/2 same-individual pairs are same-encounter",
+  "same_mean": 0.2222222222222222,
+  "same_sd": 0.31426968052735443,
+  "diff_mean": 0.041666666666666664,
+  "diff_sd": 0.1178511301977579,
+  "diff_p99": 0.3099999999999999,
+  "cohens_d": 1.1535634622409479,
+  "auroc": 0.71875,
+  "spots_per_image_mean": 16.4,
+  "frames": {
+    "chart": 0,
+    "pca": 5
+  },
+  "aspect_measured_median": 4.778263756876323,
+  "top_same_pairs": [
+    {
+      "a": "syn0000_00",
+      "b": "syn0000_01",
+      "individual": "syn0000",
+      "score": 0.4444444444444444,
+      "n_inliers": 4,
+      "flip": [
+        false,
+        true
+      ],
+      "frames": [
+        "pca",
+        "pca"
+      ],
+      "sides": [
+        "L",
+        "R"
+      ],
+      "same_encounter": false
+    },
+    {
+      "a": "syn0001_00",
+      "b": "syn0001_01",
+      "individual": "syn0001",
+      "score": 0.0,
+      "n_inliers": 0,
+      "flip": [
+        false,
+        false
+      ],
+      "frames": [
+        "pca",
+        "pca"
+      ],
+      "sides": [
+        "R",
+        "L"
+      ],
+      "same_encounter": false
+    }
+  ],
+  "n_records_read": 6,
+  "dropped": [
+    {
+      "line": 5,
+      "image_id": "syn0002_01",
+      "reason": "no body polygon or too few spots"
+    }
+  ],
+  "n_dropped": 1,
+  "truth_rows": 6
+}

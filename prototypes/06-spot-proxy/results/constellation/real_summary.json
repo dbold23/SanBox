@@ -1,0 +1,845 @@
+{
+  "mode": "real",
+  "model": "axis",
+  "n_images_used": 60,
+  "n_individuals": 43,
+  "n_same_pairs": 21,
+  "n_diff_pairs": 1748,
+  "same_encounter_same_individual_pairs": 21,
+  "cross_encounter_same_side_positives": 0,
+  "opposite_side_same_individual_pairs": 1,
+  "leakage_note": "all same-side same-individual pairs are same-encounter",
+  "usable_note": "0 cross-encounter same-side same-individual pair(s): the headline d/AUROC measure near-duplicate robustness only",
+  "same_mean": 0.34334374997674344,
+  "same_sd": 0.11698224553459341,
+  "diff_mean": 0.2564328254737395,
+  "diff_sd": 0.10345731141473108,
+  "diff_p99": 0.5313026487190621,
+  "cohens_d": 0.8387444082970948,
+  "auroc": 0.7201155061566961,
+  "by_frame": {
+    "same_frame": {
+      "n_same": 17,
+      "n_diff": 1141,
+      "same_mean": 0.36716130244089434,
+      "diff_mean": 0.2667052699994052,
+      "cohens_d": 0.964106076326096,
+      "auroc": 0.750786204052173
+    },
+    "cross_frame": {
+      "n_same": 4,
+      "n_diff": 607,
+      "same_mean": 0.2421191520041024,
+      "diff_mean": 0.23712333749386386,
+      "cohens_d": 0.05022802620080294,
+      "auroc": 0.5757825370675453
+    }
+  },
+  "spots_per_image_mean": 128.75,
+  "frames": {
+    "chart": 13,
+    "pca": 47
+  },
+  "aspect_measured_median": 6.036069481676102,
+  "rank_same_side": {
+    "n_query": 0,
+    "n_unscorable": 60
+  },
+  "drift": {
+    "0-6 months": {
+      "days": [
+        0,
+        182
+      ],
+      "n_pairs": 21,
+      "mean_score": 0.34334374997674344,
+      "median_score": 0.3225806451612903,
+      "auroc_vs_all_negatives": 0.7201155061566961
+    },
+    "6-12 months": {
+      "days": [
+        183,
+        365
+      ],
+      "n_pairs": 0,
+      "mean_score": null,
+      "median_score": null,
+      "auroc_vs_all_negatives": null
+    },
+    "1-2 years": {
+      "days": [
+        366,
+        730
+      ],
+      "n_pairs": 0,
+      "mean_score": null,
+      "median_score": null,
+      "auroc_vs_all_negatives": null
+    },
+    "2+ years": {
+      "days": [
+        731,
+        null
+      ],
+      "n_pairs": 0,
+      "mean_score": null,
+      "median_score": null,
+      "auroc_vs_all_negatives": null
+    },
+    "n_pairs_without_dates": 0,
+    "elapsed_days": {
+      "min": 0,
+      "median": 0.0,
+      "max": 0
+    }
+  },
+  "opposite_side": {
+    "n_pairs": 1,
+    "mean_score": 0.3888888888888889,
+    "auroc_vs_negatives": 0.8955949656750573,
+    "note": "L-vs-R pairs of one animal: no shared spot pattern, so an AUROC near 0.5 is the CORRECT answer, not a failure"
+  },
+  "opposite_side_pairs": [
+    {
+      "a": 20,
+      "b": 160,
+      "individual": "AOTB_A014",
+      "score": 0.3888888888888889,
+      "n_inliers": 7,
+      "flip": [
+        true,
+        true
+      ],
+      "direction": "ab",
+      "frames": [
+        "pca",
+        "pca"
+      ],
+      "sides": [
+        "L",
+        "R"
+      ],
+      "opposite_side": true,
+      "same_encounter": false,
+      "elapsed_days": 292,
+      "percentile_of_diff": 89.01601830663616
+    }
+  ],
+  "top_same_pairs": [
+    {
+      "a": 67,
+      "b": 77,
+      "individual": "AOTB_J006",
+      "score": 0.6595744680851063,
+      "n_inliers": 31,
+      "flip": [
+        false,
+        false
+      ],
+      "direction": "ab",
+      "frames": [
+        "pca",
+        "pca"
+      ],
+      "sides": [
+        null,
+        null
+      ],
+      "opposite_side": false,
+      "same_encounter": true,
+      "elapsed_days": 0
+    },
+    {
+      "a": 29,
+      "b": 43,
+      "individual": "AOTB_J007",
+      "score": 0.4791666666666667,
+      "n_inliers": 23,
+      "flip": [
+        false,
+        false
+      ],
+      "direction": "ab",
+      "frames": [
+        "pca",
+        "pca"
+      ],
+      "sides": [
+        null,
+        null
+      ],
+      "opposite_side": false,
+      "same_encounter": true,
+      "elapsed_days": 0
+    },
+    {
+      "a": 61,
+      "b": 68,
+      "individual": "AOTB_A002",
+      "score": 0.46846846846846846,
+      "n_inliers": 52,
+      "flip": [
+        false,
+        false
+      ],
+      "direction": "ab",
+      "frames": [
+        "pca",
+        "pca"
+      ],
+      "sides": [
+        null,
+        null
+      ],
+      "opposite_side": false,
+      "same_encounter": true,
+      "elapsed_days": 0
+    },
+    {
+      "a": 12,
+      "b": 41,
+      "individual": "AOTB_J004",
+      "score": 0.42857142857142855,
+      "n_inliers": 21,
+      "flip": [
+        false,
+        false
+      ],
+      "direction": "ab",
+      "frames": [
+        "pca",
+        "pca"
+      ],
+      "sides": [
+        null,
+        null
+      ],
+      "opposite_side": false,
+      "same_encounter": true,
+      "elapsed_days": 0
+    },
+    {
+      "a": 18,
+      "b": 67,
+      "individual": "AOTB_J006",
+      "score": 0.425531914893617,
+      "n_inliers": 20,
+      "flip": [
+        true,
+        false
+      ],
+      "direction": "ab",
+      "frames": [
+        "pca",
+        "pca"
+      ],
+      "sides": [
+        null,
+        null
+      ],
+      "opposite_side": false,
+      "same_encounter": true,
+      "elapsed_days": 0
+    },
+    {
+      "a": 38,
+      "b": 62,
+      "individual": "AOTB_J001",
+      "score": 0.41566265060240964,
+      "n_inliers": 69,
+      "flip": [
+        false,
+        false
+      ],
+      "direction": "ab",
+      "frames": [
+        "chart",
+        "chart"
+      ],
+      "sides": [
+        null,
+        null
+      ],
+      "opposite_side": false,
+      "same_encounter": true,
+      "elapsed_days": 0
+    },
+    {
+      "a": 61,
+      "b": 65,
+      "individual": "AOTB_A002",
+      "score": 0.4105263157894737,
+      "n_inliers": 39,
+      "flip": [
+        false,
+        false
+      ],
+      "direction": "ba",
+      "frames": [
+        "pca",
+        "pca"
+      ],
+      "sides": [
+        null,
+        null
+      ],
+      "opposite_side": false,
+      "same_encounter": true,
+      "elapsed_days": 0
+    },
+    {
+      "a": 29,
+      "b": 949,
+      "individual": "AOTB_J007",
+      "score": 0.37735849056603776,
+      "n_inliers": 20,
+      "flip": [
+        true,
+        false
+      ],
+      "direction": "ba",
+      "frames": [
+        "pca",
+        "pca"
+      ],
+      "sides": [
+        null,
+        null
+      ],
+      "opposite_side": false,
+      "same_encounter": true,
+      "elapsed_days": 0
+    },
+    {
+      "a": 26,
+      "b": 45,
+      "individual": "AOTB_J005",
+      "score": 0.3584905660377358,
+      "n_inliers": 19,
+      "flip": [
+        false,
+        false
+      ],
+      "direction": "ba",
+      "frames": [
+        "pca",
+        "pca"
+      ],
+      "sides": [
+        null,
+        null
+      ],
+      "opposite_side": false,
+      "same_encounter": true,
+      "elapsed_days": 0
+    },
+    {
+      "a": 18,
+      "b": 77,
+      "individual": "AOTB_J006",
+      "score": 0.34545454545454546,
+      "n_inliers": 19,
+      "flip": [
+        true,
+        true
+      ],
+      "direction": "ab",
+      "frames": [
+        "pca",
+        "pca"
+      ],
+      "sides": [
+        null,
+        null
+      ],
+      "opposite_side": false,
+      "same_encounter": true,
+      "elapsed_days": 0
+    },
+    {
+      "a": 15,
+      "b": 27,
+      "individual": "AOTB_J003",
+      "score": 0.3225806451612903,
+      "n_inliers": 40,
+      "flip": [
+        true,
+        true
+      ],
+      "direction": "ba",
+      "frames": [
+        "pca",
+        "chart"
+      ],
+      "sides": [
+        null,
+        null
+      ],
+      "opposite_side": false,
+      "same_encounter": true,
+      "elapsed_days": 0
+    },
+    {
+      "a": 39,
+      "b": 1074,
+      "individual": "AOTB_J009",
+      "score": 0.32,
+      "n_inliers": 16,
+      "flip": [
+        true,
+        false
+      ],
+      "direction": "ab",
+      "frames": [
+        "pca",
+        "pca"
+      ],
+      "sides": [
+        null,
+        null
+      ],
+      "opposite_side": false,
+      "same_encounter": true,
+      "elapsed_days": 0
+    },
+    {
+      "a": 15,
+      "b": 40,
+      "individual": "AOTB_J003",
+      "score": 0.31958762886597936,
+      "n_inliers": 31,
+      "flip": [
+        false,
+        false
+      ],
+      "direction": "ab",
+      "frames": [
+        "pca",
+        "pca"
+      ],
+      "sides": [
+        null,
+        null
+      ],
+      "opposite_side": false,
+      "same_encounter": true,
+      "elapsed_days": 0
+    },
+    {
+      "a": 65,
+      "b": 68,
+      "individual": "AOTB_A002",
+      "score": 0.3157894736842105,
+      "n_inliers": 30,
+      "flip": [
+        false,
+        false
+      ],
+      "direction": "ab",
+      "frames": [
+        "pca",
+        "pca"
+      ],
+      "sides": [
+        null,
+        null
+      ],
+      "opposite_side": false,
+      "same_encounter": true,
+      "elapsed_days": 0
+    },
+    {
+      "a": 43,
+      "b": 949,
+      "individual": "AOTB_J007",
+      "score": 0.3125,
+      "n_inliers": 15,
+      "flip": [
+        false,
+        false
+      ],
+      "direction": "ab",
+      "frames": [
+        "pca",
+        "pca"
+      ],
+      "sides": [
+        null,
+        null
+      ],
+      "opposite_side": false,
+      "same_encounter": true,
+      "elapsed_days": 0
+    },
+    {
+      "a": 27,
+      "b": 40,
+      "individual": "AOTB_J003",
+      "score": 0.24742268041237114,
+      "n_inliers": 24,
+      "flip": [
+        false,
+        true
+      ],
+      "direction": "ba",
+      "frames": [
+        "chart",
+        "pca"
+      ],
+      "sides": [
+        null,
+        null
+      ],
+      "opposite_side": false,
+      "same_encounter": true,
+      "elapsed_days": 0
+    },
+    {
+      "a": 37,
+      "b": 38,
+      "individual": "AOTB_J001",
+      "score": 0.21428571428571427,
+      "n_inliers": 30,
+      "flip": [
+        false,
+        false
+      ],
+      "direction": "ab",
+      "frames": [
+        "chart",
+        "chart"
+      ],
+      "sides": [
+        null,
+        null
+      ],
+      "opposite_side": false,
+      "same_encounter": true,
+      "elapsed_days": 0
+    },
+    {
+      "a": 55,
+      "b": 58,
+      "individual": "AOTB_A003",
+      "score": 0.2,
+      "n_inliers": 46,
+      "flip": [
+        true,
+        true
+      ],
+      "direction": "ab",
+      "frames": [
+        "chart",
+        "pca"
+      ],
+      "sides": [
+        null,
+        null
+      ],
+      "opposite_side": false,
+      "same_encounter": true,
+      "elapsed_days": 0
+    },
+    {
+      "a": 13,
+      "b": 16,
+      "individual": "AOTB_J002",
+      "score": 0.1984732824427481,
+      "n_inliers": 26,
+      "flip": [
+        false,
+        false
+      ],
+      "direction": "ba",
+      "frames": [
+        "pca",
+        "chart"
+      ],
+      "sides": [
+        null,
+        null
+      ],
+      "opposite_side": false,
+      "same_encounter": true,
+      "elapsed_days": 0
+    },
+    {
+      "a": 416,
+      "b": 418,
+      "individual": "OCAQ_A257",
+      "score": 0.19791666666666666,
+      "n_inliers": 38,
+      "flip": [
+        true,
+        true
+      ],
+      "direction": "ab",
+      "frames": [
+        "pca",
+        "pca"
+      ],
+      "sides": [
+        null,
+        null
+      ],
+      "opposite_side": false,
+      "same_encounter": true,
+      "elapsed_days": 0
+    }
+  ],
+  "n_records_read": 1091,
+  "dropped": [
+    {
+      "line": 1,
+      "image_id": 6,
+      "reason": "no body polygon or too few spots"
+    },
+    {
+      "line": 41,
+      "image_id": 48,
+      "reason": "no body polygon or too few spots"
+    },
+    {
+      "line": 74,
+      "image_id": 81,
+      "reason": "no body polygon or too few spots"
+    },
+    {
+      "line": 84,
+      "image_id": 91,
+      "reason": "no body polygon or too few spots"
+    },
+    {
+      "line": 88,
+      "image_id": 95,
+      "reason": "no body polygon or too few spots"
+    },
+    {
+      "line": 91,
+      "image_id": 98,
+      "reason": "no body polygon or too few spots"
+    },
+    {
+      "line": 97,
+      "image_id": 104,
+      "reason": "no body polygon or too few spots"
+    },
+    {
+      "line": 98,
+      "image_id": 105,
+      "reason": "no body polygon or too few spots"
+    },
+    {
+      "line": 113,
+      "image_id": 120,
+      "reason": "no body polygon or too few spots"
+    },
+    {
+      "line": 128,
+      "image_id": 135,
+      "reason": "no body polygon or too few spots"
+    },
+    {
+      "line": 196,
+      "image_id": 205,
+      "reason": "no body polygon or too few spots"
+    },
+    {
+      "line": 223,
+      "image_id": 232,
+      "reason": "no body polygon or too few spots"
+    },
+    {
+      "line": 267,
+      "image_id": 276,
+      "reason": "no body polygon or too few spots"
+    },
+    {
+      "line": 278,
+      "image_id": 287,
+      "reason": "no body polygon or too few spots"
+    },
+    {
+      "line": 419,
+      "image_id": 428,
+      "reason": "no body polygon or too few spots"
+    },
+    {
+      "line": 429,
+      "image_id": 438,
+      "reason": "no body polygon or too few spots"
+    },
+    {
+      "line": 441,
+      "image_id": 450,
+      "reason": "no body polygon or too few spots"
+    },
+    {
+      "line": 444,
+      "image_id": 453,
+      "reason": "no body polygon or too few spots"
+    },
+    {
+      "line": 446,
+      "image_id": 455,
+      "reason": "no body polygon or too few spots"
+    },
+    {
+      "line": 457,
+      "image_id": 466,
+      "reason": "no body polygon or too few spots"
+    },
+    {
+      "line": 464,
+      "image_id": 473,
+      "reason": "no body polygon or too few spots"
+    },
+    {
+      "line": 477,
+      "image_id": 486,
+      "reason": "no body polygon or too few spots"
+    },
+    {
+      "line": 528,
+      "image_id": 537,
+      "reason": "no body polygon or too few spots"
+    },
+    {
+      "line": 532,
+      "image_id": 541,
+      "reason": "no body polygon or too few spots"
+    },
+    {
+      "line": 551,
+      "image_id": 560,
+      "reason": "no body polygon or too few spots"
+    },
+    {
+      "line": 578,
+      "image_id": 587,
+      "reason": "no body polygon or too few spots"
+    },
+    {
+      "line": 591,
+      "image_id": 600,
+      "reason": "no body polygon or too few spots"
+    },
+    {
+      "line": 595,
+      "image_id": 604,
+      "reason": "no body polygon or too few spots"
+    },
+    {
+      "line": 616,
+      "image_id": 625,
+      "reason": "no body polygon or too few spots"
+    },
+    {
+      "line": 638,
+      "image_id": 647,
+      "reason": "no body polygon or too few spots"
+    },
+    {
+      "line": 659,
+      "image_id": 668,
+      "reason": "no body polygon or too few spots"
+    },
+    {
+      "line": 687,
+      "image_id": 696,
+      "reason": "no body polygon or too few spots"
+    },
+    {
+      "line": 694,
+      "image_id": 703,
+      "reason": "no body polygon or too few spots"
+    },
+    {
+      "line": 713,
+      "image_id": 722,
+      "reason": "no body polygon or too few spots"
+    },
+    {
+      "line": 722,
+      "image_id": 731,
+      "reason": "no body polygon or too few spots"
+    },
+    {
+      "line": 740,
+      "image_id": 749,
+      "reason": "no body polygon or too few spots"
+    },
+    {
+      "line": 747,
+      "image_id": 756,
+      "reason": "no body polygon or too few spots"
+    },
+    {
+      "line": 749,
+      "image_id": 758,
+      "reason": "no body polygon or too few spots"
+    },
+    {
+      "line": 760,
+      "image_id": 769,
+      "reason": "no body polygon or too few spots"
+    },
+    {
+      "line": 774,
+      "image_id": 783,
+      "reason": "no body polygon or too few spots"
+    },
+    {
+      "line": 799,
+      "image_id": 808,
+      "reason": "no body polygon or too few spots"
+    },
+    {
+      "line": 844,
+      "image_id": 853,
+      "reason": "no body polygon or too few spots"
+    },
+    {
+      "line": 847,
+      "image_id": 856,
+      "reason": "no body polygon or too few spots"
+    },
+    {
+      "line": 864,
+      "image_id": 873,
+      "reason": "no body polygon or too few spots"
+    },
+    {
+      "line": 883,
+      "image_id": 892,
+      "reason": "no body polygon or too few spots"
+    },
+    {
+      "line": 922,
+      "image_id": 931,
+      "reason": "no body polygon or too few spots"
+    },
+    {
+      "line": 923,
+      "image_id": 932,
+      "reason": "no body polygon or too few spots"
+    },
+    {
+      "line": 941,
+      "image_id": 950,
+      "reason": "no body polygon or too few spots"
+    },
+    {
+      "line": 955,
+      "image_id": 964,
+      "reason": "no body polygon or too few spots"
+    },
+    {
+      "line": 975,
+      "image_id": 984,
+      "reason": "no body polygon or too few spots"
+    }
+  ],
+  "n_dropped": 61,
+  "spot_filter": null
+}

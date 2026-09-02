@@ -1,0 +1,1108 @@
+{
+  "mode": "synth",
+  "model": "axis",
+  "n_images_used": 152,
+  "n_individuals": 40,
+  "n_same_pairs": 126,
+  "n_diff_pairs": 11259,
+  "same_encounter_same_individual_pairs": 0,
+  "cross_encounter_same_side_positives": 126,
+  "opposite_side_same_individual_pairs": 91,
+  "leakage_note": "0/126 same-side same-individual pairs are same-encounter",
+  "usable_note": "126 cross-encounter same-side same-individual pair(s): some genuine re-ID evidence",
+  "same_mean": 0.3240278974888068,
+  "same_sd": 0.10986355733534355,
+  "diff_mean": 0.316615532261834,
+  "diff_sd": 0.10224265362756194,
+  "diff_p99": 0.6,
+  "cohens_d": 0.07243630428993197,
+  "auroc": 0.5120757009912352,
+  "by_frame": {
+    "same_frame": {
+      "n_same": 82,
+      "n_diff": 7493,
+      "same_mean": 0.32628465179060295,
+      "diff_mean": 0.3178065552630456,
+      "cohens_d": 0.08554442973200203,
+      "auroc": 0.5183179097238724
+    },
+    "cross_frame": {
+      "n_same": 44,
+      "n_diff": 3766,
+      "same_mean": 0.31982212810818655,
+      "diff_mean": 0.31424582027349646,
+      "cohens_d": 0.05142383431703125,
+      "auroc": 0.500866002027712
+    }
+  },
+  "spots_per_image_mean": 37.33552631578947,
+  "frames": {
+    "chart": 32,
+    "pca": 120
+  },
+  "aspect_measured_median": 7.624035529370245,
+  "rank_same_side": {
+    "protocol": "leave-one-out, gallery = same side, different encounter; rank of the best correct entry; ties counted AGAINST",
+    "n_query": 136,
+    "n_unscorable": 16,
+    "gallery_size_median": 78.0,
+    "rank1": 0.03676470588235294,
+    "rank5": 0.18382352941176472,
+    "rank10": 0.2647058823529412,
+    "mean_rank": 31.08823529411765,
+    "median_rank": 28.0,
+    "mrr": 0.12364183631801261,
+    "rank1_optimistic": 0.051470588235294115,
+    "rank5_optimistic": 0.19852941176470587,
+    "n_query_tied_at_top": 2
+  },
+  "drift": {
+    "0-6 months": {
+      "days": [
+        0,
+        182
+      ],
+      "n_pairs": 85,
+      "mean_score": 0.32813157347189986,
+      "median_score": 0.3,
+      "auroc_vs_all_negatives": 0.5202948752109423
+    },
+    "6-12 months": {
+      "days": [
+        183,
+        365
+      ],
+      "n_pairs": 19,
+      "mean_score": 0.30987132910451565,
+      "median_score": 0.3225806451612903,
+      "auroc_vs_all_negatives": 0.48944703886013996
+    },
+    "1-2 years": {
+      "days": [
+        366,
+        730
+      ],
+      "n_pairs": 20,
+      "mean_score": 0.3224545647159106,
+      "median_score": 0.3251192368839428,
+      "auroc_vs_all_negatives": 0.5042676969535482
+    },
+    "2+ years": {
+      "days": [
+        731,
+        null
+      ],
+      "n_pairs": 2,
+      "mean_score": 0.2998423955870764,
+      "median_score": 0.2998423955870764,
+      "auroc_vs_all_negatives": 0.455813127275957
+    },
+    "n_pairs_without_dates": 0,
+    "elapsed_days": {
+      "min": 1,
+      "median": 97.5,
+      "max": 787
+    }
+  },
+  "opposite_side": {
+    "n_pairs": 91,
+    "mean_score": 0.28939061363021995,
+    "auroc_vs_negatives": 0.44009432258832737,
+    "note": "L-vs-R pairs of one animal: no shared spot pattern, so an AUROC near 0.5 is the CORRECT answer, not a failure"
+  },
+  "opposite_side_pairs": [
+    {
+      "a": "syn0034_00",
+      "b": "syn0034_02",
+      "individual": "syn0034",
+      "score": 0.625,
+      "n_inliers": 15,
+      "flip": [
+        false,
+        false
+      ],
+      "direction": "ab",
+      "frames": [
+        "pca",
+        "chart"
+      ],
+      "sides": [
+        "L",
+        "R"
+      ],
+      "opposite_side": true,
+      "same_encounter": false,
+      "elapsed_days": 402,
+      "percentile_of_diff": 99.16511235456079
+    },
+    {
+      "a": "syn0038_00",
+      "b": "syn0038_01",
+      "individual": "syn0038",
+      "score": 0.5,
+      "n_inliers": 3,
+      "flip": [
+        false,
+        false
+      ],
+      "direction": "ab",
+      "frames": [
+        "pca",
+        "pca"
+      ],
+      "sides": [
+        "R",
+        "L"
+      ],
+      "opposite_side": true,
+      "same_encounter": false,
+      "elapsed_days": 9,
+      "percentile_of_diff": 94.75086597388756
+    },
+    {
+      "a": "syn0033_01",
+      "b": "syn0033_03",
+      "individual": "syn0033",
+      "score": 0.4782608695652174,
+      "n_inliers": 11,
+      "flip": [
+        true,
+        false
+      ],
+      "direction": "ab",
+      "frames": [
+        "pca",
+        "pca"
+      ],
+      "sides": [
+        "R",
+        "L"
+      ],
+      "opposite_side": true,
+      "same_encounter": false,
+      "elapsed_days": 674,
+      "percentile_of_diff": 94.3156585842437
+    },
+    {
+      "a": "syn0009_01",
+      "b": "syn0009_03",
+      "individual": "syn0009",
+      "score": 0.4666666666666667,
+      "n_inliers": 7,
+      "flip": [
+        true,
+        false
+      ],
+      "direction": "ab",
+      "frames": [
+        "pca",
+        "pca"
+      ],
+      "sides": [
+        "R",
+        "L"
+      ],
+      "opposite_side": true,
+      "same_encounter": false,
+      "elapsed_days": 439,
+      "percentile_of_diff": 92.87680966338041
+    },
+    {
+      "a": "syn0034_02",
+      "b": "syn0034_03",
+      "individual": "syn0034",
+      "score": 0.4583333333333333,
+      "n_inliers": 11,
+      "flip": [
+        true,
+        false
+      ],
+      "direction": "ab",
+      "frames": [
+        "chart",
+        "pca"
+      ],
+      "sides": [
+        "R",
+        "L"
+      ],
+      "opposite_side": true,
+      "same_encounter": false,
+      "elapsed_days": 293,
+      "percentile_of_diff": 91.77546851407763
+    },
+    {
+      "a": "syn0007_01",
+      "b": "syn0007_02",
+      "individual": "syn0007",
+      "score": 0.4444444444444444,
+      "n_inliers": 8,
+      "flip": [
+        true,
+        false
+      ],
+      "direction": "ab",
+      "frames": [
+        "chart",
+        "chart"
+      ],
+      "sides": [
+        "L",
+        "R"
+      ],
+      "opposite_side": true,
+      "same_encounter": false,
+      "elapsed_days": 428,
+      "percentile_of_diff": 90.24780175859313
+    },
+    {
+      "a": "syn0019_00",
+      "b": "syn0019_02",
+      "individual": "syn0019",
+      "score": 0.43333333333333335,
+      "n_inliers": 13,
+      "flip": [
+        false,
+        true
+      ],
+      "direction": "ba",
+      "frames": [
+        "pca",
+        "chart"
+      ],
+      "sides": [
+        "L",
+        "R"
+      ],
+      "opposite_side": true,
+      "same_encounter": false,
+      "elapsed_days": 55,
+      "percentile_of_diff": 88.67572608579802
+    },
+    {
+      "a": "syn0006_00",
+      "b": "syn0006_03",
+      "individual": "syn0006",
+      "score": 0.42857142857142855,
+      "n_inliers": 9,
+      "flip": [
+        true,
+        false
+      ],
+      "direction": "ab",
+      "frames": [
+        "pca",
+        "pca"
+      ],
+      "sides": [
+        "L",
+        "R"
+      ],
+      "opposite_side": true,
+      "same_encounter": false,
+      "elapsed_days": 45,
+      "percentile_of_diff": 87.556621369571
+    },
+    {
+      "a": "syn0028_01",
+      "b": "syn0028_02",
+      "individual": "syn0028",
+      "score": 0.4166666666666667,
+      "n_inliers": 10,
+      "flip": [
+        false,
+        false
+      ],
+      "direction": "ab",
+      "frames": [
+        "pca",
+        "pca"
+      ],
+      "sides": [
+        "L",
+        "R"
+      ],
+      "opposite_side": true,
+      "same_encounter": false,
+      "elapsed_days": 4,
+      "percentile_of_diff": 84.98978594901855
+    },
+    {
+      "a": "syn0007_02",
+      "b": "syn0007_03",
+      "individual": "syn0007",
+      "score": 0.38461538461538464,
+      "n_inliers": 10,
+      "flip": [
+        true,
+        true
+      ],
+      "direction": "ab",
+      "frames": [
+        "chart",
+        "pca"
+      ],
+      "sides": [
+        "R",
+        "L"
+      ],
+      "opposite_side": true,
+      "same_encounter": false,
+      "elapsed_days": 127,
+      "percentile_of_diff": 78.41726618705036
+    },
+    {
+      "a": "syn0004_00",
+      "b": "syn0004_02",
+      "individual": "syn0004",
+      "score": 0.38235294117647056,
+      "n_inliers": 13,
+      "flip": [
+        false,
+        true
+      ],
+      "direction": "ab",
+      "frames": [
+        "pca",
+        "pca"
+      ],
+      "sides": [
+        "L",
+        "R"
+      ],
+      "opposite_side": true,
+      "same_encounter": false,
+      "elapsed_days": 57,
+      "percentile_of_diff": 77.7866595612399
+    },
+    {
+      "a": "syn0028_01",
+      "b": "syn0028_03",
+      "individual": "syn0028",
+      "score": 0.375,
+      "n_inliers": 9,
+      "flip": [
+        true,
+        true
+      ],
+      "direction": "ab",
+      "frames": [
+        "pca",
+        "chart"
+      ],
+      "sides": [
+        "L",
+        "R"
+      ],
+      "opposite_side": true,
+      "same_encounter": false,
+      "elapsed_days": 31,
+      "percentile_of_diff": 74.18953725908163
+    },
+    {
+      "a": "syn0004_01",
+      "b": "syn0004_03",
+      "individual": "syn0004",
+      "score": 0.37142857142857144,
+      "n_inliers": 13,
+      "flip": [
+        false,
+        true
+      ],
+      "direction": "ab",
+      "frames": [
+        "pca",
+        "pca"
+      ],
+      "sides": [
+        "R",
+        "L"
+      ],
+      "opposite_side": true,
+      "same_encounter": false,
+      "elapsed_days": 70,
+      "percentile_of_diff": 73.49675814903632
+    },
+    {
+      "a": "syn0022_02",
+      "b": "syn0022_03",
+      "individual": "syn0022",
+      "score": 0.3684210526315789,
+      "n_inliers": 7,
+      "flip": [
+        false,
+        true
+      ],
+      "direction": "ab",
+      "frames": [
+        "chart",
+        "pca"
+      ],
+      "sides": [
+        "R",
+        "L"
+      ],
+      "opposite_side": true,
+      "same_encounter": false,
+      "elapsed_days": 475,
+      "percentile_of_diff": 72.86615152322587
+    },
+    {
+      "a": "syn0014_00",
+      "b": "syn0014_03",
+      "individual": "syn0014",
+      "score": 0.36363636363636365,
+      "n_inliers": 12,
+      "flip": [
+        true,
+        false
+      ],
+      "direction": "ab",
+      "frames": [
+        "chart",
+        "pca"
+      ],
+      "sides": [
+        "R",
+        "L"
+      ],
+      "opposite_side": true,
+      "same_encounter": false,
+      "elapsed_days": 427,
+      "percentile_of_diff": 71.80921929123369
+    },
+    {
+      "a": "syn0032_01",
+      "b": "syn0032_03",
+      "individual": "syn0032",
+      "score": 0.36,
+      "n_inliers": 9,
+      "flip": [
+        false,
+        false
+      ],
+      "direction": "ba",
+      "frames": [
+        "chart",
+        "pca"
+      ],
+      "sides": [
+        "R",
+        "L"
+      ],
+      "opposite_side": true,
+      "same_encounter": false,
+      "elapsed_days": 735,
+      "percentile_of_diff": 71.311839417355
+    },
+    {
+      "a": "syn0009_00",
+      "b": "syn0009_03",
+      "individual": "syn0009",
+      "score": 0.35714285714285715,
+      "n_inliers": 10,
+      "flip": [
+        false,
+        true
+      ],
+      "direction": "ba",
+      "frames": [
+        "pca",
+        "pca"
+      ],
+      "sides": [
+        "R",
+        "L"
+      ],
+      "opposite_side": true,
+      "same_encounter": false,
+      "elapsed_days": 450,
+      "percentile_of_diff": 70.0595079491962
+    },
+    {
+      "a": "syn0010_01",
+      "b": "syn0010_03",
+      "individual": "syn0010",
+      "score": 0.35714285714285715,
+      "n_inliers": 10,
+      "flip": [
+        false,
+        false
+      ],
+      "direction": "ba",
+      "frames": [
+        "pca",
+        "pca"
+      ],
+      "sides": [
+        "L",
+        "R"
+      ],
+      "opposite_side": true,
+      "same_encounter": false,
+      "elapsed_days": 116,
+      "percentile_of_diff": 70.0595079491962
+    },
+    {
+      "a": "syn0004_02",
+      "b": "syn0004_03",
+      "individual": "syn0004",
+      "score": 0.35294117647058826,
+      "n_inliers": 12,
+      "flip": [
+        false,
+        true
+      ],
+      "direction": "ba",
+      "frames": [
+        "pca",
+        "pca"
+      ],
+      "sides": [
+        "R",
+        "L"
+      ],
+      "opposite_side": true,
+      "same_encounter": false,
+      "elapsed_days": 39,
+      "percentile_of_diff": 68.31867839062083
+    },
+    {
+      "a": "syn0005_01",
+      "b": "syn0005_03",
+      "individual": "syn0005",
+      "score": 0.35294117647058826,
+      "n_inliers": 12,
+      "flip": [
+        true,
+        false
+      ],
+      "direction": "ba",
+      "frames": [
+        "chart",
+        "pca"
+      ],
+      "sides": [
+        "R",
+        "L"
+      ],
+      "opposite_side": true,
+      "same_encounter": false,
+      "elapsed_days": 109,
+      "percentile_of_diff": 68.31867839062083
+    }
+  ],
+  "top_same_pairs": [
+    {
+      "a": "syn0015_00",
+      "b": "syn0015_01",
+      "individual": "syn0015",
+      "score": 0.5769230769230769,
+      "n_inliers": 15,
+      "flip": [
+        false,
+        false
+      ],
+      "direction": "ba",
+      "frames": [
+        "pca",
+        "pca"
+      ],
+      "sides": [
+        "L",
+        "L"
+      ],
+      "opposite_side": false,
+      "same_encounter": false,
+      "elapsed_days": 30
+    },
+    {
+      "a": "syn0017_01",
+      "b": "syn0017_03",
+      "individual": "syn0017",
+      "score": 0.5714285714285714,
+      "n_inliers": 24,
+      "flip": [
+        false,
+        false
+      ],
+      "direction": "ab",
+      "frames": [
+        "pca",
+        "pca"
+      ],
+      "sides": [
+        "L",
+        "L"
+      ],
+      "opposite_side": false,
+      "same_encounter": false,
+      "elapsed_days": 105
+    },
+    {
+      "a": "syn0027_02",
+      "b": "syn0027_03",
+      "individual": "syn0027",
+      "score": 0.5714285714285714,
+      "n_inliers": 16,
+      "flip": [
+        false,
+        false
+      ],
+      "direction": "ab",
+      "frames": [
+        "pca",
+        "pca"
+      ],
+      "sides": [
+        "R",
+        "R"
+      ],
+      "opposite_side": false,
+      "same_encounter": false,
+      "elapsed_days": 196
+    },
+    {
+      "a": "syn0024_00",
+      "b": "syn0024_01",
+      "individual": "syn0024",
+      "score": 0.5517241379310345,
+      "n_inliers": 16,
+      "flip": [
+        false,
+        false
+      ],
+      "direction": "ab",
+      "frames": [
+        "pca",
+        "pca"
+      ],
+      "sides": [
+        "L",
+        "L"
+      ],
+      "opposite_side": false,
+      "same_encounter": false,
+      "elapsed_days": 9
+    },
+    {
+      "a": "syn0013_01",
+      "b": "syn0013_03",
+      "individual": "syn0013",
+      "score": 0.55,
+      "n_inliers": 11,
+      "flip": [
+        false,
+        false
+      ],
+      "direction": "ab",
+      "frames": [
+        "pca",
+        "pca"
+      ],
+      "sides": [
+        "L",
+        "L"
+      ],
+      "opposite_side": false,
+      "same_encounter": false,
+      "elapsed_days": 147
+    },
+    {
+      "a": "syn0030_00",
+      "b": "syn0030_01",
+      "individual": "syn0030",
+      "score": 0.5294117647058824,
+      "n_inliers": 18,
+      "flip": [
+        true,
+        true
+      ],
+      "direction": "ba",
+      "frames": [
+        "chart",
+        "pca"
+      ],
+      "sides": [
+        "L",
+        "L"
+      ],
+      "opposite_side": false,
+      "same_encounter": false,
+      "elapsed_days": 117
+    },
+    {
+      "a": "syn0035_01",
+      "b": "syn0035_02",
+      "individual": "syn0035",
+      "score": 0.5294117647058824,
+      "n_inliers": 9,
+      "flip": [
+        false,
+        false
+      ],
+      "direction": "ab",
+      "frames": [
+        "pca",
+        "pca"
+      ],
+      "sides": [
+        "L",
+        "L"
+      ],
+      "opposite_side": false,
+      "same_encounter": false,
+      "elapsed_days": 4
+    },
+    {
+      "a": "syn0028_00",
+      "b": "syn0028_02",
+      "individual": "syn0028",
+      "score": 0.5217391304347826,
+      "n_inliers": 12,
+      "flip": [
+        true,
+        false
+      ],
+      "direction": "ab",
+      "frames": [
+        "pca",
+        "pca"
+      ],
+      "sides": [
+        "R",
+        "R"
+      ],
+      "opposite_side": false,
+      "same_encounter": false,
+      "elapsed_days": 25
+    },
+    {
+      "a": "syn0026_01",
+      "b": "syn0026_02",
+      "individual": "syn0026",
+      "score": 0.5,
+      "n_inliers": 12,
+      "flip": [
+        true,
+        true
+      ],
+      "direction": "ba",
+      "frames": [
+        "pca",
+        "chart"
+      ],
+      "sides": [
+        "R",
+        "R"
+      ],
+      "opposite_side": false,
+      "same_encounter": false,
+      "elapsed_days": 21
+    },
+    {
+      "a": "syn0027_00",
+      "b": "syn0027_02",
+      "individual": "syn0027",
+      "score": 0.5,
+      "n_inliers": 10,
+      "flip": [
+        false,
+        false
+      ],
+      "direction": "ba",
+      "frames": [
+        "pca",
+        "pca"
+      ],
+      "sides": [
+        "R",
+        "R"
+      ],
+      "opposite_side": false,
+      "same_encounter": false,
+      "elapsed_days": 24
+    },
+    {
+      "a": "syn0038_01",
+      "b": "syn0038_03",
+      "individual": "syn0038",
+      "score": 0.5,
+      "n_inliers": 3,
+      "flip": [
+        false,
+        true
+      ],
+      "direction": "ab",
+      "frames": [
+        "pca",
+        "chart"
+      ],
+      "sides": [
+        "L",
+        "L"
+      ],
+      "opposite_side": false,
+      "same_encounter": false,
+      "elapsed_days": 512
+    },
+    {
+      "a": "syn0006_02",
+      "b": "syn0006_03",
+      "individual": "syn0006",
+      "score": 0.47619047619047616,
+      "n_inliers": 10,
+      "flip": [
+        true,
+        true
+      ],
+      "direction": "ba",
+      "frames": [
+        "pca",
+        "pca"
+      ],
+      "sides": [
+        "R",
+        "R"
+      ],
+      "opposite_side": false,
+      "same_encounter": false,
+      "elapsed_days": 17
+    },
+    {
+      "a": "syn0015_00",
+      "b": "syn0015_02",
+      "individual": "syn0015",
+      "score": 0.47619047619047616,
+      "n_inliers": 10,
+      "flip": [
+        true,
+        false
+      ],
+      "direction": "ba",
+      "frames": [
+        "pca",
+        "chart"
+      ],
+      "sides": [
+        "L",
+        "L"
+      ],
+      "opposite_side": false,
+      "same_encounter": false,
+      "elapsed_days": 54
+    },
+    {
+      "a": "syn0002_00",
+      "b": "syn0002_01",
+      "individual": "syn0002",
+      "score": 0.47058823529411764,
+      "n_inliers": 8,
+      "flip": [
+        false,
+        true
+      ],
+      "direction": "ab",
+      "frames": [
+        "pca",
+        "pca"
+      ],
+      "sides": [
+        "L",
+        "L"
+      ],
+      "opposite_side": false,
+      "same_encounter": false,
+      "elapsed_days": 13
+    },
+    {
+      "a": "syn0035_01",
+      "b": "syn0035_03",
+      "individual": "syn0035",
+      "score": 0.47058823529411764,
+      "n_inliers": 8,
+      "flip": [
+        true,
+        true
+      ],
+      "direction": "ab",
+      "frames": [
+        "pca",
+        "pca"
+      ],
+      "sides": [
+        "L",
+        "L"
+      ],
+      "opposite_side": false,
+      "same_encounter": false,
+      "elapsed_days": 5
+    },
+    {
+      "a": "syn0027_01",
+      "b": "syn0027_03",
+      "individual": "syn0027",
+      "score": 0.4642857142857143,
+      "n_inliers": 13,
+      "flip": [
+        true,
+        true
+      ],
+      "direction": "ab",
+      "frames": [
+        "chart",
+        "pca"
+      ],
+      "sides": [
+        "R",
+        "R"
+      ],
+      "opposite_side": false,
+      "same_encounter": false,
+      "elapsed_days": 206
+    },
+    {
+      "a": "syn0016_02",
+      "b": "syn0016_03",
+      "individual": "syn0016",
+      "score": 0.4583333333333333,
+      "n_inliers": 11,
+      "flip": [
+        true,
+        true
+      ],
+      "direction": "ab",
+      "frames": [
+        "pca",
+        "pca"
+      ],
+      "sides": [
+        "R",
+        "R"
+      ],
+      "opposite_side": false,
+      "same_encounter": false,
+      "elapsed_days": 255
+    },
+    {
+      "a": "syn0034_01",
+      "b": "syn0034_02",
+      "individual": "syn0034",
+      "score": 0.4583333333333333,
+      "n_inliers": 11,
+      "flip": [
+        false,
+        true
+      ],
+      "direction": "ab",
+      "frames": [
+        "chart",
+        "chart"
+      ],
+      "sides": [
+        "R",
+        "R"
+      ],
+      "opposite_side": false,
+      "same_encounter": false,
+      "elapsed_days": 391
+    },
+    {
+      "a": "syn0034_00",
+      "b": "syn0034_03",
+      "individual": "syn0034",
+      "score": 0.45714285714285713,
+      "n_inliers": 16,
+      "flip": [
+        false,
+        false
+      ],
+      "direction": "ab",
+      "frames": [
+        "pca",
+        "pca"
+      ],
+      "sides": [
+        "L",
+        "L"
+      ],
+      "opposite_side": false,
+      "same_encounter": false,
+      "elapsed_days": 695
+    },
+    {
+      "a": "syn0007_01",
+      "b": "syn0007_03",
+      "individual": "syn0007",
+      "score": 0.4444444444444444,
+      "n_inliers": 8,
+      "flip": [
+        false,
+        true
+      ],
+      "direction": "ab",
+      "frames": [
+        "chart",
+        "pca"
+      ],
+      "sides": [
+        "L",
+        "L"
+      ],
+      "opposite_side": false,
+      "same_encounter": false,
+      "elapsed_days": 555
+    }
+  ],
+  "n_records_read": 160,
+  "dropped": [
+    {
+      "line": 3,
+      "image_id": "syn0000_03",
+      "reason": "no body polygon or too few spots"
+    },
+    {
+      "line": 7,
+      "image_id": "syn0001_03",
+      "reason": "no body polygon or too few spots"
+    },
+    {
+      "line": 38,
+      "image_id": "syn0009_02",
+      "reason": "no body polygon or too few spots"
+    },
+    {
+      "line": 51,
+      "image_id": "syn0012_03",
+      "reason": "no body polygon or too few spots"
+    },
+    {
+      "line": 52,
+      "image_id": "syn0013_00",
+      "reason": "no body polygon or too few spots"
+    },
+    {
+      "line": 89,
+      "image_id": "syn0022_01",
+      "reason": "no body polygon or too few spots"
+    },
+    {
+      "line": 117,
+      "image_id": "syn0029_01",
+      "reason": "no body polygon or too few spots"
+    },
+    {
+      "line": 119,
+      "image_id": "syn0029_03",
+      "reason": "no body polygon or too few spots"
+    }
+  ],
+  "n_dropped": 8,
+  "truth_rows": 160,
+  "spot_filter": {
+    "conf_min": 0.5,
+    "spots_in": 19292,
+    "spots_kept": 5675,
+    "kept_frac": 0.2941633837860253
+  }
+}

@@ -1,0 +1,126 @@
+{
+  "mode": "synth",
+  "model": "axis",
+  "n_images_used": 6,
+  "n_individuals": 3,
+  "n_same_pairs": 1,
+  "n_diff_pairs": 12,
+  "same_encounter_same_individual_pairs": 0,
+  "cross_encounter_same_side_positives": 1,
+  "opposite_side_same_individual_pairs": 2,
+  "leakage_note": "0/1 same-side same-individual pairs are same-encounter",
+  "usable_note": "1 cross-encounter same-side same-individual pair(s): some genuine re-ID evidence",
+  "same_mean": 0.0963855421686747,
+  "same_sd": null,
+  "diff_mean": 0.17499299308596636,
+  "diff_sd": 0.08301894499643098,
+  "diff_p99": 0.3496867469879519,
+  "cohens_d": NaN,
+  "auroc": 0.25,
+  "by_frame": {
+    "same_frame": {
+      "n_same": 1,
+      "n_diff": 6,
+      "same_mean": 0.0963855421686747,
+      "diff_mean": 0.2210331978515467,
+      "cohens_d": NaN,
+      "auroc": 0.16666666666666666
+    },
+    "cross_frame": {
+      "n_same": 0,
+      "n_diff": 6,
+      "same_mean": null,
+      "diff_mean": 0.128952788320386,
+      "cohens_d": NaN,
+      "auroc": NaN
+    }
+  },
+  "spots_per_image_mean": 87.83333333333333,
+  "frames": {
+    "chart": 4,
+    "pca": 2
+  },
+  "aspect_measured_median": 8.554023757096289,
+  "opposite_side_pairs": [
+    {
+      "a": "syn0000_00",
+      "b": "syn0000_01",
+      "individual": "syn0000",
+      "score": 0.19101123595505617,
+      "n_inliers": 17,
+      "flip": [
+        true,
+        false
+      ],
+      "direction": "ab",
+      "frames": [
+        "chart",
+        "pca"
+      ],
+      "sides": [
+        "L",
+        "R"
+      ],
+      "opposite_side": true,
+      "same_encounter": false,
+      "gt_shared_spots": 7,
+      "gt_ceiling": 0.07692307692307693,
+      "percentile_of_diff": 50.0
+    },
+    {
+      "a": "syn0001_00",
+      "b": "syn0001_01",
+      "individual": "syn0001",
+      "score": 0.14545454545454545,
+      "n_inliers": 8,
+      "flip": [
+        false,
+        true
+      ],
+      "direction": "ab",
+      "frames": [
+        "pca",
+        "chart"
+      ],
+      "sides": [
+        "R",
+        "L"
+      ],
+      "opposite_side": true,
+      "same_encounter": false,
+      "gt_shared_spots": 6,
+      "gt_ceiling": 0.10714285714285714,
+      "percentile_of_diff": 41.66666666666667
+    }
+  ],
+  "top_same_pairs": [
+    {
+      "a": "syn0002_00",
+      "b": "syn0002_01",
+      "individual": "syn0002",
+      "score": 0.0963855421686747,
+      "n_inliers": 8,
+      "flip": [
+        false,
+        true
+      ],
+      "direction": "ab",
+      "frames": [
+        "chart",
+        "chart"
+      ],
+      "sides": [
+        "L",
+        "L"
+      ],
+      "opposite_side": false,
+      "same_encounter": false,
+      "gt_shared_spots": 30,
+      "gt_ceiling": 0.35714285714285715
+    }
+  ],
+  "n_records_read": 6,
+  "dropped": [],
+  "n_dropped": 0,
+  "truth_rows": 6
+}

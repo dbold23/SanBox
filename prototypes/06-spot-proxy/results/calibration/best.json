@@ -1,0 +1,13 @@
+{
+  "camera": {
+    "elevation_deg": [
+      0.0,
+      32.0
+    ]
+  },
+  "pattern": {
+    "min_sep": 0.008,
+    "n_spots": 1300,
+    "radius_median": 0.0037
+  }
+}

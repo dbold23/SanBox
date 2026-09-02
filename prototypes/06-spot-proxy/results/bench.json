@@ -1,0 +1,112 @@
+[
+  {
+    "cell_mm": 1.5,
+    "last_frame_stage_s": {
+      "chart": 0.053,
+      "degrade": 0.063,
+      "pose": 0.01,
+      "raster": 5.155,
+      "shade": 0.779,
+      "spot_gt": 0.096
+    },
+    "n_faces": 152467,
+    "n_frames": 3,
+    "n_vertices": 75731,
+    "raster_with_shadow_s": 5.1008241176605225,
+    "raster_without_shadow_s": 2.732064962387085,
+    "resolution": [
+      1512,
+      2016
+    ],
+    "shadow_map_s": 2.3687591552734375,
+    "whole_frame_s": 6.175815105438232
+  },
+  {
+    "cell_mm": 2.0,
+    "last_frame_stage_s": {
+      "chart": 0.055,
+      "degrade": 0.071,
+      "pose": 0.007,
+      "raster": 3.342,
+      "shade": 0.717,
+      "spot_gt": 0.099
+    },
+    "n_faces": 87366,
+    "n_frames": 3,
+    "n_vertices": 43304,
+    "raster_with_shadow_s": 3.4265401363372803,
+    "raster_without_shadow_s": 1.9151971340179443,
+    "resolution": [
+      1512,
+      2016
+    ],
+    "shadow_map_s": 1.511343002319336,
+    "whole_frame_s": 4.508448839187622
+  },
+  {
+    "cell_mm": 2.5,
+    "last_frame_stage_s": {
+      "chart": 0.059,
+      "degrade": 0.065,
+      "pose": 0.005,
+      "raster": 2.577,
+      "shade": 0.794,
+      "spot_gt": 0.097
+    },
+    "n_faces": 56551,
+    "n_frames": 3,
+    "n_vertices": 28007,
+    "raster_with_shadow_s": 2.668091058731079,
+    "raster_without_shadow_s": 1.5552451610565186,
+    "resolution": [
+      1512,
+      2016
+    ],
+    "shadow_map_s": 1.1128458976745605,
+    "whole_frame_s": 3.6173908710479736
+  },
+  {
+    "cell_mm": 4.0,
+    "last_frame_stage_s": {
+      "chart": 0.063,
+      "degrade": 0.068,
+      "pose": 0.004,
+      "raster": 1.547,
+      "shade": 0.818,
+      "spot_gt": 0.107
+    },
+    "n_faces": 22212,
+    "n_frames": 3,
+    "n_vertices": 10933,
+    "raster_with_shadow_s": 1.6170191764831543,
+    "raster_without_shadow_s": 1.167052984237671,
+    "resolution": [
+      1512,
+      2016
+    ],
+    "shadow_map_s": 0.4499661922454834,
+    "whole_frame_s": 2.7348179817199707
+  },
+  {
+    "cell_mm": 6.0,
+    "last_frame_stage_s": {
+      "chart": 0.057,
+      "degrade": 0.064,
+      "pose": 0.003,
+      "raster": 1.112,
+      "shade": 0.763,
+      "spot_gt": 0.095
+    },
+    "n_faces": 9966,
+    "n_frames": 3,
+    "n_vertices": 4875,
+    "raster_with_shadow_s": 1.442469835281372,
+    "raster_without_shadow_s": 1.0034968852996826,
+    "resolution": [
+      1512,
+      2016
+    ],
+    "shadow_map_s": 0.43897294998168945,
+    "whole_frame_s": 2.4362311363220215
+  }
+]

@@ -1,0 +1,58 @@
+{
+  "body": {
+    "cell_mm": 1.5,
+    "cluster_drift_mm": {
+      "max": 0.12150319472991387,
+      "mean": 0.002370810370195272,
+      "p95": 0.0069087074595182
+    },
+    "face_ratio": 0.07771490145146788,
+    "glb": "/Volumes/External Dive 2TB/projects/marine-cv/7Gill/.claude/worktrees/melops-ablation-vast-gpu-6d469d/prototypes/04-sevengill-rig/results/real_v11/sevengill_rigged.glb",
+    "n_dropped_degenerate": 1804176,
+    "n_dropped_duplicate": 5233,
+    "n_faces": 152467,
+    "n_faces_source": 1961876,
+    "n_fin_vertices": 10813,
+    "n_vertices": 75731,
+    "n_vertices_source": 1013814,
+    "s_raw_range": [
+      -0.026727148480138446,
+      0.6552767966320902
+    ],
+    "seconds": {
+      "chart": null,
+      "decimate": 0.6631507873535156,
+      "load": null,
+      "total": 0.6716458797454834
+    },
+    "total_length_m": 0.4803003498178298,
+    "vertex_ratio": 0.0746991065422257
+  },
+  "coverage_frac_median": 0.33488900961619217,
+  "n_frames": 160,
+  "n_individuals": 40,
+  "out_dir": "results/synth_calib",
+  "plan": "plan_same_side_sightings(min_same_side=2)",
+  "schema": "/Volumes/External Dive 2TB/projects/marine-cv/7Gill/.claude/worktrees/melops-ablation-vast-gpu-6d469d/phase1b/p0-sevengill-schema/keypoints_sevengill_v1.yaml",
+  "seconds": 1237.75,
+  "seconds_per_frame": 7.74,
+  "seed": 0,
+  "skin": {
+    "median_rgb": [
+      0.7142289266370663,
+      0.6296108614627984,
+      0.6488891746783878
+    ],
+    "unobserved_frac": 0.02080535888671875
+  },
+  "spot_radius_px": {
+    "median": 10.881694613449236,
+    "p5": 2.763953195770684,
+    "p95": 26.12538930794905
+  },
+  "visible_spots": {
+    "max": 390,
+    "median": 248.5,
+    "min": 164
+  }
+}
