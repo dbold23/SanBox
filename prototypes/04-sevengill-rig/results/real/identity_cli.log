@@ -1,0 +1,20 @@
+load_mesh: sevengill.glb  1013814 verts / 1961876 faces  extents=(0.3572, 0.1200, 0.4352) meters  uv=True
+straighten: 1013814 verts, chart 0.5044 m, fins dorsal,pectoral_L,pectoral_R,pelvic_L,pelvic_R, 12.05s
+Traceback (most recent call last):
+  File "/Volumes/External Dive 2TB/projects/marine-cv/7Gill/.claude/worktrees/melops-ablation-vast-gpu-6d469d/prototypes/04-sevengill-rig/texture_identity.py", line 1189, in <module>
+    main()
+    ~~~~^^
+  File "/Volumes/External Dive 2TB/projects/marine-cv/7Gill/.claude/worktrees/melops-ablation-vast-gpu-6d469d/prototypes/04-sevengill-rig/texture_identity.py", line 1179, in main
+    return run(
+        glb=args.glb, out_dir=args.out, n_resights=args.n_resights,
+    ...<3 lines>...
+        validate=not args.no_validate, report=not args.quiet,
+    )
+  File "/Volumes/External Dive 2TB/projects/marine-cv/7Gill/.claude/worktrees/melops-ablation-vast-gpu-6d469d/prototypes/04-sevengill-rig/texture_identity.py", line 1015, in run
+    ctx = identity_context(schema_path=schema_path)
+  File "/Volumes/External Dive 2TB/projects/marine-cv/7Gill/.claude/worktrees/melops-ablation-vast-gpu-6d469d/prototypes/04-sevengill-rig/texture_identity.py", line 380, in identity_context
+    schema = exclusions.load_schema(path)
+  File "/Volumes/External Dive 2TB/projects/marine-cv/7Gill/.claude/worktrees/melops-ablation-vast-gpu-6d469d/prototypes/05-synthetic-identities/exclusions.py", line 184, in load_schema
+    with open(schema_yaml_path, "r") as handle:
+         ~~~~^^^^^^^^^^^^^^^^^^^^^^^
+FileNotFoundError: [Errno 2] No such file or directory: '/home/user/SanBox/phase1b/p0-sevengill-schema/keypoints_sevengill_v1.yaml'

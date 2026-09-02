@@ -1,0 +1,45 @@
+{
+  "chart_length_m": 0.504414051067419,
+  "voxel_pitch_m": 0.0034000356681644917,
+  "straight_x_extent_m_BL": 0.667766673879385,
+  "n_vertices": 1013814,
+  "n_body_vertices": 896144,
+  "as_scanned_spine_joint_error_max_m": 0.0011805968652812894,
+  "as_scanned_spine_joint_error_max_BL": 0.0017679781149044496,
+  "as_scanned_surface_rms_m": 0.01133837831770415,
+  "as_scanned_surface_max_m": 0.07038724405903621,
+  "as_scanned_surface_rms_pct_BL": 1.6979551033647626,
+  "as_scanned_surface_max_pct_BL": 10.540694349138763,
+  "as_scanned_surface_rms_pct_BL_body_only": 1.637565525361164,
+  "as_scanned_surface_max_pct_BL_body_only": 10.51980849435318,
+  "as_scanned_surface_rms_px": 3.3347821682780086,
+  "rest_extents_m": [
+    0.667766673879385,
+    0.23138266547403077,
+    0.12980078756453695
+  ],
+  "scan_extents_m": [
+    0.3571882098913193,
+    0.12000000476837158,
+    0.43520456552505493
+  ],
+  "label_counts": {
+    "anal": 5315,
+    "body": 896144,
+    "caudal_lower": 12080,
+    "caudal_upper": 1119,
+    "dorsal": 11126,
+    "pectoral_L": 36681,
+    "pectoral_R": 45548,
+    "pelvic_L": 2991,
+    "pelvic_R": 2810
+  },
+  "timings_s": {
+    "load": 4.864713907241821,
+    "centerline": 0.7779920101165771,
+    "debend": 13.193844079971313,
+    "fins": 4.0779030323028564,
+    "rig": 2.6276848316192627,
+    "motion": 0.006877899169921875
+  }
+}

@@ -1,0 +1,46 @@
+<!doctype html><html><head><meta charset="utf-8"><title>sevengill rig viewer</title>
+<style>body{margin:0;background:#1b2a30;color:#eee;font:13px system-ui;overflow:hidden}#hud{position:fixed;top:8px;left:8px;background:#0008;padding:6px 10px;border-radius:6px;white-space:pre}</style>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
+</head><body><div id="hud">loading…</div>
+<script type="module">
+// Minimal glTF viewer for results/real/sevengill_rigged.glb (rig world: snout +X, dorsal +Z, left flank +Y).
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+const params = new URLSearchParams(location.search);
+const hud = document.getElementById('hud');
+const renderer = new THREE.WebGLRenderer({antialias:true, preserveDrawingBuffer:true}); document.body.appendChild(renderer.domElement);
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0x1b2a30);
+scene.add(new THREE.HemisphereLight(0xffffff, 0x334455, 1.3)); const dl = new THREE.DirectionalLight(0xffffff, 1.6); dl.position.set(0.6, -1.0, 2.0); scene.add(dl);
+const camera = new THREE.PerspectiveCamera(30, 16/9, 0.01, 100); camera.up.set(0, 0, 1);
+function viewSize(){ return [innerWidth || document.documentElement.clientWidth || 1280, innerHeight || document.documentElement.clientHeight || 720]; }
+function fit(w, h){ if (!w) [w, h] = viewSize(); renderer.setSize(w, h); camera.aspect = w/h; camera.updateProjectionMatrix(); }
+fit(); addEventListener('resize', () => fit());
+let mixer, clips = [], root, skel, action, box, c, L, curClip = 'cruise', curView = 'side';
+function setView(view){
+  curView = view;
+  if (view === 'side') camera.position.set(c.x, c.y - 2.2*L, c.z);          // from the animal's RIGHT, left flank away; snout to the LEFT
+  else if (view === 'sideL') camera.position.set(c.x, c.y + 2.2*L, c.z);    // from the animal's LEFT; snout to the RIGHT
+  else if (view === 'top') camera.position.set(c.x + 0.0001, c.y, c.z + 2.2*L);
+  else if (view === 'front') camera.position.set(c.x + 2.2*L, c.y, c.z + 0.05*L);
+  else camera.position.set(c.x + 1.1*L, c.y - 1.5*L, c.z + 0.8*L);          // iso
+  camera.lookAt(c); camera.updateProjectionMatrix();
+}
+function setClip(name){ curClip = name; if (action) action.stop(); const clip = clips.find(k => k.name === name) || clips[0]; action = mixer.clipAction(clip); action.reset().play(); mixer.setTime(0); return clip; }
+function render(){ renderer.render(scene, camera); }
+function status(){ hud.textContent = `clips: ${clips.map(k => k.name + ' ' + k.duration.toFixed(2) + 's').join(' | ')}\nclip: ${curClip}  view: ${curView}  t=${mixer ? mixer.time.toFixed(2) : '-'}  rest bbox: ${box ? [box.getSize(new THREE.Vector3()).x, box.getSize(new THREE.Vector3()).y, box.getSize(new THREE.Vector3()).z].map(v => v.toFixed(3)).join(' ') : ''}`; }
+new GLTFLoader().load('../sevengill_rigged.glb', (g) => {
+  root = g.scene; scene.add(root); clips = g.animations;
+  box = new THREE.Box3().setFromObject(root); c = box.getCenter(new THREE.Vector3()); L = Math.max(...box.getSize(new THREE.Vector3()).toArray());
+  root.traverse(o => { if (o.isMesh) { o.frustumCulled = false; const ms = Array.isArray(o.material) ? o.material : [o.material]; ms.forEach(m => { if (params.get('pbr') !== '1') { m.metalness = 0.0; m.roughness = 0.85; m.needsUpdate = true; } }); } });
+  skel = new THREE.SkeletonHelper(root); scene.add(skel); skel.visible = params.get('bones') === '1';
+  mixer = new THREE.AnimationMixer(root);
+  setClip(params.get('clip') || 'cruise'); setView(params.get('view') || 'side'); mixer.setTime(parseFloat(params.get('t') || '0'));
+  Object.assign(window, {__ready: true, __scene: scene, __root: root, __camera: camera, __renderer: renderer, __THREE: THREE,
+    __setClip: (n) => { setClip(n); status(); render(); }, __setView: (v) => { setView(v); status(); render(); },
+    __setTime: (t) => { mixer.setTime(t); status(); render(); }, __bones: (on) => { skel.visible = !!on; render(); },
+    __shot: (w, h, q) => { fit(w, h); render(); const d = renderer.domElement.toDataURL('image/jpeg', q || 0.85); fit(); render(); return d; }});
+  status(); render();
+}, (ev) => { hud.textContent = 'loading ' + (ev.loaded/1e6).toFixed(0) + ' MB'; }, (err) => { hud.textContent = 'ERROR ' + err; window.__error = String(err); });
+const clock = new THREE.Clock();
+(function loop(){ requestAnimationFrame(loop); if (mixer && params.get('play') === '1') { mixer.update(clock.getDelta()); status(); } render(); })();
+</script></body></html>
