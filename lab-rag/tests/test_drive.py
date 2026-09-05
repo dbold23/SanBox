@@ -161,3 +161,59 @@ def test_sync_survives_download_error_and_retries_5xx(drive, tmp_path, monkeypat
     # the failed file keeps its previous manifest entry so it is retried next time
     manifest = json.loads((cache / MANIFEST_NAME).read_text())
     assert manifest["p1"]["version"] == "aaa"
+
+
+def test_same_name_delete_and_reupload_keeps_the_file(tmp_path):
+    d = FakeDrive()
+    d.folders["root"] = [pdf("old", "paper.pdf", "m1")]
+    d.contents["old"] = b"v1"
+    client = DriveClient(d)
+    cache = tmp_path / "c"
+    sync_folder(client, "root", cache)
+    d.folders["root"] = [pdf("new", "paper.pdf", "m2")]  # deleted and re-uploaded: new id, same name
+    d.contents["new"] = b"v2"
+    r = sync_folder(client, "root", cache)
+    assert (cache / "paper.pdf").read_bytes() == b"v2"
+    assert not r.removed
+    manifest = json.loads((cache / MANIFEST_NAME).read_text())
+    assert set(manifest) == {"new"}
+
+
+def test_dangling_shortcut_is_skipped_not_fatal(tmp_path):
+    d = FakeDrive()
+    d.folders["root"] = [
+        pdf("p1", "a.pdf", "1"),
+        {
+            "id": "sc",
+            "name": "gone",
+            "mimeType": "application/vnd.google-apps.shortcut",
+            "shortcutDetails": {"targetId": "missing", "targetMimeType": "application/pdf"},
+        },
+    ]
+    d.contents["p1"] = b"x"
+    files = list(DriveClient(d).walk("root"))
+    assert [f.name for f in files] == ["a.pdf"]
+
+
+def test_file_reachable_directly_and_via_shortcut_is_synced_once(tmp_path):
+    d = FakeDrive()
+    d.folders["root"] = [
+        pdf("p1", "a.pdf", "1"),
+        {"id": "sub", "name": "Links", "mimeType": FOLDER_MIME},
+    ]
+    d.folders["sub"] = [
+        {
+            "id": "sc",
+            "name": "a.pdf",
+            "mimeType": "application/vnd.google-apps.shortcut",
+            "shortcutDetails": {"targetId": "p1", "targetMimeType": "application/pdf"},
+        },
+    ]
+    d.contents["p1"] = b"x"
+    client = DriveClient(d)
+    assert [f.id for f in client.walk("root")].count("p1") == 1
+    cache = tmp_path / "c"
+    r1 = sync_folder(client, "root", cache)
+    assert len(r1.added) == 1
+    r2 = sync_folder(client, "root", cache)
+    assert not r2.changed and not r2.removed and r2.unchanged == 1

@@ -63,7 +63,7 @@
 
   <div id="indexPanel" class="card idx hidden">
     <h2>Index</h2>
-    <p class="muted" id="indexHelp">Papers are picked up from the configured folders and Google Drive. Updating re-reads new or changed files only.</p>
+    <p class="muted" id="indexHelp">Papers are picked up from the configured folders and Google Drive, usually within 30 minutes on their own. Updating now re-reads new or changed files only.</p>
     <button class="primary" id="indexBtn" type="button">Update index now</button>
     <span class="muted" id="indexState"></span>
     <pre id="indexLog" class="hidden"></pre>
@@ -110,6 +110,7 @@
     if (res.error) html += `<p class="error">Could not get an answer from the model: ${escapeHtml(res.error)}</p><p class="muted">Here are the most relevant passages instead.</p>`;
     else if (res.answer) html += `<div class="answer">${linkCitations(escapeHtml(res.answer))}</div>`;
     else if (!res.sources.length) html += `<p class="muted">Nothing in the indexed papers matches. Try other words, or check the index.</p>`;
+    else html += `<p class="muted">${$("passagesOnly").disabled ? "No language model is set up, so these are the best-matching passages from the lab's papers." : "Passages only, as requested."}</p>`;
     if (res.model) html += `<div class="meta" style="margin-top:8px">${escapeHtml(res.model)} · ${res.elapsed}s</div>`;
     html += `</div>`;
     if (res.sources.length){
@@ -119,7 +120,7 @@
           <span class="n">[${s.n}]</span> <span class="cit">${escapeHtml(s.citation)}</span> —
           <a href="${s.file_url}" target="_blank" rel="noopener">${escapeHtml(s.title)}</a>
           <span class="meta">${s.pages ? escapeHtml(s.pages) + " · " : ""}${escapeHtml(s.source)}/${escapeHtml(s.rel_path)}</span>
-          <div class="snippet">${escapeHtml(s.snippet)}</div></li>`;
+          <div class="snippet" data-short="${escapeHtml(s.snippet)}" data-full="${escapeHtml(s.text || s.snippet)}">${escapeHtml(s.snippet)}${s.truncated ? ' <a href="#" class="more">show full passage</a>' : ""}</div></li>`;
       }
       html += `</ol></div>`;
     }
@@ -127,6 +128,12 @@
     $("results").prepend(wrap);
     // clicking a citation scrolls to the source in this result
     wrap.querySelectorAll("a.cite").forEach(a => a.onclick = ev => { ev.preventDefault(); const t = wrap.querySelector(a.getAttribute("href")); if (t) t.scrollIntoView({behavior:"smooth", block:"center"}); });
+    wrap.querySelectorAll("a.more").forEach(a => a.onclick = ev => {
+      ev.preventDefault(); const box = a.parentElement; const full = box.getAttribute("data-full");
+      box.textContent = full; const back = document.createElement("a"); back.href = "#"; back.textContent = " show less"; back.className = "more";
+      back.onclick = e2 => { e2.preventDefault(); box.textContent = box.getAttribute("data-short") + " "; box.appendChild(a); };
+      box.appendChild(back);
+    });
   }
   function linkCitations(text){
     return text.replace(/\[(\d+(?:\s*[,;]\s*\d+)*)\]/g, (m, inner) =>
@@ -146,7 +153,8 @@
       if (res.answer) { history.push([q, res.answer]); $("followup").textContent = `Follow-up questions keep the last ${Math.min(history.length,3)} exchange(s) in mind.`; }
       $("question").value = "";
     } catch(e){
-      const d = document.createElement("div"); d.className = "card error"; d.textContent = "Something went wrong: " + e.message; $("results").prepend(d);
+      const d = document.createElement("div"); d.className = "card error";
+      d.textContent = "Something went wrong (" + e.message + "). Try again; if it keeps happening, tell whoever runs LabRAG - the details are in the server log."; $("results").prepend(d);
     } finally { $("askBtn").disabled = false; $("askBtn").textContent = "Ask"; }
   };
   $("question").addEventListener("keydown", ev => { if ((ev.metaKey || ev.ctrlKey) && ev.key === "Enter") $("askForm").requestSubmit(); });

@@ -9,7 +9,7 @@ from dataclasses import dataclass, field
 
 from .embed import Embedder
 from .llm import LLM, LLMError
-from .store import Hit, Store
+from .store import EmbedderMismatch, Hit, Store
 
 log = logging.getLogger(__name__)
 
@@ -22,9 +22,11 @@ Rules:
 - Be concise: a short paragraph or a few bullet points. Plain prose, no headings. Do not repeat the question."""
 
 _CITE_RE = re.compile(r"\[(\d+(?:\s*[,;]\s*\d+)*)\]")
+# Only sentence-initial openers count as a follow-up; a pronoun in the middle of a
+# perfectly ordinary question ("...where do they go in winter?") does not.
 _FOLLOWUP_RE = re.compile(
-    r"^(and|but|what about|how about|also|then|same|more|any|which of|what of|ok|okay)\b|\b(it|its|they|them|their|those|these|that one|the same|there)\b",
-    re.IGNORECASE,
+    r"^(and|but|what about|how about|also|then|same|more|which of|what of|ok|okay|it|they|those|these|that one|the same)\b",
+    re.I,
 )
 
 
@@ -44,7 +46,9 @@ class Answer:
 
 
 class Engine:
-    def __init__(self, store: Store, embedder: Embedder | None, llm: LLM | None = None, k: int = 8, per_doc: int = 3, max_tokens: int = 8000):
+    def __init__(
+        self, store: Store, embedder: Embedder | None, llm: LLM | None = None, k: int = 8, per_doc: int = 3, max_tokens: int = 16000
+    ):
         self.store = store
         self.embedder = embedder
         self.llm = llm
@@ -59,7 +63,11 @@ class Engine:
                 qvec = self.embedder.embed_query(question)
             except Exception as exc:  # embeddings are optional for search
                 log.warning("Query embedding failed (%s); falling back to keyword search", exc)
-        return self.store.search(question, qvec, k=k or self.k, per_doc=self.per_doc)
+        try:
+            return self.store.search(question, qvec, k=k or self.k, per_doc=self.per_doc)
+        except EmbedderMismatch as exc:
+            log.warning("%s Falling back to keyword search.", exc)
+            return self.store.search(question, None, k=k or self.k, per_doc=self.per_doc)
 
     def ask(self, question: str, k: int | None = None, history: list[tuple[str, str]] | None = None) -> Answer:
         started = time.monotonic()
@@ -82,7 +90,7 @@ class Engine:
             answer.elapsed = time.monotonic() - started
             return answer
         answer.text = text
-        answer.model = self.llm.name
+        answer.model = getattr(self.llm, "last_model", None) or self.llm.name
         answer.cited = extract_citations(text, len(hits))
         answer.elapsed = time.monotonic() - started
         return answer
@@ -93,7 +101,7 @@ def retrieval_query(question: str, history: list[tuple[str, str]]) -> str:
     their own, so fold the previous question in when the new one looks like a follow-up."""
     if not history:
         return question
-    if len(question.split()) <= 6 or _FOLLOWUP_RE.search(question):
+    if len(question.split()) <= 3 or _FOLLOWUP_RE.search(question):
         previous = history[-1][0].strip()
         if previous and previous.lower() != question.lower():
             return f"{previous} {question}"
@@ -106,7 +114,7 @@ def format_source(n: int, hit: Hit, max_chars: int = 2500) -> str:
     title = doc.title or doc.rel_path
     where = f", {hit.pages}" if hit.pages else ""
     text = hit.text if len(hit.text) <= max_chars else hit.text[:max_chars].rsplit(" ", 1)[0] + " ..."
-    return f"[{n}] {label} - \"{title}\"{where}\n{text}"
+    return f'[{n}] {label} - "{title}"{where}\n{text}'
 
 
 def build_prompt(question: str, hits: list[Hit], history: list[tuple[str, str]]) -> str:

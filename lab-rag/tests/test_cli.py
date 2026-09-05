@@ -61,3 +61,65 @@ def test_cli_index_without_sources_fails_clearly(tmp_path, capsys, monkeypatch):
     assert "No papers configured" in capsys.readouterr().err
     assert main(["ask", "anything"]) == 1
     assert "No index yet" in capsys.readouterr().err
+
+
+def test_search_with_changed_embedder_falls_back_with_warning(tmp_path, capsys, monkeypatch):
+    papers = tmp_path / "papers"
+    papers.mkdir()
+    (papers / "notes.md").write_text("# Tagging protocol\n\nWe use V13 acoustic tags on leopard sharks.\n")
+    env = {
+        "LABRAG_FOLDERS": str(papers),
+        "LABRAG_DATA": str(tmp_path / "index"),
+        "LABRAG_EMBED": "hash",
+        "LABRAG_LLM": "none",
+        "LABRAG_LOOKUP": "off",
+        "HOME": str(tmp_path / "home"),
+    }
+    for k, v in env.items():
+        monkeypatch.setenv(k, v)
+    assert main(["index"]) == 0
+    capsys.readouterr()
+    # pretend the index was built with a different embedder
+    import sqlite3
+
+    con = sqlite3.connect(tmp_path / "index" / "labrag.db")
+    con.execute("UPDATE meta SET value = 'fastembed:BAAI/bge-small-en-v1.5' WHERE key = 'embedding_model'")
+    con.commit()
+    con.close()
+    assert main(["search", "acoustic", "tags"]) == 0
+    out = capsys.readouterr().out
+    assert "Falling back to keyword search" in out and "Tagging protocol" in out
+    # a second index run refuses to mix models and says how to fix it
+    assert main(["index"]) == 1
+    assert "labrag index --rebuild" in capsys.readouterr().err
+
+
+def test_index_refuses_phantom_index_when_parent_missing(tmp_path, capsys, monkeypatch):
+    papers = tmp_path / "papers"
+    papers.mkdir()
+    (papers / "a.txt").write_text("sharks")
+    monkeypatch.setenv("LABRAG_FOLDERS", str(papers))
+    monkeypatch.setenv("LABRAG_DATA", str(tmp_path / "unmounted-nas" / "labrag-index"))
+    monkeypatch.setenv("LABRAG_EMBED", "hash")
+    monkeypatch.setenv("LABRAG_LLM", "none")
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    assert main(["index"]) == 1
+    assert "Is the drive mounted" in capsys.readouterr().err
+    assert not (tmp_path / "unmounted-nas").exists()
+
+
+def test_init_warns_about_missing_folder_and_clears_with_dash(tmp_path, capsys, monkeypatch):
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    target = tmp_path / "labrag.env"
+    target.parent.mkdir(exist_ok=True)
+    from labrag.config import write_env_file
+
+    write_env_file(target, {"LABRAG_PASSWORD": "old-secret", "LABRAG_FOLDERS": ""})
+    answers = iter([str(tmp_path / "nope"), "", "", "", "", "-"])  # missing folder, keep it, ..., clear password
+    monkeypatch.setattr("builtins.input", lambda prompt="": next(answers, ""))
+    assert main(["init", "--file", str(target)]) == 0
+    out = capsys.readouterr().out
+    assert "does not exist right now" in out
+    text = target.read_text()
+    assert f"LABRAG_FOLDERS={tmp_path / 'nope'}" in text
+    assert 'LABRAG_PASSWORD=""' in text

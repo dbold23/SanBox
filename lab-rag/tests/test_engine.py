@@ -29,9 +29,21 @@ def populated(tmp_path):
 
     def add(path, texts, **meta):
         chunks = [Chunk(text=t, idx=i, page_start=i + 1, page_end=i + 1) for i, t in enumerate(texts)]
-        store.upsert_document(source="nas", rel_path=path, path="/nas/" + path, sha256="s", size=1, mtime=1,
-                              title=meta.get("title"), authors=meta.get("authors"), year=meta.get("year"), doi=None,
-                              n_pages=len(texts), chunks=chunks, embeddings=emb.embed(texts))
+        store.upsert_document(
+            source="nas",
+            rel_path=path,
+            path="/nas/" + path,
+            sha256="s",
+            size=1,
+            mtime=1,
+            title=meta.get("title"),
+            authors=meta.get("authors"),
+            year=meta.get("year"),
+            doi=None,
+            n_pages=len(texts),
+            chunks=chunks,
+            embeddings=emb.embed(texts),
+        )
 
     add("a.pdf", ["White sharks eat seals near Ano Nuevo.", "Methods: we tagged sharks."], title="Diet", authors="Jorgensen", year=2010)
     add("b.pdf", ["Bat rays dig pits in the mudflat."], title="Rays", authors="Smith", year=2020)
@@ -93,8 +105,32 @@ def test_retrieval_query_expands_followups_only():
     hist = [("what do white sharks eat near Ano Nuevo?", "Seals [1].")]
     assert retrieval_query("what about leopard sharks?", hist) == "what do white sharks eat near Ano Nuevo? what about leopard sharks?"
     assert retrieval_query("which of those studies used acoustic telemetry", hist).startswith("what do white sharks")
-    assert retrieval_query("how deep do salmon sharks dive in the Gulf of Alaska in winter?", hist) == "how deep do salmon sharks dive in the Gulf of Alaska in winter?"
+    assert retrieval_query("and rays?", hist).startswith("what do white sharks")
     assert retrieval_query("what about rays?", []) == "what about rays?"
+    # ordinary questions that merely contain a pronoun are NOT expanded
+    for q in [
+        "How deep do salmon sharks dive and where do they go in winter?",
+        "Where do leopard sharks aggregate seasonally?",
+        "Is there any evidence of philopatry in white sharks?",
+        "Which tag types were used on bat rays?",
+    ]:
+        assert retrieval_query(q, hist) == q
+
+
+def test_search_falls_back_to_keywords_on_embedder_mismatch(populated):
+    from labrag.embed import HashEmbedder as H
+
+    store, _ = populated
+    wrong = H(dim=16)  # index was built with 64 dims
+    hits = Engine(store, wrong, None).search("mudflat rays")
+    assert hits and hits[0].doc.title == "Rays"
+
+
+def test_answer_model_reports_actual_model(populated):
+    store, emb = populated
+    llm = FakeLLM("Seals [1].")
+    llm.last_model = "claude-opus-4-8"
+    assert Engine(store, emb, llm).ask("what do white sharks eat?").model == "claude-opus-4-8"
 
 
 def test_ask_uses_history_for_retrieval(populated):

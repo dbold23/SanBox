@@ -1,12 +1,12 @@
 """labrag: index the lab's papers and ask questions about them.
 
-    labrag init      set up (asks a few questions, writes ~/.labrag/labrag.env)
-    labrag index     bring the index up to date (syncs Google Drive first)
-    labrag ask       ask a question from the terminal
-    labrag search    just find passages, no model
-    labrag serve     start the web page for the whole lab
-    labrag status    what is indexed, what is configured
-    labrag doctor    check that everything works
+labrag init      set up (asks a few questions, writes ~/.labrag/labrag.env)
+labrag index     bring the index up to date (syncs Google Drive first)
+labrag ask       ask a question from the terminal
+labrag search    just find passages, no model
+labrag serve     start the web page for the whole lab
+labrag status    what is indexed, what is configured
+labrag doctor    check that everything works
 """
 
 from __future__ import annotations
@@ -14,15 +14,16 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import sqlite3
 import sys
 import textwrap
 import time
 from pathlib import Path
 
 from . import __version__
-from .config import DEFAULT_ENV_NAME, DEFAULT_USER_DIR, Settings, load_settings, read_env_file, write_env_file
+from .config import DEFAULT_ENV_NAME, DEFAULT_USER_DIR, Settings, load_settings, parse_folders, read_env_file, write_env_file
 from .engine import Answer, Engine
-from .ingest import IndexReport, index_sources
+from .ingest import IndexInProgress, IndexLock, IndexReport, index_sources
 from .providers import DEFAULT_MODELS, ProviderError, make_embedder, make_llm, resolve_llm_kind
 from .store import EmbedderMismatch, Store
 
@@ -44,23 +45,37 @@ def fail(msg: str, code: int = 1) -> int:
 def cmd_init(args) -> int:
     target = Path(args.file) if args.file else DEFAULT_USER_DIR / DEFAULT_ENV_NAME
     current = read_env_file(target) if target.exists() else {}
-    say("LabRAG setup. Press Enter to accept the value in [brackets]; leave blank to skip.\n")
+    say("LabRAG setup. Press Enter to accept the value in [brackets]; leave blank to skip; type - to clear a saved value.\n")
 
     def ask(key: str, prompt: str, default: str = "", secret: bool = False) -> str:
         cur = current.get(key, default)
-        shown = ("*" * 8 if cur and secret else cur)
+        shown = "*" * 8 if cur and secret else cur
         label = f"{prompt}" + (f" [{shown}]" if shown else "") + ": "
         try:
             value = input(label).strip()
         except (EOFError, OSError):  # no terminal attached
             value = ""
+        if value == "-":
+            return ""
         return value or cur
 
-    folders = ask("LABRAG_FOLDERS", "1. Folder(s) with the lab's papers. NAS share, Google Drive for Desktop folder, any folder.\n   Separate several with ';'")
+    folders = ask(
+        "LABRAG_FOLDERS",
+        "1. Folder(s) with the lab's papers. NAS share, Google Drive for Desktop folder, any folder.\n   Separate several with ';'",
+    )
+    missing = [str(src.root) for src in parse_folders(folders) if not src.root.exists()]
+    if missing:
+        say(f"   Warning: {'; '.join(missing)} does not exist right now (typo? is the NAS mounted?). Press Enter to keep it anyway.")
+        current["LABRAG_FOLDERS"] = folders
+        folders = ask("LABRAG_FOLDERS", "   Folder(s) with the lab's papers")
     drive = ask("LABRAG_DRIVE_FOLDER", "2. Google Drive folder link to sync directly from Drive (optional)")
     creds_sa, creds_oauth = current.get("LABRAG_GOOGLE_SERVICE_ACCOUNT", ""), current.get("LABRAG_GOOGLE_CLIENT_SECRET", "")
     if drive:
-        creds = ask("LABRAG_GOOGLE_CREDENTIALS", "   Path to the Google credentials JSON (service-account key or OAuth client secret)", creds_sa or creds_oauth)
+        creds = ask(
+            "LABRAG_GOOGLE_CREDENTIALS",
+            "   Path to the Google credentials JSON (service-account key or OAuth client secret)",
+            creds_sa or creds_oauth,
+        )
         kind = _google_credentials_kind(creds) if creds else None
         if kind == "service_account":
             creds_sa, creds_oauth = creds, ""
@@ -70,24 +85,36 @@ def cmd_init(args) -> int:
             say("   (could not tell what kind of credentials file that is; saving it as a service-account key)")
             creds_sa, creds_oauth = creds, ""
     suggested = str(DEFAULT_USER_DIR / "data")
-    data = ask("LABRAG_DATA", "3. Where to keep the index (one SQLite file plus caches). This machine's own disk is the\n   safe choice; only this machine needs it, everyone else uses the web page", suggested)
-    key = ask("ANTHROPIC_API_KEY", "4. Anthropic API key so answers are written by Claude (optional; without it LabRAG\n   uses Ollama if it is running, otherwise it works as a search engine)", secret=True)
+    data = ask(
+        "LABRAG_DATA",
+        "3. Where to keep the index (one SQLite file plus caches). This machine's own disk is the\n   safe choice; only this machine needs it, everyone else uses the web page",
+        suggested,
+    )
+    key = ask(
+        "ANTHROPIC_API_KEY",
+        "4. Anthropic API key so answers are written by Claude (optional; without it LabRAG\n   uses Ollama if it is running, otherwise it works as a search engine)",
+        secret=True,
+    )
     password = ask("LABRAG_PASSWORD", "5. Password for the web page (optional; leave blank on a trusted lab network)", secret=True)
 
     values = dict(current)
-    values.update({
-        "LABRAG_FOLDERS": folders,
-        "LABRAG_DRIVE_FOLDER": drive,
-        "LABRAG_GOOGLE_SERVICE_ACCOUNT": creds_sa,
-        "LABRAG_GOOGLE_CLIENT_SECRET": creds_oauth,
-        "LABRAG_DATA": data,
-        "ANTHROPIC_API_KEY": key,
-        "LABRAG_PASSWORD": password,
-    })
+    values.update(
+        {
+            "LABRAG_FOLDERS": folders,
+            "LABRAG_DRIVE_FOLDER": drive,
+            "LABRAG_GOOGLE_SERVICE_ACCOUNT": creds_sa,
+            "LABRAG_GOOGLE_CLIENT_SECRET": creds_oauth,
+            "LABRAG_DATA": data,
+            "ANTHROPIC_API_KEY": key,
+            "LABRAG_PASSWORD": password,
+        }
+    )
     values.pop("LABRAG_GOOGLE_CREDENTIALS", None)
     write_env_file(target, values)
     say(f"\nSaved to {target}\n")
-    say("Next:\n  labrag index     # build the index (the first run downloads a small embedding model)\n  labrag ask \"what do white sharks eat near Ano Nuevo?\"\n  labrag serve     # web page for the lab at http://<this machine>:8008")
+    say(
+        'Next:\n  labrag index     # build the index (the first run downloads a small embedding model)\n  labrag ask "what do white sharks eat near Ano Nuevo?"\n  labrag serve     # web page for the lab at http://<this machine>:8008'
+    )
     return 0
 
 
@@ -111,8 +138,22 @@ def _settings(args) -> Settings:
     return s
 
 
+def ensure_data_dir(settings: Settings) -> None:
+    """Refuse to quietly create a fresh, empty index because the NAS holding the real one is not mounted."""
+    d = settings.data_dir
+    if not d.exists() and not d.parent.exists():
+        raise ProviderError(f"Index folder {d} does not exist, and neither does the folder above it. Is the drive mounted?")
+    d.mkdir(parents=True, exist_ok=True)
+
+
 def _open_store(settings: Settings) -> Store:
     return Store(settings.db_path)
+
+
+def _friendly_db_error(exc: sqlite3.OperationalError) -> str:
+    if "locked" in str(exc).lower():
+        return "The index is busy (another LabRAG index run is writing to it). Try again in a few minutes."
+    return f"Index database error: {exc}"
 
 
 def sync_drive(settings: Settings, progress=say):
@@ -132,7 +173,9 @@ def sync_drive(settings: Settings, progress=say):
     return result
 
 
-def run_index(settings: Settings, embedder, *, rebuild: bool = False, with_drive: bool = True, progress=say, store: Store | None = None) -> IndexReport:
+def run_index(
+    settings: Settings, embedder, *, rebuild: bool = False, with_drive: bool = True, progress=say, store: Store | None = None
+) -> IndexReport:
     if with_drive and settings.drive_folder:
         try:
             sync_drive(settings, progress)
@@ -144,19 +187,30 @@ def run_index(settings: Settings, embedder, *, rebuild: bool = False, with_drive
 
         lookup = CrossrefLookup()
     own_store = store is None
-    store = store or _open_store(settings)
-    try:
-        report = index_sources(store, embedder, settings.all_sources(), rebuild=rebuild, progress=progress, lookup=lookup)
-    finally:
-        if own_store:
-            store.close()
+    with IndexLock(settings.data_dir):
+        store = store or _open_store(settings)
+        try:
+            report = index_sources(
+                store,
+                embedder,
+                settings.all_sources(),
+                rebuild=rebuild,
+                progress=progress,
+                lookup=lookup,
+                exclude=(settings.data_dir,),
+            )
+        finally:
+            if own_store:
+                store.close()
     return report
 
 
 def print_report(report: IndexReport) -> None:
     say(f"\nIndex: {report.summary()}")
     if report.needs_ocr:
-        say("\nThese PDFs have no text layer (scanned images). Run them through OCR (e.g. `ocrmypdf in.pdf out.pdf`) to make them searchable:")
+        say(
+            "\nThese PDFs have no text layer (scanned images). Run them through OCR (e.g. `ocrmypdf in.pdf out.pdf`) to make them searchable:"
+        )
         for p in report.needs_ocr[:20]:
             say(f"  - {p}")
         if len(report.needs_ocr) > 20:
@@ -178,6 +232,7 @@ def cmd_index(args) -> int:
     for p in problems:
         say(f"Warning: {p}")
     try:
+        ensure_data_dir(settings)
         embedder = make_embedder(settings)
     except ProviderError as exc:
         return fail(str(exc))
@@ -187,7 +242,18 @@ def cmd_index(args) -> int:
             report = run_index(settings, embedder, rebuild=args.rebuild, with_drive=not args.no_drive)
         except EmbedderMismatch as exc:
             return fail(str(exc))
-        print_report(report)
+        except IndexInProgress as exc:
+            say(str(exc))
+            report = None
+        except sqlite3.OperationalError as exc:
+            return fail(_friendly_db_error(exc))
+        if report is not None:
+            print_report(report)
+            if report.changed == 0 and all(not s.root.exists() for s in settings.folders) and settings.folders:
+                say(
+                    "\nNone of the configured folders exist on this machine, so nothing was indexed. "
+                    "Check the paths in your settings (`labrag status`) or mount the NAS."
+                )
         if not args.every:
             return 0
         say(f"\nNext check in {args.every} minutes (Ctrl-C to stop).")
@@ -209,8 +275,10 @@ def _engine(settings: Settings, need_llm: bool = True) -> Engine:
     if store.embedding_model and store.embedding_model != "none":
         try:
             embedder = make_embedder(settings)
-        except ProviderError as exc:
+            store.check_embedder(embedder.name, embedder.dim)
+        except (ProviderError, EmbedderMismatch) as exc:
             say(f"Warning: {exc}\nFalling back to keyword search.")
+            embedder = None
     llm = None
     if need_llm:
         llm = make_llm(settings)
@@ -238,7 +306,7 @@ def print_answer(ans: Answer, show_text: bool = True) -> None:
         say(f"       {doc.source}/{doc.rel_path}")
         if not ans.text or ans.error:
             snippet = " ".join(hit.text.split())[:300]
-            say(f"       \"{snippet}...\"")
+            say(f'       "{snippet}..."')
     if ans.model:
         say(f"\n({ans.model}, {ans.elapsed:.1f}s)")
 
@@ -251,7 +319,7 @@ def cmd_ask(args) -> int:
         return fail(str(exc))
     question = " ".join(args.question).strip()
     if not question:
-        return fail("Give me a question, e.g.  labrag ask \"how deep do white sharks dive?\"")
+        return fail('Give me a question, e.g.  labrag ask "how deep do white sharks dive?"')
     if engine.llm is None:
         say("No language model configured (set ANTHROPIC_API_KEY or start Ollama) - showing the best passages.\n")
     ans = engine.ask(question, k=args.k)
@@ -284,7 +352,10 @@ def cmd_status(args) -> int:
     if settings.drive_folder:
         say(f"Google Drive:  {settings.drive_folder} -> {settings.drive_cache_dir}")
     kind = resolve_llm_kind(settings)
-    say(f"Answers:       {kind}" + (f" ({settings.llm_model or DEFAULT_MODELS.get(kind)})" if kind != "none" else " (search only - no model configured)"))
+    say(
+        f"Answers:       {kind}"
+        + (f" ({settings.llm_model or DEFAULT_MODELS.get(kind)})" if kind != "none" else " (search only - no model configured)")
+    )
     say(f"Embeddings:    {settings.embed}" + (f" ({settings.embed_model})" if settings.embed_model else ""))
     for p in settings.problems():
         say(f"Warning:       {p}")
@@ -316,10 +387,11 @@ def cmd_serve(args) -> int:
     if args.port:
         settings.port = args.port
     try:
+        ensure_data_dir(settings)
         from .web import create_app
 
         app = create_app(settings)
-    except ProviderError as exc:
+    except (ProviderError, EmbedderMismatch) as exc:
         return fail(str(exc))
     import uvicorn
 
@@ -354,12 +426,20 @@ def cmd_doctor(args) -> int:
         say(f"  [{'ok' if good else 'FAIL'}] {label}" + (f" - {detail}" if detail else ""))
 
     say("Checking LabRAG...\n")
-    check(f"Python {sys.version_info.major}.{sys.version_info.minor}", sys.version_info >= (3, 11), "" if sys.version_info >= (3, 11) else "3.11 or newer is required")
+    check(
+        f"Python {sys.version_info.major}.{sys.version_info.minor}",
+        sys.version_info >= (3, 11),
+        "" if sys.version_info >= (3, 11) else "3.11 or newer is required",
+    )
     configured = bool(settings.all_sources())
     if settings.env_file:
         check("settings", True, f"from {settings.env_file}")
     else:
-        check("settings", configured, "from environment variables" if configured else "no settings file and no LABRAG_FOLDERS; run `labrag init`")
+        check(
+            "settings",
+            configured,
+            "from environment variables" if configured else "no settings file and no LABRAG_FOLDERS; run `labrag init`",
+        )
     for p in settings.folders:
         check(f"folder '{p.name}'", p.root.exists(), str(p.root))
     if settings.drive_folder:
@@ -374,7 +454,7 @@ def cmd_doctor(args) -> int:
         except Exception as exc:
             check("Google Drive", False, str(exc)[:300])
     try:
-        settings.data_dir.mkdir(parents=True, exist_ok=True)
+        ensure_data_dir(settings)
         probe = settings.data_dir / ".write-test"
         probe.write_text("ok")
         probe.unlink()

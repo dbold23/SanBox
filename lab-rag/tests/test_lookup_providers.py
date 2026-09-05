@@ -33,7 +33,11 @@ class FakeClient:
 CROSSREF = {
     "message": {
         "title": ["Philopatry and migration of Pacific white sharks"],
-        "author": [{"family": "Jorgensen", "given": "Salvador J."}, {"family": "Reeb", "given": "Carol A."}, {"name": "The Tagging Consortium"}],
+        "author": [
+            {"family": "Jorgensen", "given": "Salvador J."},
+            {"family": "Reeb", "given": "Carol A."},
+            {"name": "The Tagging Consortium"},
+        ],
         "published-print": {"date-parts": [[2010, 3]]},
         "issued": {"date-parts": [[2009]]},
     }

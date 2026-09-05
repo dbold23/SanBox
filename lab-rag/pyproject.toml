@@ -15,8 +15,8 @@ dependencies = [
     "python-docx>=1.1",       # .docx
     # index
     "numpy>=1.26",
-    # embeddings (local, no account or GPU needed; downloads a ~130 MB model once)
-    "fastembed>=0.4",
+    # embeddings (local, no account or GPU needed; downloads a small model once)
+    "fastembed>=0.4",  # ~70 MB model download on first use
     # answering
     "anthropic>=1.0",
     "httpx>=0.27",            # Ollama / OpenAI-compatible HTTP
@@ -30,7 +30,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8", "httpx>=0.27"]
+dev = ["pytest>=8", "ruff>=0.6"]
 
 [project.scripts]
 labrag = "labrag.cli:main"

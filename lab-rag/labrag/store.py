@@ -113,7 +113,9 @@ class DocumentRow:
             return f"{who} {self.year}"
         if who:
             return who
-        title = (self.title or Path(self.rel_path).stem)[:60]
+        title = self.title or ""
+        if not title or len(title) > 60:  # a headingless note's first sentence is not a citation
+            title = Path(self.rel_path).stem
         return f"{title} ({self.year})" if self.year else title
 
 
@@ -217,6 +219,21 @@ class Store:
     def list_paths(self, source: str) -> dict[str, DocumentRow]:
         return {d.path: d for d in self.list_documents(source)}
 
+    def get_document_by_hash(self, source: str, sha256: str) -> DocumentRow | None:
+        with self._lock:
+            row = self.conn.execute(
+                "SELECT * FROM documents WHERE source = ? AND sha256 = ? ORDER BY id LIMIT 1", (source, sha256)
+            ).fetchone()
+        return DocumentRow(**dict(row)) if row else None
+
+    def update_location(self, doc_id: int, path: str, rel_path: str, size: int, mtime: float) -> None:
+        """The same file showed up at a new path (renamed, or the share is mounted elsewhere)."""
+        with self._lock, self.conn:
+            self.conn.execute(
+                "UPDATE documents SET path = ?, rel_path = ?, size = ?, mtime = ? WHERE id = ?",
+                (path, rel_path, size, mtime, doc_id),
+            )
+
     def upsert_document(
         self,
         *,
@@ -249,22 +266,52 @@ class Store:
                     self.conn.execute(
                         """UPDATE documents SET source=?, rel_path=?, sha256=?, size=?, mtime=?, title=?, authors=?,
                            year=?, doi=?, n_pages=?, n_chunks=?, status=?, error=?, indexed_at=? WHERE id=?""",
-                        (source, rel_path, sha256, size, mtime, title, authors, year, doi, n_pages, len(chunks), status, error, _now(), doc_id),
+                        (
+                            source,
+                            rel_path,
+                            sha256,
+                            size,
+                            mtime,
+                            title,
+                            authors,
+                            year,
+                            doi,
+                            n_pages,
+                            len(chunks),
+                            status,
+                            error,
+                            _now(),
+                            doc_id,
+                        ),
                     )
                 else:
                     cur = self.conn.execute(
                         """INSERT INTO documents(source, rel_path, path, sha256, size, mtime, title, authors, year, doi,
                            n_pages, n_chunks, status, error, indexed_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-                        (source, rel_path, path, sha256, size, mtime, title, authors, year, doi, n_pages, len(chunks), status, error, _now()),
+                        (
+                            source,
+                            rel_path,
+                            path,
+                            sha256,
+                            size,
+                            mtime,
+                            title,
+                            authors,
+                            year,
+                            doi,
+                            n_pages,
+                            len(chunks),
+                            status,
+                            error,
+                            _now(),
+                        ),
                     )
                     doc_id = cur.lastrowid
                 rows = []
                 for i, ch in enumerate(chunks):
                     blob = np.asarray(embeddings[i], dtype=np.float32).tobytes() if embeddings is not None else None
                     rows.append((doc_id, ch.idx, ch.page_start, ch.page_end, ch.text, blob))
-                self.conn.executemany(
-                    "INSERT INTO chunks(doc_id, idx, page_start, page_end, text, embedding) VALUES (?,?,?,?,?,?)", rows
-                )
+                self.conn.executemany("INSERT INTO chunks(doc_id, idx, page_start, page_end, text, embedding) VALUES (?,?,?,?,?,?)", rows)
                 self._bump_version()
             return doc_id
 
@@ -296,10 +343,7 @@ class Store:
                           SUM(status = 'empty') AS empty
                    FROM documents"""
             ).fetchone()
-            sources = {
-                r["source"]: r["n"]
-                for r in self.conn.execute("SELECT source, COUNT(*) AS n FROM documents GROUP BY source")
-            }
+            sources = {r["source"]: r["n"] for r in self.conn.execute("SELECT source, COUNT(*) AS n FROM documents GROUP BY source")}
             return {
                 "documents": row["docs"] or 0,
                 "chunks": row["chunks"] or 0,
@@ -320,6 +364,7 @@ class Store:
             return row["text"] if row else None
 
         # ---------------------------------------------------------------- search
+
     def keyword_search(self, query: str, limit: int = 50) -> list[tuple[int, float]]:
         """FTS5 BM25. Tries all-terms first, then any-term. Returns (chunk_id, bm25) best first."""
         with self._lock:
@@ -362,9 +407,7 @@ class Store:
             return []
         q = np.asarray(query_vec, dtype=np.float32)
         if q.shape[-1] != matrix.shape[1]:
-            raise EmbedderMismatch(
-                f"Query vector has {q.shape[-1]} dimensions but the index has {matrix.shape[1]}; the embedder changed."
-            )
+            raise EmbedderMismatch(f"Query vector has {q.shape[-1]} dimensions but the index has {matrix.shape[1]}; the embedder changed.")
         sims = matrix @ q
         k = min(limit, len(sims))
         top = np.argpartition(-sims, k - 1)[:k]
@@ -437,17 +480,67 @@ class EmbedderMismatch(RuntimeError):
 
 
 _STOP = {
-    "a", "an", "the", "and", "or", "of", "in", "on", "for", "to", "is", "are", "was", "were", "be",
-    "what", "which", "who", "how", "why", "when", "where", "do", "does", "did", "with", "by", "at",
-    "from", "that", "this", "these", "those", "it", "as", "about", "any", "there", "their", "they",
-    "i", "we", "you", "me", "my", "our", "your", "can", "could", "would", "should", "have", "has", "had",
+    "a",
+    "an",
+    "the",
+    "and",
+    "or",
+    "of",
+    "in",
+    "on",
+    "for",
+    "to",
+    "is",
+    "are",
+    "was",
+    "were",
+    "be",
+    "what",
+    "which",
+    "who",
+    "how",
+    "why",
+    "when",
+    "where",
+    "do",
+    "does",
+    "did",
+    "with",
+    "by",
+    "at",
+    "from",
+    "that",
+    "this",
+    "these",
+    "those",
+    "it",
+    "as",
+    "about",
+    "any",
+    "there",
+    "their",
+    "they",
+    "i",
+    "we",
+    "you",
+    "me",
+    "my",
+    "our",
+    "your",
+    "can",
+    "could",
+    "would",
+    "should",
+    "have",
+    "has",
+    "had",
 }
 
 
 def _fts_terms(query: str) -> list[str]:
-    words = re.findall(r"[A-Za-z0-9][A-Za-z0-9\-']*", query.lower())
+    words = re.findall(r"\w[\w\-']*", query.lower())  # \w is Unicode: México, Müller, Bahía
     terms = [w for w in words if w not in _STOP and len(w) > 1]
     if not terms:
         terms = [w for w in words if len(w) > 1]
     # quote every token so FTS5 syntax characters in user input cannot break the query
-    return ['"' + t.replace('"', '') + '"' for t in terms[:32]]
+    return ['"' + t.replace('"', "") + '"' for t in terms[:32]]

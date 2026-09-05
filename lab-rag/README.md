@@ -8,8 +8,8 @@
 
 LabRAG indexes every PDF (and .docx / .md / .txt / .html) in the folders you point it at,
 finds the passages that answer a question, and has a language model write a short answer
-that cites those passages as `[1]`, `[2]`. Click a citation and the PDF opens on that page.
-Nothing is copied or moved: the papers live where they already live.
+that cites those passages as `[1]`, `[2]`. Every source is listed with its page, and one click
+opens the PDF on that page. Nothing is copied or moved: the papers live where they already live.
 
 ```
 What tag types have been used on leopard sharks in Elkhorn Slough?
@@ -34,8 +34,8 @@ Sources
 3. Every answer lists its sources. Highlighted sources are the ones the answer cites.
    Click a title to open the paper at the cited page. **Check the source before you cite it.**
 4. To add papers, drop them into the lab's papers folder on the NAS or into the shared
-   Google Drive folder. They become searchable at the next index update, which is either
-   automatic or one click on **Update index** at the top of the page.
+   Google Drive folder. They are usually searchable within 30 minutes. In a hurry? Click
+   **Update index** at the top of the page, then **Update index now**.
 
 If there is no language model configured, LabRAG still works as a search engine over the
 lab's papers: you get the best passages and where they came from, without a written summary.
@@ -48,11 +48,12 @@ You need a machine that stays on and can see the papers: a lab desktop, a Mac mi
 box, or the NAS itself if it runs Python. It needs Python 3.11 or newer.
 
 ```bash
-python3 -m pip install --user pipx && pipx ensurepath       # once, if you don't have pipx
-pipx install ./lab-rag                                        # or: pip install ./lab-rag
+git clone https://github.com/dbold23/SanBox.git && cd SanBox     # or download the ZIP from GitHub and unzip it
+python3 -m pip install --user pipx && pipx ensurepath           # once, if you don't have pipx; then open a new terminal
+pipx install ./lab-rag                                            # or: python3 -m pip install ./lab-rag
 
 labrag init        # answers five questions and writes ~/.labrag/labrag.env
-labrag index       # first run downloads a 130 MB embedding model, then indexes every paper
+labrag index       # first run downloads a 70 MB embedding model, then indexes every paper
 labrag serve       # the web page, at http://<this machine>:8008
 ```
 
@@ -66,6 +67,7 @@ labrag serve       # the web page, at http://<this machine>:8008
 | Anthropic API key | Optional. With it, Claude writes the answers. Without it LabRAG uses Ollama if it is running, otherwise it is search-only. |
 | Password for the web page | Optional. Leave blank on a trusted lab network. |
 
+Re-run `labrag init` any time; saved values are offered as defaults and typing `-` clears one.
 Then check everything at once with `labrag doctor`.
 
 Keep it running after a reboot and keep the index fresh: [docs/LAB-SERVER.md](docs/LAB-SERVER.md)
@@ -84,7 +86,8 @@ has copy-paste service files for macOS, Linux and Windows. The short version is
 | Several places | List several folders in `LABRAG_FOLDERS` and add a Drive folder too. Each shows up as a named source. |
 
 Subfolders are included. Hidden folders, temp files and files over 200 MB are skipped.
-Google Docs and Slides in a synced Drive folder are exported as text; Sheets are skipped.
+With direct Drive sync, Google Docs and Slides are exported as text and indexed too; Drive
+for Desktop only shows them as link files, which are skipped.
 
 ---
 
@@ -100,7 +103,7 @@ Google Docs and Slides in a synced Drive folder are exported as text; Sheets are
 3. **Answering.** The model sees only those numbered passages and is told to cite them and
    to say plainly when they do not contain the answer.
 4. **Citations.** `[n]` in the answer is source *n* in the list. The list shows the paper,
-   page, and the passage itself, so you can verify every sentence.
+   page, and the passage (click *show full passage*), so you can verify every sentence.
 
 The model can still misread a passage. Treat LabRAG as a very fast reader who hands you the
 page, not as the last word.
@@ -112,9 +115,11 @@ page, not as the last word.
 | Setting | What happens | Privacy |
 |---|---|---|
 | `ANTHROPIC_API_KEY` set | Claude writes the answers (default model `claude-opus-5`; set `LABRAG_LLM_MODEL=claude-sonnet-5` for a cheaper one). A question costs a few cents. | The question and the retrieved passages are sent to Anthropic. The full papers never are. |
-| Ollama running on the machine | Answers from a local model (default `llama3.1`). Free, slower, needs a machine with 16 GB RAM. | Nothing leaves the building. |
 | `OPENAI_API_KEY` set | OpenAI or any compatible server (`LABRAG_OPENAI_BASE_URL`). | As for Claude. |
+| Ollama running on the machine | Answers from a local model (default `llama3.1`). Free, slower, needs a machine with 16 GB RAM. | Nothing leaves the building. |
 | None of the above | Search-only mode: passages and sources, no written answer. | Nothing leaves the building. |
+
+Checked in that order when `LABRAG_LLM` is left on `auto`.
 
 Embeddings are computed on the LabRAG machine by default (`fastembed`, model
 `BAAI/bge-small-en-v1.5`, downloaded once). Ollama or OpenAI embeddings are available with
@@ -170,7 +175,9 @@ and refuses to remove anything.
 | "Folder ... does not exist (is the NAS mounted?)" | Mount the share. Nothing is removed from the index while it is missing. |
 | "Could not reach Ollama" | Start Ollama (`ollama serve` or the desktop app) and `ollama pull llama3.1`. |
 | "Anthropic rejected the API key" | Re-run `labrag init` and paste the key again, or edit `~/.labrag/labrag.env`. |
-| First `labrag index` seems stuck | It is downloading the embedding model (130 MB) from huggingface.co. Campus proxies sometimes block it; `LABRAG_EMBED=hash` gets you going with keyword-only quality until it works. |
+| First `labrag index` seems stuck | It is downloading the embedding model (about 70 MB) from huggingface.co. Campus proxies sometimes block it; `LABRAG_EMBED=hash` gets you going with keyword-only quality until it works. |
+| "Another LabRAG index run is in progress" | `labrag index --every` and the page's Update button share one lock, so only one runs at a time. Wait for it; the page header shows "indexing…" meanwhile. |
+| The model "ran out of tokens while reasoning" | Raise `LABRAG_MAX_TOKENS` (default 16000) or set `LABRAG_LLM_EFFORT=low`. |
 | Port 8008 is taken | `labrag serve --port 8010`, or set `LABRAG_PORT`. |
 | A paper's title or authors look wrong | The paper has no DOI on its first page and poor PDF metadata. Rename the file to `Author_Year_Title.pdf`; the filename is the fallback. |
 

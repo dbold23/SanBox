@@ -60,8 +60,7 @@ def parse_folder_id(value: str) -> str:
     if re.fullmatch(r"[A-Za-z0-9_-]{10,}", value):
         return value
     raise ValueError(
-        f"{value!r} does not look like a Google Drive folder ID or folder link "
-        "(expected https://drive.google.com/drive/folders/<id>)"
+        f"{value!r} does not look like a Google Drive folder ID or folder link (expected https://drive.google.com/drive/folders/<id>)"
     )
 
 
@@ -155,8 +154,7 @@ class SyncResult:
     def summary(self) -> str:
         return (
             f"{len(self.added)} new, {len(self.updated)} updated, {len(self.removed)} removed, "
-            f"{self.unchanged} unchanged, {len(self.skipped)} skipped"
-            + (f", {len(self.errors)} errors" if self.errors else "")
+            f"{self.unchanged} unchanged, {len(self.skipped)} skipped" + (f", {len(self.errors)} errors" if self.errors else "")
         )
 
 
@@ -209,6 +207,7 @@ class DriveClient:
     def walk(self, folder_id: str) -> Iterator[DriveFile]:
         """Yield every indexable file under a folder, recursively."""
         seen_folders: set[str] = set()
+        seen_files: set[str] = set()  # a file reachable directly and via a shortcut is one file
         stack: list[tuple[str, str]] = [(folder_id, "")]
         while stack:
             fid, prefix = stack.pop()
@@ -217,7 +216,8 @@ class DriveClient:
             seen_folders.add(fid)
             children = self.list_children(fid)
             used_names: set[str] = set()
-            for item in sorted(children, key=lambda i: i.get("name", "")):
+            # (name, id) gives a total order, so duplicate-name suffixes are stable between runs
+            for item in sorted(children, key=lambda i: (i.get("name", ""), i.get("id", ""))):
                 if item.get("mimeType") == SHORTCUT_MIME:
                     target = item.get("shortcutDetails", {})
                     target_id = target.get("targetId")
@@ -226,12 +226,19 @@ class DriveClient:
                     if target.get("targetMimeType") == FOLDER_MIME:
                         stack.append((target_id, f"{prefix}{_safe_name(item['name'])}/"))
                         continue
-                    item = self.get_file(target_id)
+                    try:
+                        item = self.get_file(target_id)
+                    except Exception as exc:  # a dangling shortcut must not stop the whole sync
+                        log.warning("Skipping shortcut %r: %s", item.get("name"), exc)
+                        continue
                 if item.get("mimeType") == FOLDER_MIME:
                     stack.append((item["id"], f"{prefix}{_safe_name(item['name'])}/"))
                     continue
+                if item["id"] in seen_files:
+                    continue
                 df = _to_drive_file(item, prefix, used_names)
                 if df is not None:
+                    seen_files.add(item["id"])
                     yield df
 
     # -- download -----------------------------------------------------------
@@ -317,19 +324,26 @@ def sync_folder(client: DriveClient, folder_id: str, cache_dir: Path) -> SyncRes
             else:
                 seen.pop(f.id, None)
             continue
-        if previous and previous.get("rel_path") != f.rel_path:
-            old = cache_dir / previous["rel_path"]
-            if old.exists():
-                old.unlink()
-                result.removed.append(old)
         (result.updated if previous else result.added).append(dest)
 
+    # Remove local files that no longer correspond to anything remote. A path that is still
+    # in use (a file deleted and re-uploaded gets a new id but the same name) must survive.
+    current_paths = {entry["rel_path"] for entry in seen.values()}
+    stale: list[str] = []
     for fid, previous in manifest.items():
         if fid not in seen:
-            old = cache_dir / previous["rel_path"]
-            if old.exists():
-                old.unlink()
-                result.removed.append(old)
+            stale.append(previous["rel_path"])
+    for fid, entry in seen.items():
+        previous = manifest.get(fid)
+        if previous and previous.get("rel_path") != entry["rel_path"]:
+            stale.append(previous["rel_path"])
+    for rel in stale:
+        if rel in current_paths:
+            continue
+        old = cache_dir / rel
+        if old.exists():
+            old.unlink()
+            result.removed.append(old)
 
     manifest_path.write_text(json.dumps(seen, indent=1, sort_keys=True))
     _remove_empty_dirs(cache_dir)

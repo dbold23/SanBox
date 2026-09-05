@@ -54,7 +54,9 @@ def make_embedder(settings: Settings) -> Embedder:
     except Exception as exc:
         hint = ""
         if kind == "fastembed":
-            hint = " (first run downloads the model from huggingface.co; check the network, or set LABRAG_EMBED=hash to get going without it)"
+            hint = (
+                " (first run downloads the model from huggingface.co; check the network, or set LABRAG_EMBED=hash to get going without it)"
+            )
         elif kind == "ollama":
             hint = f" (is Ollama running at {settings.ollama_url}? did you `ollama pull {model}`?)"
         raise ProviderError(f"Could not start the '{kind}' embedder: {exc}{hint}") from exc

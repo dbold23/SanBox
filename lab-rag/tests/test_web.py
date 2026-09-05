@@ -8,6 +8,7 @@ from labrag.chunk import Chunk
 from labrag.config import Settings
 from labrag.embed import HashEmbedder
 from labrag.engine import Engine
+from labrag.ingest import IndexInProgress, IndexLock
 from labrag.llm import LLMError
 from labrag.store import Store
 from labrag.web import IndexJob, create_app
@@ -33,9 +34,21 @@ def engine(tmp_path):
     pdf = tmp_path / "Smith_2019_sharks.txt"
     pdf.write_text("White sharks eat seals near Ano Nuevo.")
     chunks = [Chunk("White sharks eat seals near Ano Nuevo.", 0, 3, 3)]
-    store.upsert_document(source="nas", rel_path="Smith_2019_sharks.txt", path=str(pdf), sha256="s", size=1, mtime=1,
-                          title="Shark diet", authors="Smith J", year=2019, doi=None, n_pages=3, chunks=chunks,
-                          embeddings=emb.embed([c.text for c in chunks]))
+    store.upsert_document(
+        source="nas",
+        rel_path="Smith_2019_sharks.txt",
+        path=str(pdf),
+        sha256="s",
+        size=1,
+        mtime=1,
+        title="Shark diet",
+        authors="Smith J",
+        year=2019,
+        doi=None,
+        n_pages=3,
+        chunks=chunks,
+        embeddings=emb.embed([c.text for c in chunks]),
+    )
     yield Engine(store, emb, FakeLLM("They eat seals [1]."), k=5)
     store.close()
 
@@ -52,8 +65,20 @@ def test_page_status_ask_and_file(engine):
     st = c.get("/api/status").json()
     assert st["documents"] == 1 and st["model"] == "fake" and st["embeddings"] == "hash-32"
     assert st["problem_files"] == []
-    engine.store.upsert_document(source="nas", rel_path="scan.pdf", path="/nas/scan.pdf", sha256="z", size=1, mtime=1, title="scan",
-                                 authors=None, year=None, doi=None, n_pages=2, status="needs_ocr")
+    engine.store.upsert_document(
+        source="nas",
+        rel_path="scan.pdf",
+        path="/nas/scan.pdf",
+        sha256="z",
+        size=1,
+        mtime=1,
+        title="scan",
+        authors=None,
+        year=None,
+        doi=None,
+        n_pages=2,
+        status="needs_ocr",
+    )
     assert c.get("/api/status").json()["problem_files"] == [{"source": "nas", "rel_path": "scan.pdf", "status": "needs_ocr", "error": None}]
 
     r = c.post("/api/ask", json={"question": "what do white sharks eat?", "history": [["a", "b"], ["bad"]]})
@@ -62,6 +87,7 @@ def test_page_status_ask_and_file(engine):
     assert body["answer"] == "They eat seals [1]." and body["cited"] == [1]
     src = body["sources"][0]
     assert src["cited"] and src["citation"] == "Smith 2019" and src["pages"] == "p. 3"
+    assert src["text"] == "White sharks eat seals near Ano Nuevo." and src["snippet"] == src["text"] and src["truncated"] is False
     assert src["file_url"] == f"/file/{src['doc_id']}#page=3"
 
     f = c.get(f"/file/{src['doc_id']}")
@@ -134,3 +160,22 @@ def test_index_job_reports_failure():
     assert job.start()
     job._thread.join(2)
     assert job.error == "nas unplugged" and not job.running and job.status()["log"][-1].startswith("Failed")
+
+
+def test_status_reports_indexing_when_lock_held(engine, tmp_path):
+    settings = Settings(data_dir=tmp_path / "data")
+    c = make_client(engine, settings)
+    assert c.get("/api/status").json()["indexing"] is False
+    with IndexLock(settings.data_dir):
+        assert c.get("/api/status").json()["indexing"] is True
+
+
+def test_index_job_treats_in_progress_as_information():
+    def busy(progress):
+        raise IndexInProgress("Another LabRAG index run is in progress (started 10:00 UTC on labmac).")
+
+    job = IndexJob(busy)
+    job.start()
+    job._thread.join(2)
+    st = job.status()
+    assert st["error"] is None and "in progress" in st["last_summary"] and "in progress" in st["log"][-1]

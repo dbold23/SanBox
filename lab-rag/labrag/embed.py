@@ -2,10 +2,10 @@
 
 The default is `fastembed` (a small ONNX model that runs on any laptop, no
 account and no GPU). Ollama and OpenAI-compatible servers are supported for
-labs that already run them. `HashEmbedder` needs nothing at all and is used by
-the tests and as a last-resort fallback: it is a bag-of-words hash, so it only
-captures word overlap, but keyword search still works and the tool stays
-usable while the real model downloads.
+labs that already run them. `HashEmbedder` needs nothing at all: it is a
+bag-of-words hash, so it only captures word overlap. The tests use it, and
+`LABRAG_EMBED=hash` is the documented escape hatch when the real model cannot
+be downloaded (keyword search does most of the work then).
 """
 
 from __future__ import annotations
@@ -126,7 +126,14 @@ class OllamaEmbedder:
 class OpenAIEmbedder:
     """OpenAI or any /v1/embeddings-compatible server."""
 
-    def __init__(self, model: str = "text-embedding-3-small", api_key: str = "", base_url: str = "https://api.openai.com/v1", batch_size: int = 64, timeout: float = 120.0):
+    def __init__(
+        self,
+        model: str = "text-embedding-3-small",
+        api_key: str = "",
+        base_url: str = "https://api.openai.com/v1",
+        batch_size: int = 64,
+        timeout: float = 120.0,
+    ):
         import httpx
 
         self.name = f"openai:{model}"

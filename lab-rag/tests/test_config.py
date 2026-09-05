@@ -29,9 +29,28 @@ def test_env_file_roundtrip_and_precedence(tmp_path, monkeypatch):
 
 
 def test_problems_lists_missing_things(tmp_path):
-    s = load_settings(env={"LABRAG_FOLDERS": str(tmp_path / "nope"), "LABRAG_DRIVE_FOLDER": "abc123abc123"}, env_file=str(tmp_path / "none.env"))
+    s = load_settings(
+        env={"LABRAG_FOLDERS": str(tmp_path / "nope"), "LABRAG_DRIVE_FOLDER": "abc123abc123"}, env_file=str(tmp_path / "none.env")
+    )
     probs = s.problems()
     assert any("does not exist" in p for p in probs)
     assert any("LABRAG_GOOGLE_SERVICE_ACCOUNT" in p for p in probs)
     assert len(s.all_sources()) == 2 and s.all_sources()[1].name == "drive"
     assert load_settings(env={}, env_file=str(tmp_path / "none.env")).problems()
+
+
+def test_shipped_example_file_loads_clean():
+    example = Path(__file__).resolve().parents[1] / "labrag.env.example"
+    s = load_settings(env={}, env_file=str(example))
+    assert s.password is None
+    assert s.google_service_account is None and s.google_client_secret is None
+    assert s.drive_folder is None
+    assert [str(f.root) for f in s.folders] == ["/Volumes/LabNAS/Papers"]
+    assert not any("GOOGLE" in p for p in s.problems())
+
+
+def test_comment_only_values_are_empty(tmp_path):
+    f = tmp_path / "x.env"
+    f.write_text('A=   # nothing here\nB=value # trailing\nC="quoted # not a comment"\n')
+    v = read_env_file(f)
+    assert v == {"A": "", "B": "value", "C": "quoted # not a comment"}

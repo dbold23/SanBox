@@ -6,11 +6,14 @@ second, parsing and embedding only when something really changed.
 from __future__ import annotations
 
 import hashlib
+import json
 import logging
 import os
+import socket
 import time
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from pathlib import Path
 
 from .chunk import chunk_pages
@@ -52,14 +55,75 @@ class IndexReport:
         return s + f" ({self.seconds:.0f}s)"
 
 
-def scan_folder(root: Path) -> Iterator[Path]:
-    """Yield supported files under root, skipping hidden/system folders and temp files."""
+LOCK_STALE_HOURS = 6
+# Bump when parsing or chunking changes in a way that should refresh existing passages.
+# Files that have not changed are otherwise never re-read, so an upgrade would leave old text behind.
+PARSER_VERSION = 2
+
+
+class IndexInProgress(RuntimeError):
+    """Another `labrag index` (or the web page's Update button) is running against this index."""
+
+
+class IndexLock:
+    """A lock file in the data folder so two index runs never overlap."""
+
+    def __init__(self, data_dir: Path):
+        self.path = Path(data_dir) / "labrag.lock"
+
+    def __enter__(self):
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        for _attempt in range(2):
+            try:
+                fd = os.open(self.path, os.O_WRONLY | os.O_CREAT | os.O_EXCL)
+            except FileExistsError:
+                info = self.read()
+                started = info.get("started")
+                if started:
+                    try:
+                        age_h = (datetime.now(UTC) - datetime.fromisoformat(started)).total_seconds() / 3600
+                    except ValueError:
+                        age_h = 0.0
+                    if age_h > LOCK_STALE_HOURS:
+                        log.warning("Removing stale index lock from %s", started)
+                        self.path.unlink(missing_ok=True)
+                        continue
+                when = started[11:16] if started else "unknown time"
+                raise IndexInProgress(
+                    f"Another LabRAG index run is in progress (started {when} UTC on {info.get('host', '?')}). "
+                    "New papers will show up when it finishes."
+                ) from None
+            with os.fdopen(fd, "w") as fh:
+                json.dump(
+                    {"pid": os.getpid(), "host": socket.gethostname(), "started": datetime.now(UTC).isoformat(timespec="seconds")},
+                    fh,
+                )
+            return self
+        raise IndexInProgress("Another LabRAG index run is in progress.")
+
+    def __exit__(self, *exc):
+        self.path.unlink(missing_ok=True)
+
+    def read(self) -> dict:
+        try:
+            return json.loads(self.path.read_text())
+        except (OSError, ValueError):
+            return {}
+
+    @property
+    def held(self) -> bool:
+        return self.path.exists()
+
+
+def scan_folder(root: Path, exclude: tuple[Path, ...] = ()) -> Iterator[Path]:
+    """Yield supported files under root, skipping hidden/system folders, temp files and `exclude` dirs."""
     root = Path(root)
+    excluded = {os.path.realpath(e) for e in exclude}
     visited: set[str] = set()
     for dirpath, dirnames, filenames in os.walk(root, followlinks=True):
         real = os.path.realpath(dirpath)
-        if real in visited:  # a symlink pointing back up the tree
-            dirnames[:] = []
+        if real in visited or real in excluded or any(real.startswith(e + os.sep) for e in excluded):
+            dirnames[:] = []  # a symlink pointing back up the tree, or the index folder itself
             continue
         visited.add(real)
         dirnames[:] = sorted(d for d in dirnames if not d.startswith(SKIP_DIR_PREFIXES))
@@ -88,8 +152,10 @@ def index_sources(
     progress: ProgressFn | None = None,
     parse: Callable[[Path], ParsedDoc] = parse_file,
     lookup=None,
+    exclude: tuple[Path, ...] = (),
 ) -> IndexReport:
-    """lookup: an object with .enrich(ParsedDoc) -> bool (see lookup.CrossrefLookup), or None."""
+    """lookup: an object with .enrich(ParsedDoc) -> bool (see lookup.CrossrefLookup), or None.
+    exclude: folders never to scan (the index/data folder, in case it sits inside a papers folder)."""
     say = progress or (lambda msg: None)
     started = time.monotonic()
     report = IndexReport()
@@ -97,6 +163,9 @@ def index_sources(
         say("Rebuilding the index from scratch")
         store.clear()
     store.check_embedder(embedder.name, embedder.dim)
+    reparse_all = store.get_meta("parser_version") != str(PARSER_VERSION) and store.stats()["documents"] > 0
+    if reparse_all:
+        say("LabRAG's document parser changed since this index was built; re-reading every file once")
 
     for source in sources:
         root = Path(source.root)
@@ -105,13 +174,15 @@ def index_sources(
             continue
         known = store.list_paths(source.name)
         seen: set[str] = set()
-        files = list(scan_folder(root))
+        files = list(scan_folder(root, exclude))
         say(f"[{source.name}] {len(files)} files in {root}")
         if not files and known:
             # A mount point that lost its share looks like an empty folder. Never wipe an
             # index because the NAS is unplugged.
-            say(f"[{source.name}] folder is empty but {len(known)} documents are indexed from it; "
-                "not removing anything (is the drive mounted?)")
+            say(
+                f"[{source.name}] folder is empty but {len(known)} documents are indexed from it; "
+                "not removing anything (is the drive mounted?)"
+            )
             report.errors.append((str(root), f"folder empty; kept {len(known)} indexed documents"))
             continue
         for i, path in enumerate(files, start=1):
@@ -126,15 +197,29 @@ def index_sources(
                 report.errors.append((key, f"skipped: larger than {MAX_FILE_MB} MB"))
                 continue
             existing = known.get(key)
-            if existing and existing.size == st.st_size and existing.mtime == st.st_mtime and existing.status != "error":
+            if (
+                existing
+                and not reparse_all
+                and existing.size == st.st_size
+                and existing.mtime == st.st_mtime
+                and existing.status != "error"
+            ):
                 report.unchanged += 1
                 continue
             digest = sha256_of(path)
-            if existing and existing.sha256 == digest and existing.status != "error":
+            if existing and not reparse_all and existing.sha256 == digest and existing.status != "error":
                 # touched but identical (e.g. copied to a new NAS) - just refresh the stat cache
                 store.upsert_stat(existing.id, st.st_size, st.st_mtime)
                 report.unchanged += 1
                 continue
+            if existing is None:
+                moved = store.get_document_by_hash(source.name, digest)
+                if moved is not None and moved.status != "error" and not Path(moved.path).exists():
+                    # same file, new path: renamed, moved, or the share is mounted somewhere else
+                    store.update_location(moved.id, key, str(path.relative_to(root)), st.st_size, st.st_mtime)
+                    known.pop(moved.path, None)
+                    report.unchanged += 1
+                    continue
             say(f"[{source.name}] ({i}/{len(files)}) {'re-indexing' if existing else 'indexing'} {path.relative_to(root)}")
             rel = str(path.relative_to(root))
             try:
@@ -142,8 +227,21 @@ def index_sources(
             except Exception as exc:
                 log.warning("Failed to parse %s: %s", path, exc)
                 report.errors.append((key, str(exc)))
-                store.upsert_document(source=source.name, rel_path=rel, path=key, sha256=digest, size=st.st_size, mtime=st.st_mtime,
-                                      title=path.stem, authors=None, year=None, doi=None, n_pages=None, status="error", error=str(exc)[:500])
+                store.upsert_document(
+                    source=source.name,
+                    rel_path=rel,
+                    path=key,
+                    sha256=digest,
+                    size=st.st_size,
+                    mtime=st.st_mtime,
+                    title=path.stem,
+                    authors=None,
+                    year=None,
+                    doi=None,
+                    n_pages=None,
+                    status="error",
+                    error=str(exc)[:500],
+                )
                 continue
             if lookup is not None and doc.doi:
                 try:
@@ -166,9 +264,21 @@ def index_sources(
                     report.errors.append((key, f"embedding failed: {exc}"))
                     status, chunks = "error", []
             store.upsert_document(
-                source=source.name, rel_path=rel, path=key, sha256=digest, size=st.st_size, mtime=st.st_mtime,
-                title=doc.title, authors=doc.authors, year=doc.year, doi=doc.doi, n_pages=doc.n_pages or None,
-                status=status, error=None if status != "error" else "embedding failed", chunks=chunks, embeddings=embeddings,
+                source=source.name,
+                rel_path=rel,
+                path=key,
+                sha256=digest,
+                size=st.st_size,
+                mtime=st.st_mtime,
+                title=doc.title,
+                authors=doc.authors,
+                year=doc.year,
+                doi=doc.doi,
+                n_pages=doc.n_pages or None,
+                status=status,
+                error=None if status != "error" else "embedding failed",
+                chunks=chunks,
+                embeddings=embeddings,
             )
             if existing:
                 report.updated += 1
@@ -181,6 +291,7 @@ def index_sources(
                 report.removed += 1
                 say(f"[{source.name}] removed {row.rel_path}")
 
+    store.set_meta("parser_version", str(PARSER_VERSION))
     store.mark_indexed()
     report.seconds = time.monotonic() - started
     return report

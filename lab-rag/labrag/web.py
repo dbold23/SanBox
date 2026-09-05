@@ -6,6 +6,7 @@ from __future__ import annotations
 import base64
 import logging
 import secrets
+import sqlite3
 import threading
 import time
 from collections import deque
@@ -20,6 +21,7 @@ from pydantic import BaseModel, Field
 from . import __version__
 from .config import Settings
 from .engine import Answer, Engine
+from .ingest import IndexInProgress, IndexLock
 from .providers import make_embedder, make_llm
 from .store import Hit, Store
 
@@ -67,6 +69,18 @@ class IndexJob:
             report = self._run(self.log.append)
             self.last_summary = getattr(report, "summary", lambda: str(report))()
             self.log.append(f"Done: {self.last_summary}")
+        except IndexInProgress as exc:  # not a failure: the timed run has it
+            self.last_summary = str(exc)
+            self.log.append(str(exc))
+        except sqlite3.OperationalError as exc:
+            msg = (
+                "The index is busy (another LabRAG index run is writing to it). Try again in a few minutes."
+                if "locked" in str(exc).lower()
+                else str(exc)
+            )
+            log.warning("Indexing stopped: %s", exc)
+            self.error = msg
+            self.log.append(f"Stopped: {msg}")
         except Exception as exc:
             log.exception("Indexing failed")
             self.error = str(exc)
@@ -101,6 +115,8 @@ def hit_to_dict(n: int, hit: Hit, cited: bool) -> dict:
         "pages": hit.pages,
         "page_start": hit.page_start,
         "snippet": " ".join(hit.text.split())[:400],
+        "truncated": len(" ".join(hit.text.split())) > 400,
+        "text": hit.text,
         "file_url": f"/file/{doc.id}" + (f"#page={hit.page_start}" if hit.page_start else ""),
     }
 
@@ -164,8 +180,10 @@ def create_app(settings: Settings, engine: Engine | None = None, index_runner=No
 
     @app.get("/favicon.ico", include_in_schema=False)
     def favicon():
-        svg = ('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="6" fill="#0b6e99"/>'
-               '<text x="16" y="22" font-family="Helvetica,Arial" font-size="16" font-weight="700" fill="#fff" text-anchor="middle">L</text></svg>')
+        svg = (
+            '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="6" fill="#0b6e99"/>'
+            '<text x="16" y="22" font-family="Helvetica,Arial" font-size="16" font-weight="700" fill="#fff" text-anchor="middle">L</text></svg>'
+        )
         return Response(svg, media_type="image/svg+xml", headers={"Cache-Control": "public, max-age=86400"})
 
     @app.get("/api/status")
@@ -181,7 +199,7 @@ def create_app(settings: Settings, engine: Engine | None = None, index_runner=No
             "last_indexed": st["last_indexed"],
             "model": engine.llm.name if engine.llm else None,
             "embeddings": engine.embedder.name if engine.embedder else None,
-            "indexing": job.running,
+            "indexing": job.running or IndexLock(settings.data_dir).held,
             "problem_files": [
                 {"source": d.source, "rel_path": d.rel_path, "status": d.status, "error": d.error}
                 for d in engine.store.list_documents()
@@ -210,8 +228,19 @@ def create_app(settings: Settings, engine: Engine | None = None, index_runner=No
         if status_filter:
             docs = [d for d in docs if d.status == status_filter]
         return [
-            {"id": d.id, "source": d.source, "rel_path": d.rel_path, "title": d.title, "authors": d.authors, "year": d.year,
-             "n_pages": d.n_pages, "n_chunks": d.n_chunks, "status": d.status, "error": d.error, "file_url": f"/file/{d.id}"}
+            {
+                "id": d.id,
+                "source": d.source,
+                "rel_path": d.rel_path,
+                "title": d.title,
+                "authors": d.authors,
+                "year": d.year,
+                "n_pages": d.n_pages,
+                "n_chunks": d.n_chunks,
+                "status": d.status,
+                "error": d.error,
+                "file_url": f"/file/{d.id}",
+            }
             for d in docs
         ]
 

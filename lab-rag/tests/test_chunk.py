@@ -13,8 +13,8 @@ def test_short_document_is_one_chunk():
 
 def test_packs_paragraphs_with_overlap_and_pages():
     pages = [
-        "\n\n".join(words(120, f"p{i}_") for i in range(3)),   # 360 words on page 1
-        "\n\n".join(words(120, f"q{i}_") for i in range(3)),   # 360 words on page 2
+        "\n\n".join(words(120, f"p{i}_") for i in range(3)),  # 360 words on page 1
+        "\n\n".join(words(120, f"q{i}_") for i in range(3)),  # 360 words on page 2
     ]
     chunks = chunk_pages(pages, target_words=250, overlap_words=30, min_words=40)
     assert len(chunks) >= 3

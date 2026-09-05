@@ -25,9 +25,7 @@ MIN_TEXT_CHARS = 200
 _DOI_RE = re.compile(r"\b(10\.\d{4,9}/[^\s\"'<>]+)")
 _YEAR_RE = re.compile(r"(?<!\d)((?:19|20)\d{2})(?!\d)")
 # Author_Year_Title.pdf or "Smith et al. 2019 - Title.pdf" style filenames
-_FILENAME_AUTHOR_YEAR_RE = re.compile(
-    r"^(?P<author>[A-Z][A-Za-z'\-]+)(?:\s*et\s*al\.?)?[\s_\-]+(?P<year>(?:19|20)\d{2})\b"
-)
+_FILENAME_AUTHOR_YEAR_RE = re.compile(r"^(?P<author>[A-Z][A-Za-z'\-]+)(?:\s*et\s*al\.?)?[\s_\-]+(?P<year>(?:19|20)\d{2})\b")
 
 
 @dataclass
@@ -96,7 +94,8 @@ def _parse_pdf(path: Path) -> ParsedDoc:
             title = _largest_font_line(pdf[0])
 
     text = "\n\n".join(p for p in pages if p)
-    needs_ocr = len(text) < MIN_TEXT_CHARS and len(pages) > 0
+    empty_pages = sum(1 for p in pages if len(p) < 50)
+    needs_ocr = len(pages) > 0 and (len(text) < MIN_TEXT_CHARS or empty_pages > len(pages) / 2)
     return ParsedDoc(text=text, pages=pages, title=title, authors=authors, year=year, needs_ocr=needs_ocr)
 
 
@@ -112,7 +111,7 @@ def _page_text(page) -> str:
     for b in (b for b in blocks if len(b) > 6 and b[6] == 0):
         txt = clean_text(b[4])
         if txt:
-            parts.append(" ".join(txt.split("\n")) if "\n\n" not in txt else txt)
+            parts.append(txt)  # keep the block's own line breaks: a "References" heading stays on its line
     return "\n\n".join(parts)
 
 
@@ -142,9 +141,9 @@ def _largest_font_line(page) -> str | None:
             elif abs(size - best_size) <= 0.5:
                 best_lines.append(txt)
     title = " ".join(best_lines).strip()
-    if not title or len(title) < 8:
-        return None
-    return title[:300]
+    if not title or len(title) < 8 or len(best_lines) > 4 or len(title) > 200:
+        return None  # a page with one uniform font has no title we can pick out
+    return title
 
 
 # -------------------------------------------------------------------------- DOCX
@@ -275,8 +274,9 @@ def _fill_metadata_from_filename_and_text(doc: ParsedDoc, path: Path) -> None:
     if fm:
         if not doc.authors:
             doc.authors = fm.group("author")
-        if not doc.year:
-            doc.year = int(fm.group("year"))
+        # A year the lab wrote into the filename beats the PDF's creation date (often the
+        # day it was downloaded) and beats any guess from the text.
+        doc.year = int(fm.group("year"))
 
     if not doc.year:
         doc.year = _guess_year(path.stem) or _guess_year(head[:6000])

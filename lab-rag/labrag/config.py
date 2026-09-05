@@ -28,10 +28,10 @@ DOC = {
     "LABRAG_GOOGLE_SERVICE_ACCOUNT": "Path to a Google service-account JSON key; share the Drive folder with its e-mail (optional).",
     "LABRAG_GOOGLE_CLIENT_SECRET": "Path to an OAuth 'Desktop app' client secret JSON; first run opens a browser (optional).",
     "ANTHROPIC_API_KEY": "Claude API key. When set, answers are written by Claude.",
-    "LABRAG_LLM": "anthropic | openai | ollama | none. Default: auto (anthropic if a key is set, else ollama if it is running, else none).",
+    "LABRAG_LLM": "anthropic | openai | ollama | none. Default: auto (anthropic if ANTHROPIC_API_KEY is set, else openai if OPENAI_API_KEY is set, else ollama if it is running, else none).",
     "LABRAG_LLM_MODEL": "Model name for the chosen LLM. Defaults: claude-opus-5 / gpt-4o-mini / llama3.1.",
     "LABRAG_LLM_EFFORT": "Claude reasoning effort: low | medium | high. Default medium.",
-    "LABRAG_MAX_TOKENS": "Maximum answer length in tokens. Default 8000.",
+    "LABRAG_MAX_TOKENS": "Token budget per answer, shared between the model's reasoning and the text it writes. Default 16000.",
     "OPENAI_API_KEY": "OpenAI (or compatible) API key.",
     "LABRAG_OPENAI_BASE_URL": "Base URL for an OpenAI-compatible server. Default https://api.openai.com/v1.",
     "LABRAG_OLLAMA_URL": "Ollama server URL. Default http://localhost:11434.",
@@ -61,7 +61,7 @@ class Settings:
     llm: str = "auto"
     llm_model: str | None = None
     llm_effort: str = "medium"
-    max_tokens: int = 8000
+    max_tokens: int = 16000
     anthropic_api_key: str | None = None
     openai_api_key: str | None = None
     openai_base_url: str = "https://api.openai.com/v1"
@@ -106,7 +106,10 @@ class Settings:
                 out.append(f"Folder for source '{s.name}' does not exist: {s.root} (is the NAS mounted?)")
         if self.drive_folder and not (self.google_service_account or self.google_client_secret):
             out.append("LABRAG_DRIVE_FOLDER is set but neither LABRAG_GOOGLE_SERVICE_ACCOUNT nor LABRAG_GOOGLE_CLIENT_SECRET is.")
-        for label, p in (("LABRAG_GOOGLE_SERVICE_ACCOUNT", self.google_service_account), ("LABRAG_GOOGLE_CLIENT_SECRET", self.google_client_secret)):
+        for label, p in (
+            ("LABRAG_GOOGLE_SERVICE_ACCOUNT", self.google_service_account),
+            ("LABRAG_GOOGLE_CLIENT_SECRET", self.google_client_secret),
+        ):
             if p and not p.exists():
                 out.append(f"{label} points to a file that does not exist: {p}")
         return out
@@ -136,7 +139,7 @@ def read_env_file(path: Path) -> dict[str, str]:
         if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
             value = value[1:-1]
         else:
-            value = re.sub(r"\s+#.*$", "", value)  # trailing comment
+            value = re.sub(r"(^|\s+)#.*$", "", value).strip()  # trailing comment, or a value that is only a comment
         if key:
             values[key] = value
     return values
@@ -211,7 +214,7 @@ def load_settings(env: dict[str, str] | None = None, env_file: str | None = None
     s.llm = (get("LABRAG_LLM", "auto") or "auto").lower()
     s.llm_model = get("LABRAG_LLM_MODEL")
     s.llm_effort = (get("LABRAG_LLM_EFFORT", "medium") or "medium").lower()
-    s.max_tokens = int(get("LABRAG_MAX_TOKENS", "8000") or 8000)
+    s.max_tokens = int(get("LABRAG_MAX_TOKENS", "16000") or 16000)
     s.anthropic_api_key = get("ANTHROPIC_API_KEY")
     s.openai_api_key = get("OPENAI_API_KEY")
     s.openai_base_url = get("LABRAG_OPENAI_BASE_URL", "https://api.openai.com/v1") or "https://api.openai.com/v1"

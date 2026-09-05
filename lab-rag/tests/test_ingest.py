@@ -3,7 +3,7 @@ import time
 
 from labrag.config import Source
 from labrag.embed import HashEmbedder
-from labrag.ingest import index_sources, scan_folder
+from labrag.ingest import IndexInProgress, IndexLock, index_sources, scan_folder
 from labrag.store import Store
 
 
@@ -121,3 +121,79 @@ def test_scan_survives_symlink_loop(tmp_path):
         return  # no symlinks here
     names = sorted(p.name for p in scan_folder(root))
     assert names == ["a.txt"]
+
+
+def test_index_folder_inside_papers_is_not_scanned(tmp_path):
+    root = tmp_path / "papers"
+    write(root / "a.txt", "sharks " * 30)
+    data = root / "labrag-index"
+    write(data / "drive" / "d.txt", "drive copy " * 30)
+    store = Store(data / "labrag.db")
+    r = index_sources(store, HashEmbedder(16), [Source("nas", root)], exclude=(data,))
+    assert r.added == 1 and [d.rel_path for d in store.list_documents()] == ["a.txt"]
+    store.close()
+
+
+def test_moved_file_is_relinked_not_reembedded(tmp_path):
+    root = tmp_path / "papers"
+    f = write(root / "old" / "a.txt", "leopard sharks " * 30)
+    store = Store(tmp_path / "i.db")
+    emb = HashEmbedder(16)
+    index_sources(store, emb, [Source("nas", root)])
+    doc_id = store.list_documents()[0].id
+    calls = []
+
+    def counting_parse(path):
+        calls.append(path)
+        from labrag.parse import parse_file
+
+        return parse_file(path)
+
+    new = root / "new" / "renamed.txt"
+    new.parent.mkdir()
+    f.rename(new)
+    r = index_sources(store, emb, [Source("nas", root)], parse=counting_parse)
+    assert not calls  # no re-parse, no re-embed
+    assert r.added == 0 and r.removed == 0 and r.unchanged == 1
+    docs = store.list_documents()
+    assert len(docs) == 1 and docs[0].id == doc_id and docs[0].rel_path == os.path.join("new", "renamed.txt")
+    store.close()
+
+
+def test_index_lock(tmp_path):
+    import json
+
+    data = tmp_path / "data"
+    with IndexLock(data) as lock:
+        assert lock.held
+        try:
+            with IndexLock(data):
+                raise AssertionError("second lock should not be granted")
+        except IndexInProgress as exc:
+            assert "in progress" in str(exc)
+    assert not (data / "labrag.lock").exists()
+    # a stale lock (older than the threshold) is removed and taken over
+    (data / "labrag.lock").write_text(json.dumps({"pid": 1, "host": "x", "started": "2000-01-01T00:00:00+00:00"}))
+    with IndexLock(data):
+        pass
+    assert not (data / "labrag.lock").exists()
+
+
+def test_parser_version_bump_reparses_unchanged_files(tmp_path, monkeypatch):
+    import labrag.ingest as ing
+
+    root = tmp_path / "papers"
+    write(root / "a.txt", "sharks " * 30)
+    store = Store(tmp_path / "i.db")
+    emb = HashEmbedder(16)
+    index_sources(store, emb, [Source("nas", root)])
+    assert store.get_meta("parser_version") == str(ing.PARSER_VERSION)
+    store.set_meta("parser_version", "1")  # index built by an older LabRAG
+    log = []
+    r = index_sources(store, emb, [Source("nas", root)], progress=log.append)
+    assert r.updated == 1 and r.unchanged == 0
+    assert any("parser changed" in m for m in log)
+    assert store.get_meta("parser_version") == str(ing.PARSER_VERSION)
+    r2 = index_sources(store, emb, [Source("nas", root)])
+    assert r2.unchanged == 1 and r2.updated == 0
+    store.close()

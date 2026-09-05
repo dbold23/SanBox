@@ -45,8 +45,7 @@ def test_unsupported_raises(tmp_path):
 def test_pdf_title_year_doi_from_text(tmp_path):
     body = (
         "Received 3 March 2019; accepted 9 June 2019\n"
-        "doi:10.1234/abcd.5678.\n"
-        + "White sharks aggregate seasonally near pinniped colonies. " * 8
+        "doi:10.1234/abcd.5678.\n" + "White sharks aggregate seasonally near pinniped colonies. " * 8
     )
     p = tmp_path / "paper.pdf"
     make_pdf(p, [body, "Methods. " * 60], title_line="Seasonal aggregation of white sharks")
@@ -104,8 +103,10 @@ def test_markdown_title_from_heading(tmp_path):
 
 def test_html_strips_scripts(tmp_path):
     p = tmp_path / "page.html"
-    p.write_text("<html><head><title>Shark page</title><script>var x=1;</script></head>"
-                 "<body><p>Sevengill sharks</p><style>p{}</style><p>eat rays</p></body></html>")
+    p.write_text(
+        "<html><head><title>Shark page</title><script>var x=1;</script></head>"
+        "<body><p>Sevengill sharks</p><style>p{}</style><p>eat rays</p></body></html>"
+    )
     doc = parse_file(p)
     assert doc.title == "Shark page"
     assert "var x" not in doc.text
@@ -179,3 +180,43 @@ def test_two_column_pdf_keeps_reading_order(tmp_path):
     text = parse_file(p).pages[0]
     order = [text.index(k) for k in ("LEFT-ONE", "LEFT-TWO", "RIGHT-ONE", "RIGHT-TWO")]
     assert order == sorted(order), text
+
+
+def test_filename_year_beats_pdf_creation_date(tmp_path):
+    p = tmp_path / "Smith_2010_white_sharks.pdf"
+    make_pdf(p, ["Body text. " * 50], metadata={"creationDate": "D:20230115120000Z"})
+    doc = parse_file(p)
+    assert doc.year == 2010 and doc.authors == "Smith"
+
+
+def test_references_heading_in_same_block_as_first_entry(tmp_path):
+    import pymupdf
+
+    from labrag.chunk import chunk_pages
+
+    p = tmp_path / "refs2.pdf"
+    d = pymupdf.open()
+    page = d.new_page()
+    page.insert_textbox(pymupdf.Rect(72, 72, 540, 300), "Results paragraph about sharks. " * 25, fontsize=9)
+    # heading and the first entries in ONE block, separated only by line breaks
+    page.insert_text(
+        (72, 330), "References\nSmith J (2019) Some cited paper. Journal 1:1-10.\nJones K (2020) Another cited paper.", fontsize=9
+    )
+    d.save(str(p))
+    d.close()
+    doc = parse_file(p)
+    chunks = chunk_pages(doc.pages)
+    assert chunks and not any("Some cited paper" in c.text for c in chunks)
+
+
+def test_uniform_font_page_falls_back_to_filename_title(tmp_path):
+    p = tmp_path / "Lowe_2001_leopard_shark_movements.pdf"
+    make_pdf(p, [("Just body text with a single font size and many lines. " * 3 + "\n") * 12])
+    doc = parse_file(p)
+    assert doc.title == "Lowe 2001 leopard shark movements"
+
+
+def test_mostly_scanned_pdf_needs_ocr(tmp_path):
+    p = tmp_path / "scan_with_cover.pdf"
+    make_pdf(p, ["Typed cover page with enough text to pass the old whole-document threshold. " * 5, "", "", ""])
+    assert parse_file(p).needs_ocr

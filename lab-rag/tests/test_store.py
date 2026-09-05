@@ -51,10 +51,16 @@ def test_fts_terms_are_quoted_and_stopwords_dropped():
 def test_upsert_search_update_delete(store):
     emb = HashEmbedder(dim=64)
     store.check_embedder(emb.name, emb.dim)
-    d1 = add_doc(store, emb, "/nas/a.pdf", ["White sharks eat seals near the coast.", "Tagging methods for sharks."],
-                 title="Shark diet", authors="Jorgensen S, Smith J", year=2010)
-    d2 = add_doc(store, emb, "/nas/b.pdf", ["Bat rays forage in mudflats.", "Estuary ecology of leopard sharks."],
-                 title="Rays", year=2020)
+    d1 = add_doc(
+        store,
+        emb,
+        "/nas/a.pdf",
+        ["White sharks eat seals near the coast.", "Tagging methods for sharks."],
+        title="Shark diet",
+        authors="Jorgensen S, Smith J",
+        year=2010,
+    )
+    d2 = add_doc(store, emb, "/nas/b.pdf", ["Bat rays forage in mudflats.", "Estuary ecology of leopard sharks."], title="Rays", year=2020)
     assert store.stats()["documents"] == 2 and store.stats()["chunks"] == 4
 
     hits = store.search("what do white sharks eat", emb.embed_query("what do white sharks eat"), k=3)
@@ -75,7 +81,11 @@ def test_upsert_search_update_delete(store):
     assert store.stats()["chunks"] == 3
     hits = store.search("plankton", emb.embed_query("plankton"), k=3)
     assert hits[0].doc.title == "New"
-    assert not store.search("seals", emb.embed_query("seals"), k=3) or "seals" not in store.search("seals", None)[0].text if store.search("seals", None) else True
+    assert (
+        not store.search("seals", emb.embed_query("seals"), k=3) or "seals" not in store.search("seals", None)[0].text
+        if store.search("seals", None)
+        else True
+    )
 
     store.delete_document(d2)
     assert store.stats()["documents"] == 1
@@ -114,11 +124,46 @@ def test_special_characters_in_query_do_not_crash(store):
 def test_short_citation_fallbacks():
     from labrag.store import DocumentRow
 
-    base = {"id": 1, "source": "nas", "rel_path": "Papers/Some_Long_Title_here.pdf", "path": "/x", "sha256": "", "size": 0,
-            "mtime": 0, "doi": None, "n_pages": 1, "n_chunks": 1, "status": "ok", "error": None, "indexed_at": ""}
+    base = {
+        "id": 1,
+        "source": "nas",
+        "rel_path": "Papers/Some_Long_Title_here.pdf",
+        "path": "/x",
+        "sha256": "",
+        "size": 0,
+        "mtime": 0,
+        "doi": None,
+        "n_pages": 1,
+        "n_chunks": 1,
+        "status": "ok",
+        "error": None,
+        "indexed_at": "",
+    }
     assert DocumentRow(title=None, authors="Salvador J. Jorgensen; Another", year=2015, **base).short_citation == "Jorgensen 2015"
     assert DocumentRow(title="A title", authors=None, year=2015, **base).short_citation == "A title (2015)"
     assert DocumentRow(title=None, authors="Christopher G. Lowe and Kelly Anderson", year=2000, **base).short_citation == "Lowe 2000"
     assert DocumentRow(title=None, authors="Jorgensen SJ, Reeb CA", year=2010, **base).short_citation == "Jorgensen 2010"
     assert DocumentRow(title=None, authors="Lowe", year=None, **base).short_citation == "Lowe"
     assert DocumentRow(title=None, authors=None, year=None, **base).short_citation == "Some_Long_Title_here"
+    long_title = "We use Vemco V13 acoustic tags on bat rays and leopard sharks in the upper slough during summer"
+    assert DocumentRow(title=long_title, authors=None, year=None, **base).short_citation == "Some_Long_Title_here"
+
+
+def test_keyword_search_handles_accented_words(store):
+    emb = HashEmbedder(dim=16)
+    add_doc(store, emb, "/nas/mx.pdf", ["Tiburones blancos en Bahía de México y la Isla Guadalupe."])
+    add_doc(store, emb, "/nas/other.pdf", ["Nothing relevant here at all."])
+    assert _fts_terms("México Bahía") == ['"méxico"', '"bahía"']
+    hits = store.search("México", None)
+    assert hits and hits[0].doc.path == "/nas/mx.pdf"
+    assert store.search("mexico", None)[0].doc.path == "/nas/mx.pdf"  # unicode61 folds diacritics
+
+
+def test_moved_file_lookup_and_update(store):
+    emb = HashEmbedder(dim=16)
+    doc_id = add_doc(store, emb, "/Volumes/NAS/a.pdf", ["sharks"], sha256="abc")
+    found = store.get_document_by_hash("nas", "abc")
+    assert found and found.id == doc_id
+    store.update_location(doc_id, "/mnt/nas/a.pdf", "a.pdf", 5, 2.0)
+    assert store.get_document(doc_id).path == "/mnt/nas/a.pdf"
+    assert store.get_document_by_hash("nas", "zzz") is None

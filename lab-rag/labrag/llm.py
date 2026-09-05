@@ -18,7 +18,7 @@ log = logging.getLogger(__name__)
 class LLM(Protocol):
     name: str
 
-    def complete(self, system: str, user: str, max_tokens: int = 8000) -> str: ...
+    def complete(self, system: str, user: str, max_tokens: int = 16000) -> str: ...
 
 
 class LLMError(RuntimeError):
@@ -38,8 +38,9 @@ class AnthropicLLM:
         self._client = anthropic.Anthropic(**kwargs)
         self._anthropic = anthropic
         self._fallbacks_supported = True
+        self.last_model: str | None = None  # the model that actually answered (a fallback may have)
 
-    def complete(self, system: str, user: str, max_tokens: int = 8000) -> str:
+    def complete(self, system: str, user: str, max_tokens: int = 16000) -> str:
         messages = [{"role": "user", "content": user}]
         try:
             if self._fallbacks_supported:
@@ -55,7 +56,9 @@ class AnthropicLLM:
                         betas=["server-side-fallback-2026-07-01"],
                         fallbacks="default",
                     )
-                except (self._anthropic.BadRequestError, TypeError) as exc:
+                except self._anthropic.BadRequestError as exc:
+                    if "fallback" not in str(exc).lower() and "beta" not in str(exc).lower():
+                        raise  # a genuinely bad request; reported below
                     log.info("Fallbacks not accepted (%s); using the plain Messages API", exc)
                     self._fallbacks_supported = False
                     response = self._plain(system, messages, max_tokens)
@@ -72,11 +75,17 @@ class AnthropicLLM:
         except self._anthropic.APIStatusError as exc:
             raise LLMError(f"Anthropic API error {exc.status_code}: {exc.message}") from exc
 
+        self.last_model = getattr(response, "model", None) or self.model
         if response.stop_reason == "refusal":
             return "The model declined to answer this question."
         text = "".join(block.text for block in response.content if block.type == "text").strip()
         if response.stop_reason == "max_tokens":
-            text += "\n\n[answer cut short: increase LABRAG_MAX_TOKENS]"
+            if not text:
+                raise LLMError(
+                    "The model ran out of tokens while reasoning, before writing an answer. "
+                    "Raise LABRAG_MAX_TOKENS or lower LABRAG_LLM_EFFORT."
+                )
+            text += "\n\n[answer cut short: raise LABRAG_MAX_TOKENS]"
         return text
 
     def _plain(self, system: str, messages: list[dict], max_tokens: int):
@@ -99,7 +108,7 @@ class OllamaLLM:
         self._client = httpx.Client(timeout=timeout)
         self._httpx = httpx
 
-    def complete(self, system: str, user: str, max_tokens: int = 8000) -> str:
+    def complete(self, system: str, user: str, max_tokens: int = 16000) -> str:
         payload = {
             "model": self.model,
             "stream": False,
@@ -128,12 +137,13 @@ class OpenAILLM:
         self._client = httpx.Client(timeout=timeout, headers=headers)
         self._httpx = httpx
 
-    def complete(self, system: str, user: str, max_tokens: int = 8000) -> str:
+    def complete(self, system: str, user: str, max_tokens: int = 16000) -> str:
+        # max_completion_tokens and no temperature: accepted by both the gpt-4o family and the
+        # reasoning models (gpt-5, o-series), which reject max_tokens/temperature.
         payload = {
             "model": self.model,
             "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
-            "max_tokens": max_tokens,
-            "temperature": 0.2,
+            "max_completion_tokens": max_tokens,
         }
         try:
             r = self._client.post(f"{self.base_url}/chat/completions", json=payload)
