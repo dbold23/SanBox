@@ -18,6 +18,7 @@ Assumptions made (adjust the plan if any are wrong):
   and Hertz, and weight the international options more heavily.
 - You are open to leaving California. The single best-fit lab is at UCLA,
   but most of the field is elsewhere.
+- Your GPA is about 2.8. Sections 4 and 7 are written around that.
 
 ## 1. Timeline (today is Sept 5, 2026)
 
@@ -98,13 +99,18 @@ confirmed on the program page.
 | Sally Casanova Pre-Doctoral (CSU) | Next cycle expected to open ~Dec 2026, close ~Feb 2027 | $5,000 plus fee waivers at UCLA and other UCs. The 2026-27 cohort closed Feb 13, 2026. Contact CSUMB coordinators at predoc@csumb.edu (Natasha Oehlman, Myrsha Garcia). Relevant if you are still a CSUMB student in 2027-28. |
 | Application fee waivers | Request in November | UCLA honors event-based and program-based waivers (Sally Casanova scholars qualify). UC Riverside has already allocated its 2026-27 waivers. Most private schools waive for documented financial need; ask each graduate office. |
 
-## 4. How many, and which
+## 4. How many, and which (revised for a sub-3.0 GPA)
 
-Apply to 8-10 total. A reasonable mix:
+Do not spend $1,000 on ten reach applications. Split the cycle three ways:
 
-- 3 reach: Ozcan (UCLA), Waller (Berkeley), Yang (Caltech) or Barbastathis (MIT)
-- 4 match: Tian (BU), Horstmeyer (Duke), Zhou (Michigan), Chowdhury (UT Austin), McLeod (Arizona), Zheng or Javidi (UConn)
-- 2 likely: Preza (Memphis), UConn, UCSC
+- 3-4 PhD applications, only where a PI has replied positively to your
+  email or where there is no hard GPA floor: Preza (Memphis), McLeod
+  (Arizona), Zhou (Michigan), Horstmeyer (Duke), Tian (BU). Add UCLA only if
+  Ozcan or a lab member responds; UCLA can admit below 3.0 through a Dean's
+  Special Action, but only when a department pushes for it.
+- 2-3 funded, thesis-based MS applications as the realistic path to the
+  same labs two years from now (Section 7).
+- Paid research positions starting summer 2027 (Section 7).
 
 Rank by advisor fit, not by school ranking. In computational imaging your
 advisor's group determines your thesis, your papers, and your job.
@@ -153,12 +159,90 @@ the link. Suggested fixes, in priority order:
 6. Ask your CSUMB research mentor to name specific technical contributions in
    their letter; hand them a bullet list.
 
-## 7. Files here
+## 7. If your GPA is under 3.0
+
+A 2.8 is below the stated floor at most of the programs above. What that
+means in practice, from the policies I could verify:
+
+- UC campuses (UCLA, Berkeley, UCSC) require a 3.0 cumulative GPA for
+  graduate admission. UCLA can admit below that through a Dean's Special
+  Action when the department argues the rest of the file shows readiness.
+  UCLA also waives that process entirely if you have completed one year of a
+  master's program with a B average, or hold a master's degree. That rule is
+  the clearest argument for the two-step route below.
+- UConn admits to the PhD directly from a BS only with a 3.5 or demonstrated
+  research experience; the MS requires a 3.0.
+- Caltech, MIT, and Stanford are not realistic this cycle. Skip them.
+- Memphis, Arizona, Michigan, Duke, and BU have no published hard cutoff
+  that I found; a PI who wants you can carry the file. That is why outreach
+  is now mandatory rather than optional.
+
+What actually moves a low-GPA file:
+
+1. A faculty advocate. PhD admissions in engineering are advisor-driven. A
+   PI with funding who has seen your code and wants you will get most
+   committees past a GPA. Email early, send the repo and a 2-page summary,
+   and ask directly whether the GPA is disqualifying in their department.
+2. Research evidence. A working pipeline with measured results, a poster, a
+   preprint, or a co-authored paper. Section 6 is now the highest-leverage
+   work you can do before December.
+3. Trajectory. If your last 60 units or your major GPA are above 3.0, state
+   the number in the statement of purpose and have a recommender repeat it.
+4. NSF GRFP. It has no GPA floor and is scored on research potential and
+   broader impacts. A GRFP makes a sub-3.0 applicant fundable anywhere.
+   Apply this October regardless; the essays become your statement of
+   purpose.
+5. GRE quantitative, only where a program still accepts scores. A high
+   score is one of the few objective counterweights. Berkeley EECS does not
+   accept it; check each program page.
+6. One sentence on the GPA in your statement, only if there is a concrete
+   cause (work hours, family, health, a bad first year). State the cause and
+   the recovery, then move on. Do not apologize at length.
+
+The two-step route, which is how many students in these labs got there:
+
+- Funded thesis MS, then PhD. A thesis MS with a B+ average resets the
+  admissions conversation and produces the paper you need. Options:
+  - CSU MS programs in EE or CS (thesis track). San Jose State's Fall 2027
+    master's window is Feb 1 to Apr 1, 2027. In-state tuition, and CSU
+    graduate admission floors are commonly 2.5-3.0 with conditional
+    admission possible. Pick a campus with an imaging or vision faculty
+    member who will supervise a thesis.
+  - MS at a school with a target lab: Arizona Optical Sciences MS,
+    Memphis ECE MS, UConn ECE or BME MS (3.0 floor, so ask first). You can
+    switch to the PhD internally once a PI knows you.
+- Paid research job, then PhD. Two years as a research engineer or
+  technician with a publication is at least as strong as an MS, and you are
+  paid rather than paying.
+  - MBARI in Moss Landing runs ocean-vision machine learning (FathomNet,
+    image embeddings, MLOps research engineer postings). Summer 2027
+    internship applications open fall 2026; interns have converted to
+    research technician roles.
+  - Ozcan's group and other large imaging labs hire staff researchers and
+    lab engineers. Ask in your outreach email.
+  - NIH PREP post-baccalaureate programs pay a salary for one year of
+    mentored biomedical research. They favor biomedical science over
+    engineering, so only pursue with a host lab doing imaging or
+    microbiology.
+  - National labs near you: Lawrence Livermore and Sandia Livermore both run
+    computational imaging groups and hire post-bachelor's staff.
+
+Revised timeline additions:
+
+- Sept-Oct 2026: send the outreach emails with the GPA question included.
+- Oct 2026: NSF GRFP, as planned.
+- Dec 2026: 3-4 PhD applications where a PI engaged.
+- Jan-Apr 2027: CSU or partner-school MS applications; MBARI and lab
+  research positions.
+- Fall 2027: whichever landed. Reapply to PhD programs from there in
+  Dec 2027 or Dec 2028 with a thesis or paper in hand.
+
+## 8. Files here
 
 - `target_labs.csv`: tracker with one row per program. Fill in the status columns as you go.
 - `outreach_email_template.md`: faculty email plus a follow-up.
 
-## 8. Sources consulted
+## 9. Sources consulted
 
 - Ozcan lab: nature.com/articles/s41377-020-00358-9; pubs.acs.org/doi/10.1021/acsphotonics.2c00572; research.seas.ucla.edu/ozcan
 - CEA-Leti colonies: journals.plos.org/digitalhealth/article?id=10.1371/journal.pdig.0000122
@@ -174,4 +258,5 @@ the link. Suggested fixes, in priority order:
 - Hertz: hertzfoundation.org/hertz-fellowship/apply; NDSEG: ndseg.org; GEM: gemfellowship.org/application-process
 - Sally Casanova: calstate.edu/csu-system/faculty-staff/predoc; CSUMB UROC: csumb.edu/uroc/scholarships-and-fellowships
 - Cal-Bridge: calbridge.org/doctoral-program
+- GPA policies: grad.ucla.edu/deans/announcements/memo20180816.pdf; grad.berkeley.edu/admissions/application-process/requirements; advising.engineering.uconn.edu; sjsu.edu/admissions/graduate/deadlines; mbari.org/about/careers
 - Deadlines: grad.berkeley.edu (EECS), ee.stanford.edu/admissions/phd, ee.ucla.edu/graduate-application-requirements, gradoffice.caltech.edu, duffield.cornell.edu/ece/phd, bu.edu/eng/admissions/graduate, gradschool.duke.edu, bme.umich.edu, ece.utexas.edu/academics/graduate/admissions, eceweb.rice.edu, bme.uconn.edu, optics.arizona.edu, graduateadmissions.ucsc.edu/application-deadlines
