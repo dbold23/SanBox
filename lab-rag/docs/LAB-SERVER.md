@@ -112,24 +112,22 @@ Startup folder (`shell:startup`) that run `labrag serve` and `labrag index --eve
 
 ## Docker
 
-```Dockerfile
-FROM python:3.12-slim
-COPY lab-rag /src
-RUN pip install --no-cache-dir /src
-ENV LABRAG_FOLDERS=/papers LABRAG_DATA=/data
-EXPOSE 8008
-CMD ["sh", "-c", "labrag index --every 30 & exec labrag serve"]
-```
+A `Dockerfile` ships with the project (it runs the index updater and the web page in one
+container):
 
 ```bash
-docker build -t labrag .
+docker build -t labrag ./lab-rag
 docker run -d --name labrag -p 8008:8008 \
-  -v /mnt/nas/Papers:/papers:ro -v /mnt/nas/labrag-index:/data \
+  -v /mnt/nas/Papers:/papers:ro \
+  -v labrag-data:/data \
+  -v labrag-models:/root/.labrag/models \
   -e ANTHROPIC_API_KEY=... labrag
 ```
 
-The first start downloads the embedding model into the container; add
-`-v labrag-models:/root/.labrag/models` to keep it across rebuilds.
+`/papers` is the (read-only) papers folder, `/data` holds the index, and the models volume
+keeps the downloaded embedding model across rebuilds. Add `-e LABRAG_PASSWORD=...` to
+protect the page. On a Synology or QNAP NAS, Container Manager / Container Station can run
+the same image with the shared folder mounted at `/papers`.
 
 ## Passwords and networks
 
