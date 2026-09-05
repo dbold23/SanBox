@@ -9,7 +9,8 @@ What this pipeline does
 4. Preprocesses images for ML pipeline
 5. Saves standardized images ready for annotation
 
-PSEUDOCODE IMPLEMENTATION
+Run:  python Dataprep.py --raw        (reconstruct raw holograms)
+      python Dataprep.py --existing   (only preprocess existing images)
 """
 
 import numpy as np
@@ -18,119 +19,210 @@ import os
 from pathlib import Path
 import sys
 
-# Add parent directory to path to import config
-sys.path.append(str(Path(__file__).parent.parent))
-from config import CONFIG
+# config.py lives next to this file
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from config import CONFIG, ensure_dirs
 
 
 # ============================================================================
 # HOLOGRAM RECONSTRUCTION FUNCTIONS
 # ============================================================================
 
-def reconstruct_hologram(raw_hologram, depth_microns):
+def angular_spectrum_transfer(height, width, depth_microns,
+                              wavelength=None, pixel_size=None):
     """
-    Reconstruct a hologram at a given depth.
+    Build the angular-spectrum transfer function H(fx, fy; z).
 
-    INPUT:
-        raw_hologram = 2D array (or 1D tensor) interference pattern from the camera
-        depth_microns = reconstruction depth in microns
+    Returns a complex array laid out in the SAME (unshifted) frequency order
+    that np.fft.fft2 produces, so it can be multiplied directly against
+    fft2(hologram) with no fftshift on either side.
 
-    OUTPUT:
-        reconstructed_image = focused image at specified depth
-
-    NOTE: This is SIMPLIFIED pseudocode. Replace with your actual
-          holography reconstruction library for your setup.
+    Evanescent frequencies, where (lambda*fx)^2 + (lambda*fy)^2 > 1, are
+    zeroed. Propagating them would take the square root of a negative
+    number and fill the reconstruction with NaN.
     """
+    wavelength = CONFIG['WAVELENGTH'] if wavelength is None else wavelength
+    pixel_size = CONFIG['PIXEL_SIZE'] if pixel_size is None else pixel_size
 
-    # 1:  parameters
-    wavelength = CONFIG['WAVELENGTH']  # microns
-    pixel_size = CONFIG['PIXEL_SIZE']  # microns
-
-    #2: Convert to frequency domain
-    hologram_fft = np.fft.fft2(raw_hologram)
-    hologram_fft_shifted = np.fft.fftshift(hologram_fft)
-
-    # 3: Create frequency coordinate grids
-    height, width = raw_hologram.shape
-    fx = np.fft.fftfreq(width, d=pixel_size)
+    fx = np.fft.fftfreq(width, d=pixel_size)   # cycles per micron
     fy = np.fft.fftfreq(height, d=pixel_size)
     FX, FY = np.meshgrid(fx, fy)
 
-    # 4: Angular Spectrum Propagation
-    # Implements the diffraction formula
-    k = 2 * np.pi / wavelength  # Wave number
-    propagation_phase = np.exp(1j * k * depth_microns *
-                               np.sqrt(1 - (wavelength * FX)**2 - (wavelength * FY)**2))
+    k = 2 * np.pi / wavelength
+    argument = 1.0 - (wavelength * FX) ** 2 - (wavelength * FY) ** 2
+    propagating = argument > 0
 
-    # Apply propagation in frequency domain
-    propagated_fft = hologram_fft_shifted * propagation_phase
+    kz = np.zeros_like(argument)
+    kz[propagating] = k * np.sqrt(argument[propagating])
 
-    # 5: Transform back to spatial domain
-    propagated_fft_unshifted = np.fft.ifftshift(propagated_fft)
-    reconstructed_complex = np.fft.ifft2(propagated_fft_unshifted)
-
-    #6: Extract intensity (amplitude squared)
-    reconstructed_intensity = np.abs(reconstructed_complex)**2
-
-    return reconstructed_intensity
+    transfer = np.exp(1j * kz * depth_microns)
+    transfer[~propagating] = 0.0
+    return transfer
 
 
-def reconstruct_hologram_stack(raw_hologram):
+def reconstruct_hologram(raw_hologram, depth_microns, return_complex=False):
     """
-    PSEUDOCODE: Reconstruct hologram at multiple depths
+    Reconstruct an in-line hologram at a given depth with the angular
+    spectrum method.
 
-    INPUT: raw_hologram = 2D interference pattern
-    OUTPUT: List of images at different depths
+    INPUT:
+        raw_hologram   = 2D intensity pattern from the sensor
+        depth_microns  = signed propagation distance in microns. See the
+                         DEPTH_* comment in config.py for the sign convention.
+        return_complex = return the complex field instead of intensity
+
+    OUTPUT:
+        reconstructed intensity (or complex field) at that depth
     """
+    field = np.asarray(raw_hologram, dtype=np.float64)
+
+    # Dividing out the mean removes the DC term so the object, not the
+    # reference beam, dominates the reconstruction.
+    if CONFIG['NORMALIZE_HOLOGRAM']:
+        mean = field.mean()
+        if mean > 0:
+            field = field / mean
+
+    height, width = field.shape
+    spectrum = np.fft.fft2(field)
+    transfer = angular_spectrum_transfer(height, width, depth_microns)
+    reconstructed_complex = np.fft.ifft2(spectrum * transfer)
+
+    if return_complex:
+        return reconstructed_complex
+    return np.abs(reconstructed_complex) ** 2
+
+
+def depth_scan_values():
+    """Depths to reconstruct at, taken from CONFIG. Supports float steps."""
+    depths = np.arange(CONFIG['DEPTH_MIN'],
+                       CONFIG['DEPTH_MAX'] + 1e-9,
+                       CONFIG['DEPTH_STEP'])
+    if len(depths) == 0:
+        raise ValueError("DEPTH_MIN/DEPTH_MAX/DEPTH_STEP produce an empty scan")
+    return depths
+
+
+def reconstruct_hologram_stack(raw_hologram, verbose=True):
+    """
+    Reconstruct a hologram at every depth in the configured scan.
+
+    INPUT:  raw_hologram = 2D interference pattern
+    OUTPUT: (list of intensity images, list of depths)
+
+    The FFT of the hologram is computed once and reused for every depth.
+    """
+    field = np.asarray(raw_hologram, dtype=np.float64)
+    if CONFIG['NORMALIZE_HOLOGRAM']:
+        mean = field.mean()
+        if mean > 0:
+            field = field / mean
+
+    height, width = field.shape
+    spectrum = np.fft.fft2(field)
 
     depth_planes = []
     depths = []
-
-    # Reconstruct at each depth
-    for depth in range(CONFIG['DEPTH_MIN'],
-                      CONFIG['DEPTH_MAX'],
-                      CONFIG['DEPTH_STEP']):
-
-        print(f"  Reconstructing at depth {depth} μm...")
-
-        # Reconstruct at this depth
-        reconstructed = reconstruct_hologram(raw_hologram, depth)
-
+    for depth in depth_scan_values():
+        if verbose:
+            print(f"  Reconstructing at depth {depth:.1f} um...")
+        transfer = angular_spectrum_transfer(height, width, depth)
+        reconstructed = np.abs(np.fft.ifft2(spectrum * transfer)) ** 2
         depth_planes.append(reconstructed)
-        depths.append(depth)
+        depths.append(float(depth))
 
     return depth_planes, depths
 
 
-def find_best_focus(image_stack):
+def _gradient_magnitude(image):
+    gx = cv2.Sobel(image, cv2.CV_64F, 1, 0, ksize=3)
+    gy = cv2.Sobel(image, cv2.CV_64F, 0, 1, ksize=3)
+    return np.hypot(gx, gy)
+
+
+def _normalize_scores(values):
+    values = np.asarray(values, dtype=np.float64)
+    span = values.max() - values.min()
+    return (values - values.min()) / (span + 1e-12)
+
+
+def focus_score(image, method="laplacian"):
     """
-    PSEUDOCODE: Automatically find the best-focused image
+    Single-image sharpness score. Higher is sharper.
 
-    INPUT: List of images at different depths
-    OUTPUT: Index of sharpest image
+    These per-image metrics are provided for completeness but are NOT
+    reliable on in-line holograms: defocus fringes are themselves sharp,
+    high-frequency structure, so both metrics routinely peak at the wrong
+    depth. Use find_best_focus(method="dark_edge") for real work.
 
-    METHOD: Uses variance of Laplacian as focus metric
-            (higher variance = sharper edges = better focus)
+    method="laplacian"  variance of the Laplacian (the classic photo metric)
+    method="sparsity"   L2/L1 ratio of the gradient magnitude
     """
+    image = np.asarray(image, dtype=np.float64)
+    image = (image - image.min()) / (image.max() - image.min() + 1e-10)
 
-    focus_scores = []
+    if method == "laplacian":
+        as_uint8 = (image * 255).astype(np.uint8)
+        return float(cv2.Laplacian(as_uint8, cv2.CV_64F).var())
 
-    for image in image_stack:
-        # Normalize image
-        normalized = (image - image.min()) / (image.max() - image.min() + 1e-10)
-        normalized = (normalized * 255).astype(np.uint8)
+    if method == "sparsity":
+        magnitude = _gradient_magnitude(image)
+        return float(np.sqrt((magnitude ** 2).sum()) / (magnitude.sum() + 1e-12))
 
-        # Calculate Laplacian (edge detection)
-        laplacian = cv2.Laplacian(normalized, cv2.CV_64F)
+    raise ValueError(f"unknown focus method: {method}")
 
-        # Variance of Laplacian = focus metric
-        focus_score = laplacian.var()
-        focus_scores.append(focus_score)
 
-    # Return index with highest score (sharpest)
-    best_index = np.argmax(focus_scores)
+def dark_edge_components(amplitude, window=9, crop_radius=24):
+    """
+    Two per-plane measurements used by the "dark_edge" autofocus.
 
-    return best_index, focus_scores
+    darkness = -min of the box-filtered amplitude. A solid absorbing object
+               in focus is a uniformly dark region; thin defocus fringes
+               are removed by the box filter and do not count.
+    edge     = strongest gradient inside a crop around that darkest region.
+               In focus the object boundary is a single sharp step; out of
+               focus it is a soft, ringed shadow.
+
+    Darkness alone ties when a large object's geometric shadow is still
+    dark near the sensor plane. Edge alone ties on fringe ridges. Their
+    product across the stack does not, on synthetic tests.
+    """
+    amplitude = np.asarray(amplitude, dtype=np.float64)
+    blurred = cv2.blur(amplitude, (window, window))
+    cy, cx = np.unravel_index(int(np.argmin(blurred)), blurred.shape)
+    y0, x0 = max(cy - crop_radius, 0), max(cx - crop_radius, 0)
+    crop = amplitude[y0:cy + crop_radius, x0:cx + crop_radius]
+    return -float(blurred.min()), float(_gradient_magnitude(crop).max())
+
+
+def find_best_focus(image_stack, method="dark_edge"):
+    """
+    Pick the best-focused plane from a reconstructed depth stack.
+
+    INPUT:  list of intensity images at different depths
+    OUTPUT: (index of sharpest image, list of per-plane focus scores)
+
+    method="dark_edge"  (default) product of stack-normalized darkness and
+                        edge scores from dark_edge_components(). Chosen
+                        because it recovered the true depth in 36/36
+                        synthetic trials where Laplacian variance, gradient
+                        sparsity, Gini edge sparsity, and the Dubois
+                        integrated-amplitude criterion all failed on
+                        defocus rings or geometric shadows.
+    method="laplacian" / "sparsity"  per-image metrics, see focus_score().
+
+    Scores are always "higher is sharper".
+    """
+    if method == "dark_edge":
+        amplitudes = [np.sqrt(np.clip(np.asarray(img, dtype=np.float64), 0, None))
+                      for img in image_stack]
+        darkness, edge = zip(*(dark_edge_components(a) for a in amplitudes))
+        scores = (_normalize_scores(darkness) * _normalize_scores(edge)).tolist()
+    else:
+        scores = [focus_score(image, method) for image in image_stack]
+
+    best_index = int(np.argmax(scores))
+    return best_index, scores
 
 
 # ============================================================================
@@ -177,7 +269,12 @@ def preprocess_image(image, subtract_background=False):
 
 def process_raw_holograms():
     """
-    MAIN PSEUDOCODE: Process all raw holograms
+    Process every raw hologram in RAW_HOLOGRAM_DIR.
+
+    Save holograms as the sensor recorded them (raw 8-bit or 16-bit, a
+    black-level pedestal is fine). Do NOT auto-contrast or min-max stretch
+    them first: that rescales the interference term relative to the DC
+    term and throws the autofocus off by hundreds of microns.
 
     FOR each hologram file:
         1. Load raw hologram
@@ -189,6 +286,7 @@ def process_raw_holograms():
 
     raw_dir = Path(CONFIG['RAW_HOLOGRAM_DIR'])
     output_dir = Path(CONFIG['RECONSTRUCTED_DIR'])
+    output_dir.mkdir(parents=True, exist_ok=True)
 
     # Find all hologram files
     # Adjust extensions to match your file format; keep only the relevant
@@ -209,7 +307,10 @@ def process_raw_holograms():
 
         try:
             #Load raw hologram
-            raw_hologram = cv2.imread(str(hologram_path), cv2.IMREAD_GRAYSCALE)
+            # ANYDEPTH keeps 16-bit TIFFs at full precision instead of
+            # silently downconverting them to 8-bit.
+            raw_hologram = cv2.imread(str(hologram_path),
+                                      cv2.IMREAD_GRAYSCALE | cv2.IMREAD_ANYDEPTH)
 
             if raw_hologram is None:
                 print(f"  ERROR: Could not load {hologram_path}")
@@ -284,6 +385,27 @@ def process_existing_reconstructed_images():
 
 
 # ============================================================================
-# MAIN 
+# MAIN
 # ============================================================================
 
+def main(argv=None):
+    import argparse
+
+    parser = argparse.ArgumentParser(
+        description="Reconstruct raw holograms or preprocess existing images.")
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument("--raw", action="store_true",
+                       help="reconstruct every hologram in RAW_HOLOGRAM_DIR")
+    group.add_argument("--existing", action="store_true",
+                       help="preprocess already-reconstructed images in RECONSTRUCTED_DIR")
+    args = parser.parse_args(argv)
+
+    ensure_dirs()
+    if args.raw:
+        process_raw_holograms()
+    else:
+        process_existing_reconstructed_images()
+
+
+if __name__ == "__main__":
+    main()

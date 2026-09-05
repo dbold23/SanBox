@@ -1,0 +1,5 @@
+numpy>=1.26
+opencv-python-headless>=4.9
+scipy>=1.11
+tensorflow>=2.16   # only needed for Modeltrain.py
+pytest>=8

@@ -21,9 +21,9 @@ from tensorflow.keras import layers, Model
 from tensorflow.keras.callbacks import ModelCheckpoint, EarlyStopping, ReduceLROnPlateau, TensorBoard
 import datetime
 
-# Add parent directory to path
-sys.path.append(str(Path(__file__).parent.parent))
-from config import CONFIG
+# config.py lives next to this file
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from config import CONFIG, ensure_dirs
 
 
 # ============================================================================
@@ -62,12 +62,20 @@ def load_data_generator(data_dir, batch_size, augment=False):
             for image_path in batch_files:
                 # Load image
                 image = cv2.imread(str(image_path), cv2.IMREAD_GRAYSCALE)
+                if image is None:
+                    print(f"WARNING: could not read {image_path}, skipping")
+                    continue
                 image = cv2.resize(image, (CONFIG['IMAGE_WIDTH'], CONFIG['IMAGE_HEIGHT']))
 
                 # Load corresponding mask
                 mask_path = masks_dir / image_path.name
                 mask = cv2.imread(str(mask_path), cv2.IMREAD_GRAYSCALE)
-                mask = cv2.resize(mask, (CONFIG['IMAGE_WIDTH'], CONFIG['IMAGE_HEIGHT']))
+                if mask is None:
+                    print(f"WARNING: no mask for {image_path.name}, skipping")
+                    continue
+                # Nearest-neighbour keeps the mask binary
+                mask = cv2.resize(mask, (CONFIG['IMAGE_WIDTH'], CONFIG['IMAGE_HEIGHT']),
+                                  interpolation=cv2.INTER_NEAREST)
 
                 # Normalize
                 image = image.astype(np.float32) / 255.0
@@ -321,6 +329,7 @@ def train_model():
 
     # Setup callbacks
     print("\nSetting up training callbacks...")
+    os.makedirs(CONFIG['MODEL_DIR'], exist_ok=True)
 
     # 1. Model checkpoint - save best model
     checkpoint_path = os.path.join(CONFIG['MODEL_DIR'], 'best_unet_model.h5')
@@ -394,3 +403,10 @@ def train_model():
     return history, model
 
 
+# ============================================================================
+# MAIN
+# ============================================================================
+
+if __name__ == "__main__":
+    ensure_dirs()
+    train_model()
