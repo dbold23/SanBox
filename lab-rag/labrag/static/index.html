@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LabRAG</title>
+<style>
+  :root { --ink:#1c2430; --muted:#6b7686; --line:#e3e7ee; --accent:#0b6e99; --bg:#f7f8fa; --card:#fff; --hl:#fff6d6; }
+  * { box-sizing: border-box; }
+  body { margin:0; font: 16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color:var(--ink); background:var(--bg); }
+  header { display:flex; align-items:baseline; gap:14px; padding:18px 24px 10px; border-bottom:1px solid var(--line); background:var(--card); flex-wrap:wrap; }
+  header h1 { margin:0; font-size:22px; letter-spacing:.2px; }
+  header .status { color:var(--muted); font-size:14px; }
+  header .spacer { flex:1; }
+  header button.link { background:none; border:none; color:var(--accent); cursor:pointer; font-size:14px; padding:0; }
+  main { max-width: 960px; margin: 0 auto; padding: 20px 24px 60px; }
+  form.ask { display:flex; gap:10px; align-items:flex-start; }
+  textarea { flex:1; min-height:64px; resize:vertical; font:inherit; padding:12px 14px; border:1px solid var(--line); border-radius:10px; background:var(--card); }
+  textarea:focus { outline:2px solid var(--accent); border-color:transparent; }
+  button.primary { font:inherit; font-weight:600; padding:12px 18px; border:none; border-radius:10px; background:var(--accent); color:#fff; cursor:pointer; }
+  button.primary[disabled] { opacity:.5; cursor:wait; }
+  .row { display:flex; gap:16px; align-items:center; color:var(--muted); font-size:14px; margin:8px 0 18px; flex-wrap:wrap; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:18px 20px; margin-top:16px; }
+  .card h2 { margin:0 0 8px; font-size:15px; color:var(--muted); font-weight:600; text-transform:uppercase; letter-spacing:.6px; }
+  .answer { white-space:pre-wrap; }
+  .answer a.cite { color:var(--accent); text-decoration:none; font-weight:600; font-size:.85em; vertical-align:super; padding:0 1px; }
+  .error { color:#a12b2b; }
+  ol.sources { margin:0; padding-left:0; list-style:none; }
+  ol.sources li { padding:10px 0; border-top:1px solid var(--line); }
+  ol.sources li:first-child { border-top:none; }
+  ol.sources li.cited { background: var(--hl); margin:0 -10px; padding:10px; border-radius:8px; border-top-color:transparent; }
+  .n { display:inline-block; min-width:26px; font-weight:700; color:var(--accent); }
+  .cit { font-weight:600; }
+  .meta { color:var(--muted); font-size:14px; }
+  .snippet { color:#3b4552; font-size:14px; margin-top:4px; }
+  .muted { color:var(--muted); }
+  .idx pre { background:#0f1720; color:#d7e0ea; padding:12px; border-radius:8px; max-height:260px; overflow:auto; font-size:13px; }
+  .hidden { display:none; }
+  .q { color:var(--muted); font-size:14px; margin-bottom:6px; }
+  .examples button { font:inherit; font-size:14px; background:var(--card); border:1px solid var(--line); border-radius:999px; padding:6px 12px; cursor:pointer; color:var(--ink); }
+  footer { color:var(--muted); font-size:13px; margin-top:30px; }
+  @media (max-width:640px){ form.ask{flex-direction:column} button.primary{width:100%} }
+</style>
+</head>
+<body>
+<header>
+  <h1>LabRAG</h1>
+  <span class="status" id="status">loading…</span>
+  <span class="spacer"></span>
+  <button class="link" id="toggleIndex">Update index</button>
+</header>
+<main>
+  <form class="ask" id="askForm">
+    <textarea id="question" placeholder="Ask about the lab's papers — e.g. what tag types have been used on leopard sharks in Elkhorn Slough?" required></textarea>
+    <button class="primary" id="askBtn" type="submit">Ask</button>
+  </form>
+  <div class="row">
+    <label><input type="checkbox" id="passagesOnly"> Just show passages (no model)</label>
+    <button class="link" id="newTopic" type="button" style="background:none;border:none;color:var(--accent);cursor:pointer;font:inherit;font-size:14px">New topic</button>
+    <span id="followup" class="muted"></span>
+  </div>
+  <div class="examples" id="examples"></div>
+
+  <div id="indexPanel" class="card idx hidden">
+    <h2>Index</h2>
+    <p class="muted" id="indexHelp">Papers are picked up from the configured folders and Google Drive. Updating re-reads new or changed files only.</p>
+    <button class="primary" id="indexBtn" type="button">Update index now</button>
+    <span class="muted" id="indexState"></span>
+    <pre id="indexLog" class="hidden"></pre>
+  </div>
+
+  <div id="results"></div>
+  <footer>Answers are written from the passages listed under each answer. Check the source before you cite it.</footer>
+</main>
+<script>
+(function(){
+  const $ = id => document.getElementById(id);
+  const history = [];   // [[question, answer], ...] for follow-up questions
+  const EXAMPLES = [
+    "What methods have been used to estimate white shark body size from video?",
+    "Where do leopard sharks aggregate seasonally?",
+    "Which papers discuss acoustic telemetry detection range?",
+  ];
+  $("examples").innerHTML = EXAMPLES.map(e => `<button type="button">${escapeHtml(e)}</button>`).join(" ");
+  $("examples").querySelectorAll("button").forEach(b => b.onclick = () => { $("question").value = b.textContent; $("askForm").requestSubmit(); });
+
+  function escapeHtml(s){ return String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+
+  async function loadStatus(){
+    try {
+      const r = await fetch("api/status"); const s = await r.json();
+      const when = s.last_indexed ? new Date(s.last_indexed).toLocaleString() : "never";
+      const model = s.model ? `answers by ${s.model}` : "search only (no model configured)";
+      $("status").textContent = `${s.documents.toLocaleString()} documents · indexed ${when} · ${model}` + (s.indexing ? " · indexing…" : "");
+      if (!s.model) { $("passagesOnly").checked = true; $("passagesOnly").disabled = true; }
+      if (s.documents === 0) $("indexPanel").classList.remove("hidden");
+    } catch(e){ $("status").textContent = "server not reachable"; }
+  }
+
+  function renderAnswer(res){
+    const wrap = document.createElement("div");
+    let html = `<div class="card"><div class="q">${escapeHtml(res.question)}</div>`;
+    if (res.error) html += `<p class="error">Could not get an answer from the model: ${escapeHtml(res.error)}</p><p class="muted">Here are the most relevant passages instead.</p>`;
+    else if (res.answer) html += `<div class="answer">${linkCitations(escapeHtml(res.answer))}</div>`;
+    else if (!res.sources.length) html += `<p class="muted">Nothing in the indexed papers matches. Try other words, or check the index.</p>`;
+    if (res.model) html += `<div class="meta" style="margin-top:8px">${escapeHtml(res.model)} · ${res.elapsed}s</div>`;
+    html += `</div>`;
+    if (res.sources.length){
+      html += `<div class="card"><h2>Sources${res.cited.length ? " — highlighted ones are cited above" : ""}</h2><ol class="sources">`;
+      for (const s of res.sources){
+        html += `<li id="src-${s.n}" class="${s.cited ? "cited" : ""}">
+          <span class="n">[${s.n}]</span> <span class="cit">${escapeHtml(s.citation)}</span> —
+          <a href="${s.file_url}" target="_blank" rel="noopener">${escapeHtml(s.title)}</a>
+          <span class="meta">${s.pages ? escapeHtml(s.pages) + " · " : ""}${escapeHtml(s.source)}/${escapeHtml(s.rel_path)}</span>
+          <div class="snippet">${escapeHtml(s.snippet)}</div></li>`;
+      }
+      html += `</ol></div>`;
+    }
+    wrap.innerHTML = html;
+    $("results").prepend(wrap);
+    // clicking a citation scrolls to the source in this result
+    wrap.querySelectorAll("a.cite").forEach(a => a.onclick = ev => { ev.preventDefault(); const t = wrap.querySelector(a.getAttribute("href")); if (t) t.scrollIntoView({behavior:"smooth", block:"center"}); });
+  }
+  function linkCitations(text){
+    return text.replace(/\[(\d+(?:\s*[,;]\s*\d+)*)\]/g, (m, inner) =>
+      "[" + inner.split(/[,;]/).map(n => n.trim()).map(n => `<a class="cite" href="#src-${n}">${n}</a>`).join(", ") + "]");
+  }
+
+  $("askForm").onsubmit = async ev => {
+    ev.preventDefault();
+    const q = $("question").value.trim(); if (!q) return;
+    $("askBtn").disabled = true; $("askBtn").textContent = "Thinking…";
+    try {
+      const r = await fetch("api/ask", {method:"POST", headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({question:q, history: history.slice(-3), passages_only: $("passagesOnly").checked})});
+      if (!r.ok) throw new Error(`server said ${r.status}`);
+      const res = await r.json();
+      renderAnswer(res);
+      if (res.answer) { history.push([q, res.answer]); $("followup").textContent = `Follow-up questions keep the last ${Math.min(history.length,3)} exchange(s) in mind.`; }
+      $("question").value = "";
+    } catch(e){
+      const d = document.createElement("div"); d.className = "card error"; d.textContent = "Something went wrong: " + e.message; $("results").prepend(d);
+    } finally { $("askBtn").disabled = false; $("askBtn").textContent = "Ask"; }
+  };
+  $("question").addEventListener("keydown", ev => { if ((ev.metaKey || ev.ctrlKey) && ev.key === "Enter") $("askForm").requestSubmit(); });
+  $("newTopic").onclick = () => { history.length = 0; $("followup").textContent = ""; $("results").innerHTML = ""; };
+
+  // ---- index panel
+  $("toggleIndex").onclick = () => { $("indexPanel").classList.toggle("hidden"); pollIndex(); };
+  $("indexBtn").onclick = async () => { await fetch("api/index", {method:"POST"}); pollIndex(true); };
+  let pollTimer = null;
+  async function pollIndex(keep){
+    try {
+      const r = await fetch("api/index"); const st = await r.json();
+      $("indexBtn").disabled = st.running;
+      $("indexState").textContent = st.running ? " running…" : (st.error ? " failed: " + st.error : (st.last_summary ? " last run: " + st.last_summary : ""));
+      if (st.log && st.log.length){ $("indexLog").classList.remove("hidden"); $("indexLog").textContent = st.log.join("\n"); $("indexLog").scrollTop = $("indexLog").scrollHeight; }
+      if (st.running || keep){ clearTimeout(pollTimer); pollTimer = setTimeout(() => pollIndex(st.running), 2000); }
+      if (!st.running) loadStatus();
+    } catch(e){}
+  }
+  loadStatus();
+})();
+</script>
+</body>
+</html>

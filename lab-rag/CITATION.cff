@@ -1,0 +1,28 @@
+cff-version: 1.2.0
+message: "If you use this software in your research, please cite it using the metadata in this file."
+title: "LabRAG: cited answers from a lab's paper collection"
+abstract: >-
+  LabRAG indexes the documents in a research lab's shared folders (a NAS share and/or a
+  Google Drive folder) into a single SQLite file combining full-text and vector search, and
+  answers natural-language questions with passages cited by paper and page. It is the
+  successor to SHARK RAG, rebuilt so that one machine serves the whole lab through a web
+  page and lab members install nothing.
+type: software
+authors:
+  - family-names: Sambold
+    given-names: Daniel
+    email: dsambold@csumb.edu
+    affiliation: "California State University, Monterey Bay"
+    orcid: "https://orcid.org/0009-0003-7810-650X"
+  - family-names: Jorgensen
+    given-names: Salvador
+license: MIT
+version: 2.0.0
+date-released: "2026-09-05"
+keywords:
+  - retrieval-augmented generation
+  - literature search
+  - marine biology
+  - citations
+  - sqlite
+repository-code: "https://github.com/dbold23/SanBox"
