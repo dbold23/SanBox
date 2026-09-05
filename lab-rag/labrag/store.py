@@ -13,16 +13,14 @@ deliberately not used because it is unsafe on network filesystems.
 
 from __future__ import annotations
 
-import json
 import logging
 import re
 import sqlite3
 import threading
-import time
+from collections.abc import Iterable
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Iterable
 
 import numpy as np
 
@@ -140,7 +138,7 @@ class Hit:
 
 
 def _now() -> str:
-    return datetime.now(timezone.utc).isoformat(timespec="seconds")
+    return datetime.now(UTC).isoformat(timespec="seconds")
 
 
 class Store:
@@ -174,9 +172,8 @@ class Store:
             return row["value"] if row else None
 
     def set_meta(self, key: str, value: str) -> None:
-        with self._lock:
-            with self.conn:
-                self.conn.execute("INSERT OR REPLACE INTO meta(key, value) VALUES (?, ?)", (key, value))
+        with self._lock, self.conn:
+            self.conn.execute("INSERT OR REPLACE INTO meta(key, value) VALUES (?, ?)", (key, value))
 
     def _bump_version(self) -> None:
         self.conn.execute("UPDATE meta SET value = CAST(CAST(value AS INTEGER) + 1 AS TEXT) WHERE key = 'index_version'")
@@ -272,24 +269,21 @@ class Store:
             return doc_id
 
     def upsert_stat(self, doc_id: int, size: int, mtime: float) -> None:
-        with self._lock:
-            with self.conn:
-                self.conn.execute("UPDATE documents SET size = ?, mtime = ? WHERE id = ?", (size, mtime, doc_id))
+        with self._lock, self.conn:
+            self.conn.execute("UPDATE documents SET size = ?, mtime = ? WHERE id = ?", (size, mtime, doc_id))
 
     def delete_document(self, doc_id: int) -> None:
-        with self._lock:
-            with self.conn:
-                self.conn.execute("DELETE FROM chunks WHERE doc_id = ?", (doc_id,))
-                self.conn.execute("DELETE FROM documents WHERE id = ?", (doc_id,))
-                self._bump_version()
+        with self._lock, self.conn:
+            self.conn.execute("DELETE FROM chunks WHERE doc_id = ?", (doc_id,))
+            self.conn.execute("DELETE FROM documents WHERE id = ?", (doc_id,))
+            self._bump_version()
 
     def clear(self) -> None:
-        with self._lock:
-            with self.conn:
-                self.conn.execute("DELETE FROM chunks")
-                self.conn.execute("DELETE FROM documents")
-                self.conn.execute("DELETE FROM meta WHERE key IN ('embedding_model', 'embedding_dim')")
-                self._bump_version()
+        with self._lock, self.conn:
+            self.conn.execute("DELETE FROM chunks")
+            self.conn.execute("DELETE FROM documents")
+            self.conn.execute("DELETE FROM meta WHERE key IN ('embedding_model', 'embedding_dim')")
+            self._bump_version()
 
     def stats(self) -> dict:
         with self._lock:

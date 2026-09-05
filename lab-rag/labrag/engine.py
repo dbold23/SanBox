@@ -24,7 +24,7 @@ Rules:
 _CITE_RE = re.compile(r"\[(\d+(?:\s*[,;]\s*\d+)*)\]")
 _FOLLOWUP_RE = re.compile(
     r"^(and|but|what about|how about|also|then|same|more|any|which of|what of|ok|okay)\b|\b(it|its|they|them|their|those|these|that one|the same|there)\b",
-    re.I,
+    re.IGNORECASE,
 )
 
 

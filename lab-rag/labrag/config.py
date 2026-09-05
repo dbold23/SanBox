@@ -23,7 +23,7 @@ DEFAULT_ENV_NAME = "labrag.env"
 
 DOC = {
     "LABRAG_FOLDERS": "Folders with papers to index, separated by ';'. A NAS share, a Google Drive for Desktop folder, a laptop folder. Optional 'name=path' gives a source a short name.",
-    "LABRAG_DATA": "Where the index (labrag.db) and caches live. Put it on the NAS so the whole lab shares one index.",
+    "LABRAG_DATA": "Where the index (labrag.db) and caches live. Default: this machine's disk (~/.labrag/data). Only the machine that runs `labrag serve` needs it.",
     "LABRAG_DRIVE_FOLDER": "Google Drive folder link or ID to sync and index (optional).",
     "LABRAG_GOOGLE_SERVICE_ACCOUNT": "Path to a Google service-account JSON key; share the Drive folder with its e-mail (optional).",
     "LABRAG_GOOGLE_CLIENT_SECRET": "Path to an OAuth 'Desktop app' client secret JSON; first run opens a browser (optional).",
@@ -129,8 +129,7 @@ def read_env_file(path: Path) -> dict[str, str]:
         line = raw.strip()
         if not line or line.startswith("#") or "=" not in line:
             continue
-        if line.startswith("export "):
-            line = line[len("export "):]
+        line = line.removeprefix("export ")
         key, _, value = line.partition("=")
         key = key.strip()
         value = value.strip()

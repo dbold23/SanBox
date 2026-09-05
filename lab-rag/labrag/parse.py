@@ -214,7 +214,7 @@ def _parse_html(path: Path) -> ParsedDoc:
 
 def _parse_text(path: Path) -> ParsedDoc:
     raw = path.read_text(encoding="utf-8", errors="replace")
-    body = re.sub(r"^#{1,6}\s+", "", raw, flags=re.M) if path.suffix.lower() in {".md", ".markdown"} else raw
+    body = re.sub(r"^#{1,6}\s+", "", raw, flags=re.MULTILINE) if path.suffix.lower() in {".md", ".markdown"} else raw
     text = clean_text(body)
     title = None
     for line in raw.splitlines():

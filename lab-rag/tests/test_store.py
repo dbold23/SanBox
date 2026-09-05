@@ -114,8 +114,8 @@ def test_special_characters_in_query_do_not_crash(store):
 def test_short_citation_fallbacks():
     from labrag.store import DocumentRow
 
-    base = dict(id=1, source="nas", rel_path="Papers/Some_Long_Title_here.pdf", path="/x", sha256="", size=0, mtime=0,
-                doi=None, n_pages=1, n_chunks=1, status="ok", error=None, indexed_at="")
+    base = {"id": 1, "source": "nas", "rel_path": "Papers/Some_Long_Title_here.pdf", "path": "/x", "sha256": "", "size": 0,
+            "mtime": 0, "doi": None, "n_pages": 1, "n_chunks": 1, "status": "ok", "error": None, "indexed_at": ""}
     assert DocumentRow(title=None, authors="Salvador J. Jorgensen; Another", year=2015, **base).short_citation == "Jorgensen 2015"
     assert DocumentRow(title="A title", authors=None, year=2015, **base).short_citation == "A title (2015)"
     assert DocumentRow(title=None, authors="Christopher G. Lowe and Kelly Anderson", year=2000, **base).short_citation == "Lowe 2000"

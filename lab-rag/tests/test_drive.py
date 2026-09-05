@@ -1,5 +1,4 @@
 import json
-from pathlib import Path
 
 import pytest
 
@@ -136,8 +135,8 @@ def test_sync_downloads_then_is_idempotent_then_tracks_changes(drive, tmp_path):
     drive.folders["root"][2] = {"id": "g1", "name": "Lab protocol v2", "mimeType": DOC_MIME, "modifiedTime": "2024-03-03T00:00:00Z"}
     drive.contents["p1"] = b"%PDF-1b"
     r3 = sync_folder(client, "root", cache)
-    assert [p.name for p in r3.updated] == ["Smith_2019_sharks.pdf", "Lab protocol v2.txt"] or set(p.name for p in r3.updated) == {"Smith_2019_sharks.pdf", "Lab protocol v2.txt"}
-    assert set(p.name for p in r3.removed) == {"Jones_2020_tags.pdf", "Lab protocol.txt"}
+    assert {p.name for p in r3.updated} == {"Smith_2019_sharks.pdf", "Lab protocol v2.txt"}
+    assert {p.name for p in r3.removed} == {"Jones_2020_tags.pdf", "Lab protocol.txt"}
     assert (cache / "Smith_2019_sharks.pdf").read_bytes() == b"%PDF-1b"
     assert not (cache / "Telemetry").exists()  # empty dir cleaned
     assert not (cache / "Lab protocol.txt").exists()

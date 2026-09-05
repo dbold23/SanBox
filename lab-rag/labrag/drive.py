@@ -24,9 +24,10 @@ import json
 import logging
 import re
 import time
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Iterator, Protocol
+from typing import Protocol
 
 from .parse import SUPPORTED_EXTENSIONS
 

@@ -48,8 +48,13 @@ def make_client(engine, settings=None, runner=None):
 def test_page_status_ask_and_file(engine):
     c = make_client(engine)
     assert "LabRAG" in c.get("/").text
+    assert c.get("/favicon.ico").headers["content-type"].startswith("image/svg+xml")
     st = c.get("/api/status").json()
     assert st["documents"] == 1 and st["model"] == "fake" and st["embeddings"] == "hash-32"
+    assert st["problem_files"] == []
+    engine.store.upsert_document(source="nas", rel_path="scan.pdf", path="/nas/scan.pdf", sha256="z", size=1, mtime=1, title="scan",
+                                 authors=None, year=None, doi=None, n_pages=2, status="needs_ocr")
+    assert c.get("/api/status").json()["problem_files"] == [{"source": "nas", "rel_path": "scan.pdf", "status": "needs_ocr", "error": None}]
 
     r = c.post("/api/ask", json={"question": "what do white sharks eat?", "history": [["a", "b"], ["bad"]]})
     assert r.status_code == 200

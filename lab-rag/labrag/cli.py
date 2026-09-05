@@ -14,7 +14,6 @@ from __future__ import annotations
 import argparse
 import json
 import logging
-import os
 import sys
 import textwrap
 import time
@@ -34,7 +33,7 @@ def say(msg: str = "") -> None:
     print(msg, flush=True)
 
 
-def fail(msg: str, code: int = 1) -> "int":
+def fail(msg: str, code: int = 1) -> int:
     print(f"\nProblem: {msg}", file=sys.stderr, flush=True)
     return code
 
@@ -70,9 +69,8 @@ def cmd_init(args) -> int:
         elif creds:
             say("   (could not tell what kind of credentials file that is; saving it as a service-account key)")
             creds_sa, creds_oauth = creds, ""
-    first = folders.split(";")[0].strip() if folders else ""
-    suggested = str(Path(first).expanduser().parent / "labrag-index") if first else str(DEFAULT_USER_DIR / "data")
-    data = ask("LABRAG_DATA", f"3. Where to keep the index. On the NAS, next to the papers, lets the whole lab share it", suggested)
+    suggested = str(DEFAULT_USER_DIR / "data")
+    data = ask("LABRAG_DATA", "3. Where to keep the index (one SQLite file plus caches). This machine's own disk is the\n   safe choice; only this machine needs it, everyone else uses the web page", suggested)
     key = ask("ANTHROPIC_API_KEY", "4. Anthropic API key so answers are written by Claude (optional; without it LabRAG\n   uses Ollama if it is running, otherwise it works as a search engine)", secret=True)
     password = ask("LABRAG_PASSWORD", "5. Password for the web page (optional; leave blank on a trusted lab network)", secret=True)
 
@@ -326,6 +324,8 @@ def cmd_serve(args) -> int:
     import uvicorn
 
     say(f"LabRAG is at http://{_display_host(settings.host)}:{settings.port}  (Ctrl-C to stop)")
+    if settings.host not in ("127.0.0.1", "localhost", "::1") and not settings.password:
+        say("Note: the page is open to everyone on this network. Set LABRAG_PASSWORD if that is not what you want.")
     uvicorn.run(app, host=settings.host, port=settings.port, log_level="warning")
     return 0
 

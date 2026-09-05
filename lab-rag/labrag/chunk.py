@@ -13,7 +13,7 @@ import re
 from dataclasses import dataclass
 
 _SENTENCE_RE = re.compile(r"(?<=[.!?])\s+(?=[A-Z0-9(\"'])")
-_REFERENCES_RE = re.compile(r"^\s*(references|literature cited|bibliography|works cited|references cited)\s*:?\s*$", re.I)
+_REFERENCES_RE = re.compile(r"^\s*(references|literature cited|bibliography|works cited|references cited)\s*:?\s*$", re.IGNORECASE)
 
 
 @dataclass

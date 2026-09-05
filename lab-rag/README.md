@@ -62,7 +62,7 @@ labrag serve       # the web page, at http://<this machine>:8008
 |---|---|
 | Folder(s) with the papers | The NAS share as mounted on this machine, e.g. `/Volumes/LabNAS/Papers` or `Z:\Papers`. Several folders: separate with `;`. A Google Drive for Desktop folder works here too. |
 | Google Drive folder link | Only if you want LabRAG to pull straight from Drive without Drive for Desktop. See [docs/GOOGLE-DRIVE.md](docs/GOOGLE-DRIVE.md). |
-| Where to keep the index | Default is a `labrag-index` folder next to the papers. On the NAS is best: then the whole lab shares one index and nobody re-indexes. |
+| Where to keep the index | Default is `~/.labrag/data` on this machine, which is the safe choice: only the machine that runs the web page needs the index. |
 | Anthropic API key | Optional. With it, Claude writes the answers. Without it LabRAG uses Ollama if it is running, otherwise it is search-only. |
 | Password for the web page | Optional. Leave blank on a trusted lab network. |
 
@@ -136,7 +136,7 @@ inside the same call rather than failing.
 | `labrag serve` | Start the web page for the lab. `--port 8010` to change the port. |
 | `labrag ask "..."` | Ask from the terminal. |
 | `labrag search "..."` | Show matching passages only, no model. |
-| `labrag status` | What is indexed, from where, with which model. `-v` lists files that failed or need OCR. |
+| `labrag status` | What is indexed, from where, with which model. `-v` lists files that failed or need OCR (the web page lists them too, under **Update index**). |
 | `labrag doctor` | Check Python, folders, Drive access, embeddings and the model in one go. |
 
 Settings come from environment variables or from `~/.labrag/labrag.env` (or a `labrag.env` in
@@ -145,13 +145,16 @@ the current folder). Real environment variables win. Every key is documented in
 
 ---
 
-## Sharing one index across the lab
+## One index for the lab
 
-Put `LABRAG_DATA` on the NAS, next to the papers. One machine runs `labrag index` (on a
-schedule) and `labrag serve`; that is the only machine that writes to the index. Anyone else
-who installs LabRAG can point at the same `LABRAG_DATA` and run `labrag ask` or their own
-`labrag serve` read-only. Two machines must not both run `labrag index` against the same
-index at the same time.
+The normal setup needs no sharing at all: one machine runs `labrag index` and `labrag serve`,
+and the index lives on that machine's disk. Everyone uses the web page.
+
+If other people want to run `labrag ask` from their own laptops against the same index, put
+`LABRAG_DATA` on the NAS instead and point their settings at it. Only one machine may run
+`labrag index` against a shared index, and the index is deliberately kept in SQLite's plain
+journal mode (no WAL) so that it works on a network share. If the share is flaky, keep the
+index local.
 
 If the NAS is unmounted when an index run happens, LabRAG notices that the folder is empty
 and refuses to remove anything.

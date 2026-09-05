@@ -30,7 +30,7 @@ def test_index_add_update_remove_and_errors(tmp_path):
     root = tmp_path / "papers"
     f1 = write(root / "Smith_2019_sharks.txt", "White sharks eat seals. " * 30)
     f2 = write(root / "sub" / "notes.md", "# Rays\n\nBat rays dig pits. " * 30)
-    bad = write(root / "broken.txt", "text")
+    write(root / "broken.txt", "text")
     store = Store(tmp_path / "i.db")
     emb = HashEmbedder(dim=32)
     src = [Source("nas", root)]

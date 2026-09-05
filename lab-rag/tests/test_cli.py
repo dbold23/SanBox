@@ -48,7 +48,7 @@ def test_cli_end_to_end(tmp_path, capsys, monkeypatch):
     assert main(["init", "--file", str(tmp_path / "labrag.env")]) == 0
     text = (tmp_path / "labrag.env").read_text()
     assert f"LABRAG_FOLDERS={papers}" in text and "ANTHROPIC_API_KEY=" in text
-    assert "labrag-index" in text  # suggested index location next to the papers
+    assert "LABRAG_DATA=" in text
 
 
 def test_cli_index_without_sources_fails_clearly(tmp_path, capsys, monkeypatch):

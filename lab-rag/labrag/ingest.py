@@ -9,9 +9,9 @@ import hashlib
 import logging
 import os
 import time
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable, Iterator
 
 from .chunk import chunk_pages
 from .config import Source

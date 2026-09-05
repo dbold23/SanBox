@@ -13,7 +13,9 @@ from __future__ import annotations
 import hashlib
 import logging
 import re
-from typing import Iterable, Protocol
+from collections.abc import Iterable
+from itertools import pairwise
+from typing import Protocol
 
 import numpy as np
 
@@ -49,7 +51,7 @@ class HashEmbedder:
     def _vec(self, text: str) -> np.ndarray:
         v = np.zeros(self.dim, dtype=np.float32)
         words = [w.lower() for w in _WORD_RE.findall(text)]
-        tokens = words + [f"{a} {b}" for a, b in zip(words, words[1:])]
+        tokens = words + [f"{a} {b}" for a, b in pairwise(words)]
         for tok in tokens:
             h = hashlib.blake2b(tok.encode(), digest_size=8).digest()
             idx = int.from_bytes(h[:4], "little") % self.dim
@@ -76,7 +78,7 @@ class FastEmbedEmbedder:
         self.batch_size = batch_size
         self._model = TextEmbedding(model_name=model, cache_dir=cache_dir)
         probe = next(iter(self._model.embed(["dimension probe"])))
-        self.dim = int(len(probe))
+        self.dim = len(probe)
 
     def embed(self, texts: list[str]) -> np.ndarray:
         if not texts:
@@ -96,7 +98,7 @@ class OllamaEmbedder:
         self.url = url.rstrip("/")
         self.batch_size = batch_size
         self._client = httpx.Client(timeout=timeout)
-        self.dim = int(len(self._raw(["dimension probe"])[0]))
+        self.dim = len(self._raw(["dimension probe"])[0])
 
     def _raw(self, texts: list[str]) -> list[list[float]]:
         r = self._client.post(f"{self.url}/api/embed", json={"model": self.model, "input": texts})
@@ -133,7 +135,7 @@ class OpenAIEmbedder:
         self.batch_size = batch_size
         headers = {"Authorization": f"Bearer {api_key}"} if api_key else {}
         self._client = httpx.Client(timeout=timeout, headers=headers)
-        self.dim = int(len(self._raw(["dimension probe"])[0]))
+        self.dim = len(self._raw(["dimension probe"])[0])
 
     def _raw(self, texts: list[str]) -> list[list[float]]:
         r = self._client.post(f"{self.base_url}/embeddings", json={"model": self.model, "input": texts})

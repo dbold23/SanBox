@@ -9,9 +9,9 @@ import secrets
 import threading
 import time
 from collections import deque
+from collections.abc import Callable
 from importlib import resources
 from pathlib import Path
-from typing import Callable
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
@@ -162,6 +162,12 @@ def create_app(settings: Settings, engine: Engine | None = None, index_runner=No
     def index_page():
         return resources.files("labrag").joinpath("static/index.html").read_text(encoding="utf-8")
 
+    @app.get("/favicon.ico", include_in_schema=False)
+    def favicon():
+        svg = ('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="6" fill="#0b6e99"/>'
+               '<text x="16" y="22" font-family="Helvetica,Arial" font-size="16" font-weight="700" fill="#fff" text-anchor="middle">L</text></svg>')
+        return Response(svg, media_type="image/svg+xml", headers={"Cache-Control": "public, max-age=86400"})
+
     @app.get("/api/status")
     def status():
         st = engine.store.stats()
@@ -176,6 +182,11 @@ def create_app(settings: Settings, engine: Engine | None = None, index_runner=No
             "model": engine.llm.name if engine.llm else None,
             "embeddings": engine.embedder.name if engine.embedder else None,
             "indexing": job.running,
+            "problem_files": [
+                {"source": d.source, "rel_path": d.rel_path, "status": d.status, "error": d.error}
+                for d in engine.store.list_documents()
+                if d.status != "ok"
+            ][:100],
         }
 
     @app.post("/api/ask")

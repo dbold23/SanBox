@@ -67,6 +67,10 @@
     <button class="primary" id="indexBtn" type="button">Update index now</button>
     <span class="muted" id="indexState"></span>
     <pre id="indexLog" class="hidden"></pre>
+    <div id="problems" class="hidden">
+      <p class="muted" style="margin-bottom:4px">These files are in the folders but could not be made searchable:</p>
+      <ul id="problemList" class="meta" style="margin:0 0 0 18px; padding:0"></ul>
+    </div>
   </div>
 
   <div id="results"></div>
@@ -94,6 +98,9 @@
       $("status").textContent = `${s.documents.toLocaleString()} documents · indexed ${when} · ${model}` + (s.indexing ? " · indexing…" : "");
       if (!s.model) { $("passagesOnly").checked = true; $("passagesOnly").disabled = true; }
       if (s.documents === 0) $("indexPanel").classList.remove("hidden");
+      const probs = s.problem_files || [];
+      $("problems").classList.toggle("hidden", probs.length === 0);
+      $("problemList").innerHTML = probs.map(p => `<li>${escapeHtml(p.source)}/${escapeHtml(p.rel_path)} — ${p.status === "needs_ocr" ? "scanned PDF with no text layer (needs OCR)" : p.status === "empty" ? "no text found" : escapeHtml(p.error || p.status)}</li>`).join("");
     } catch(e){ $("status").textContent = "server not reachable"; }
   }
 
