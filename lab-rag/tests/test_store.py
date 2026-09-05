@@ -118,4 +118,7 @@ def test_short_citation_fallbacks():
                 doi=None, n_pages=1, n_chunks=1, status="ok", error=None, indexed_at="")
     assert DocumentRow(title=None, authors="Salvador J. Jorgensen; Another", year=2015, **base).short_citation == "Jorgensen 2015"
     assert DocumentRow(title="A title", authors=None, year=2015, **base).short_citation == "A title (2015)"
+    assert DocumentRow(title=None, authors="Christopher G. Lowe and Kelly Anderson", year=2000, **base).short_citation == "Lowe 2000"
+    assert DocumentRow(title=None, authors="Jorgensen SJ, Reeb CA", year=2010, **base).short_citation == "Jorgensen 2010"
+    assert DocumentRow(title=None, authors="Lowe", year=None, **base).short_citation == "Lowe"
     assert DocumentRow(title=None, authors=None, year=None, **base).short_citation == "Some_Long_Title_here"

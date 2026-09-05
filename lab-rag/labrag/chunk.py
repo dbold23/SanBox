@@ -34,8 +34,8 @@ def chunk_pages(
     overlap_words: int = 50,
     min_words: int = 40,
 ) -> list[Chunk]:
+    pages = drop_references(pages)
     paragraphs = _paragraphs_with_pages(pages)
-    paragraphs = _drop_references(paragraphs)
     if not paragraphs:
         return []
 
@@ -89,14 +89,24 @@ def _paragraphs_with_pages(pages: list[str]) -> list[tuple[str, int]]:
     return out
 
 
-def _drop_references(paragraphs: list[tuple[str, int]]) -> list[tuple[str, int]]:
-    total = sum(len(p.split()) for p, _ in paragraphs)
+def drop_references(pages: list[str], min_fraction: float = 0.4) -> list[str]:
+    """Cut the document at a 'References' / 'Literature Cited' heading that sits on its own
+    line past `min_fraction` of the text. Everything after it (usually the bibliography, on
+    this and later pages) is dropped. An early heading (table of contents) is ignored."""
+    total = sum(len((p or "").split()) for p in pages)
+    if total == 0:
+        return pages
     seen = 0
-    for i, (para, _) in enumerate(paragraphs):
-        if _REFERENCES_RE.match(para) and seen > total * 0.4:
-            return paragraphs[:i]
-        seen += len(para.split())
-    return paragraphs
+    for page_no, page in enumerate(pages):
+        lines = (page or "").split("\n")
+        words_before = seen
+        for i, line in enumerate(lines):
+            if _REFERENCES_RE.match(line) and words_before > total * min_fraction:
+                kept = "\n".join(lines[:i]).strip()
+                return pages[:page_no] + ([kept] if kept else [])
+            words_before += len(line.split())
+        seen = words_before
+    return pages
 
 
 def _split_long_paragraph(para: str, target_words: int) -> list[str]:

@@ -126,3 +126,56 @@ def test_docx(tmp_path):
     assert doc.authors == "Sambold D"
     assert "excavate pits" in doc.text
     assert isinstance(doc, ParsedDoc)
+
+
+def test_year_not_taken_from_doi(tmp_path):
+    p = tmp_path / "paper.pdf"
+    make_pdf(p, ["doi:10.1098/rspb.2009.1155\nPublished 2012. " + "Body text. " * 40])
+    doc = parse_file(p)
+    assert doc.doi == "10.1098/rspb.2009.1155"
+    assert doc.year == 2012
+
+
+def test_pdf_blocks_become_paragraphs_and_references_are_dropped(tmp_path):
+    import pymupdf
+
+    p = tmp_path / "refs.pdf"
+    d = pymupdf.open()
+    page = d.new_page()
+    y = 72
+    for para in ["Intro paragraph about sharks. " * 6, "Methods paragraph about tags. " * 6, "Results paragraph. " * 6]:
+        page.insert_textbox(pymupdf.Rect(72, y, 540, y + 90), para, fontsize=9)
+        y += 100
+    page.insert_text((72, y + 10), "References", fontsize=11)
+    page.insert_text((72, y + 30), "Smith J (2019) Some cited paper. Journal 1:1-10.", fontsize=9)
+    d.save(str(p))
+    d.close()
+    doc = parse_file(p)
+    assert "\n\n" in doc.pages[0]  # blocks separated by blank lines
+    from labrag.chunk import chunk_pages
+
+    chunks = chunk_pages(doc.pages)
+    assert chunks and not any("Some cited paper" in c.text for c in chunks)
+
+
+def test_two_column_pdf_keeps_reading_order(tmp_path):
+    import pymupdf
+
+    p = tmp_path / "twocol.pdf"
+    d = pymupdf.open()
+    page = d.new_page()
+    left = ["LEFT-ONE first column top paragraph. " * 3, "LEFT-TWO first column second paragraph. " * 3]
+    right = ["RIGHT-ONE second column top paragraph. " * 3, "RIGHT-TWO second column second paragraph. " * 3]
+    y = 72
+    for para in left:
+        page.insert_textbox(pymupdf.Rect(60, y, 290, y + 80), para, fontsize=9)
+        y += 90
+    y = 72
+    for para in right:
+        page.insert_textbox(pymupdf.Rect(310, y, 540, y + 80), para, fontsize=9)
+        y += 90
+    d.save(str(p))
+    d.close()
+    text = parse_file(p).pages[0]
+    order = [text.index(k) for k in ("LEFT-ONE", "LEFT-TWO", "RIGHT-ONE", "RIGHT-TWO")]
+    assert order == sorted(order), text

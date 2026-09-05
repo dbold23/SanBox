@@ -107,10 +107,10 @@ class DocumentRow:
         who = None
         if self.authors:
             first = re.split(r"[,;&]| and ", self.authors)[0].strip()
-            # "Salvador J. Jorgensen" -> "Jorgensen"; "Jorgensen S" -> "Jorgensen"
-            parts = [p for p in re.split(r"\s+", first) if p]
+            parts = [p.strip(".") for p in re.split(r"\s+", first) if p.strip(".")]
             if parts:
-                who = max(parts, key=len).strip(".") if len(parts) > 1 else parts[0]
+                # "Jorgensen S" / "Jorgensen SJ" -> Jorgensen; "Salvador J. Jorgensen" -> Jorgensen
+                who = parts[0] if len(parts[-1]) <= 2 else parts[-1]
         if who and self.year:
             return f"{who} {self.year}"
         if who:

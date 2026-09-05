@@ -143,14 +143,11 @@ def test_sync_downloads_then_is_idempotent_then_tracks_changes(drive, tmp_path):
     assert not (cache / "Lab protocol.txt").exists()
 
 
-def test_sync_survives_download_error_and_retries_5xx(drive, tmp_path):
+def test_sync_survives_download_error_and_retries_5xx(drive, tmp_path, monkeypatch):
     client = DriveClient(drive, retries=1)
     cache = tmp_path / "cache"
-    # first request 503 then OK -> retry path (sleep is 1s; acceptable in tests)
-    drive.fail_next = [503]
-    import labrag.drive as d
-
-    d.time.sleep = lambda s: None  # don't actually wait
+    drive.fail_next = [503]  # first request 503 then OK -> retry path
+    monkeypatch.setattr("labrag.drive.time.sleep", lambda s: None)
     r = sync_folder(client, "root", cache)
     assert len(r.added) == 5 and not r.errors
 

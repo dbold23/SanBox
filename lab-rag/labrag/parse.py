@@ -84,7 +84,7 @@ def _parse_pdf(path: Path) -> ParsedDoc:
     year = None
     with pymupdf.open(str(path)) as pdf:
         for page in pdf:
-            pages.append(clean_text(page.get_text("text")))
+            pages.append(_page_text(page))
         meta = pdf.metadata or {}
         title = _clean_meta(meta.get("title"))
         authors = _clean_meta(meta.get("author"))
@@ -98,6 +98,22 @@ def _parse_pdf(path: Path) -> ParsedDoc:
     text = "\n\n".join(p for p in pages if p)
     needs_ocr = len(text) < MIN_TEXT_CHARS and len(pages) > 0
     return ParsedDoc(text=text, pages=pages, title=title, authors=authors, year=year, needs_ocr=needs_ocr)
+
+
+def _page_text(page) -> str:
+    """Page text with real paragraph breaks: one blank line between layout blocks."""
+    try:
+        blocks = page.get_text("blocks")
+    except Exception:  # pragma: no cover - pymupdf internals
+        return clean_text(page.get_text("text"))
+    parts = []
+    # Keep pymupdf's natural block order: it follows the PDF content stream, which is the
+    # reading order for two-column journal layouts. Sorting by position would interleave columns.
+    for b in (b for b in blocks if len(b) > 6 and b[6] == 0):
+        txt = clean_text(b[4])
+        if txt:
+            parts.append(" ".join(txt.split("\n")) if "\n\n" not in txt else txt)
+    return "\n\n".join(parts)
 
 
 def _largest_font_line(page) -> str | None:
@@ -271,6 +287,7 @@ def _fill_metadata_from_filename_and_text(doc: ParsedDoc, path: Path) -> None:
 
 def _guess_year(text: str) -> int | None:
     this_year = date.today().year
+    text = _DOI_RE.sub(" ", text)  # a DOI like 10.1098/rspb.2009.1155 is not a publication year
     years = [int(y) for y in _YEAR_RE.findall(text) if 1900 <= int(y) <= this_year + 1]
     if not years:
         return None

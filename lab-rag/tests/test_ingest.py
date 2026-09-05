@@ -108,3 +108,16 @@ def test_empty_folder_does_not_wipe_index(tmp_path):
     r2 = index_sources(store, emb, [Source("nas", root)])
     assert r2.added == 1 and r2.removed == 1
     store.close()
+
+
+def test_scan_survives_symlink_loop(tmp_path):
+    root = tmp_path / "papers"
+    write(root / "a.txt", "x")
+    sub = root / "sub"
+    sub.mkdir()
+    try:
+        (sub / "loop").symlink_to(root, target_is_directory=True)
+    except (OSError, NotImplementedError):
+        return  # no symlinks here
+    names = sorted(p.name for p in scan_folder(root))
+    assert names == ["a.txt"]

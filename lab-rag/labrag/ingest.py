@@ -55,7 +55,13 @@ class IndexReport:
 def scan_folder(root: Path) -> Iterator[Path]:
     """Yield supported files under root, skipping hidden/system folders and temp files."""
     root = Path(root)
+    visited: set[str] = set()
     for dirpath, dirnames, filenames in os.walk(root, followlinks=True):
+        real = os.path.realpath(dirpath)
+        if real in visited:  # a symlink pointing back up the tree
+            dirnames[:] = []
+            continue
+        visited.add(real)
         dirnames[:] = sorted(d for d in dirnames if not d.startswith(SKIP_DIR_PREFIXES))
         for name in sorted(filenames):
             if name.startswith(SKIP_FILE_PREFIXES) or name.endswith(SKIP_FILE_SUFFIXES):

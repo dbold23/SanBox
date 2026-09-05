@@ -1,4 +1,4 @@
-from labrag.chunk import chunk_pages
+from labrag.chunk import chunk_pages, drop_references
 
 
 def words(n, tag="w"):
@@ -48,3 +48,14 @@ def test_references_are_dropped():
 
 def test_no_words_no_chunks():
     assert chunk_pages(["", "   "]) == []
+
+
+def test_references_detected_at_line_level_across_pages():
+    body = words(400, "b")
+    pages = [body, "Last results.\nReferences\nSmith J (2019) A paper.\nJones K (2020) Another.", "More refs (2021)."]
+    kept = drop_references(pages)
+    assert kept == [body, "Last results."]
+    assert chunk_pages(pages) and not any("Smith J" in c.text for c in chunk_pages(pages))
+    # heading too early (a table of contents) is ignored
+    assert drop_references(["References\n" + body]) == ["References\n" + body]
+    assert drop_references(["", None]) == ["", None]
